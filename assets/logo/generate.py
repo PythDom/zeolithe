@@ -1,83 +1,111 @@
-"""Generate the Zeolite logo: a hexagonal cut gem seen from above.
+"""Generate the Zeolite logo: a rough, raw crystal (like uncut fluorite).
 
-Faceting follows a brilliant cut: a flat table in the middle, star facets
-around it, and upper-girdle facets out to the girdle. Each facet is shaded
-from its tilt direction against a light from the top left.
+An irregular, chipped outline around a hexagonal habit, cut into uneven
+planes that meet at two ridge points, shaded from a top-left light in
+translucent mint-green, with a few faint inner fractures.
 Run: python3 generate.py
 """
 import math
 
-C, R_OUT, R_TABLE = 256, 228, 100
+C = 256
 LIGHT = 225  # degrees, SVG coordinates (y down): top-left
 
-# Teal ramp from deep shadow to highlight.
-RAMP = ["#06302F", "#0A4644", "#0E5E5A", "#0F7A73", "#0D9488", "#14B8A6", "#2DD4BF", "#5EEAD4", "#99F6E4", "#CCFBF1"]
+# Mint/seafoam ramp from shadow to highlight.
+RAMP = ["#165E52", "#1F7466", "#2A8C7B", "#3AA690", "#52BFA5", "#72D3B9", "#96E3CB", "#BAF0DC", "#DDFAEE"]
+
+# Outline: angle (deg), radius. Irregular hexagonal habit with chipped corners.
+OUTLINE = [
+    (-96, 222), (-78, 214), (-38, 206), (-24, 220), (18, 214), (34, 196),
+    (78, 218), (96, 206), (142, 222), (158, 200), (202, 214), (218, 222),
+]
+# Ridge points where the planes meet (offset from the centre like a real stone).
+RIDGES = [(-28, 0.0), (205, 62), (40, 74)]  # (angle, radius) — first is the centre
 
 
-def pt(r, a):
+def pt(a, r):
     a = math.radians(a)
     return (C + r * math.cos(a), C + r * math.sin(a))
 
 
-def shade(cx, cy, tilt):
-    """tilt 0 = flat, 1 = steep. Steeper facets swing further from mid-tone."""
-    ang = math.degrees(math.atan2(cy - C, cx - C))
-    b = 0.55 + 0.45 * tilt * math.cos(math.radians(ang - LIGHT))
-    return RAMP[max(0, min(len(RAMP) - 1, round(b * (len(RAMP) - 1))))]
+outer = [pt(a, r) for a, r in OUTLINE]
+ridges = [pt(a, r) for a, r in RIDGES]
 
 
 def fmt(points):
     return " ".join(f"{x:.1f},{y:.1f}" for x, y in points)
 
 
-angles = [-90 + 60 * i for i in range(6)]  # pointy-top hexagon
-outer = [pt(R_OUT, a) for a in angles]
-table = [pt(R_TABLE, a) for a in angles]
-mids = [pt(R_OUT * math.cos(math.radians(30)), a + 30) for a in angles]  # girdle edge midpoints
+def shade(pts, tilt):
+    cx = sum(p[0] for p in pts) / len(pts)
+    cy = sum(p[1] for p in pts) / len(pts)
+    ang = math.degrees(math.atan2(cy - C, cx - C))
+    b = 0.55 + 0.36 * tilt * math.cos(math.radians(ang - LIGHT))
+    return RAMP[max(0, min(len(RAMP) - 1, round(b * (len(RAMP) - 1))))]
+
+
+def nearest(p):
+    return min(range(len(ridges)), key=lambda i: (ridges[i][0] - p[0]) ** 2 + (ridges[i][1] - p[1]) ** 2)
+
 
 facets = []
-for i in range(6):
-    j = (i + 1) % 6
-    for pts, tilt in (
-        ([table[i], table[j], mids[i]], 0.75),   # star facet
-        ([outer[i], table[i], mids[i]], 1.0),    # upper girdle facets
-        ([mids[i], table[j], outer[j]], 1.0),
-    ):
-        cx = sum(p[0] for p in pts) / 3
-        cy = sum(p[1] for p in pts) / 3
-        facets.append(f'<polygon points="{fmt(pts)}" fill="{shade(cx, cy, tilt)}"/>')
+n = len(outer)
+owner = [nearest(((outer[i][0] + outer[(i + 1) % n][0]) / 2, (outer[i][1] + outer[(i + 1) % n][1]) / 2)) for i in range(n)]
+for i in range(n):
+    a, b = outer[i], outer[(i + 1) % n]
+    r = ridges[owner[i]]
+    tilt = 1.0 if (i % 3) else 0.75  # vary plane steepness for a rougher look
+    facets.append(([a, b, r], tilt))
+    nxt = owner[(i + 1) % n]
+    if nxt != owner[i]:
+        facets.append(([b, ridges[nxt], r], 0.6))
+# Planes between the ridge points.
+facets.append((ridges, 0.35))
 
-glint = pt(R_TABLE * 0.55, LIGHT)
+fractures = [
+    (pt(200, 120), pt(250, 40)),
+    (pt(-60, 150), pt(-20, 90)),
+    (pt(120, 150), pt(80, 120)),
+]
 
 
-def gem(prefix):
+def crystal(prefix):
+    polys = "\n    ".join(
+        f'<polygon points="{fmt(p)}" fill="{shade(p, t)}"/>' for p, t in facets
+    )
+    lines = "\n    ".join(
+        f'<line x1="{a[0]:.1f}" y1="{a[1]:.1f}" x2="{b[0]:.1f}" y2="{b[1]:.1f}"/>' for a, b in fractures
+    )
     return f"""<defs>
-    <linearGradient id="{prefix}-table" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#99F6E4"/>
-      <stop offset="0.55" stop-color="#2DD4BF"/>
-      <stop offset="1" stop-color="#0D9488"/>
+    <clipPath id="{prefix}-clip"><polygon points="{fmt(outer)}"/></clipPath>
+    <linearGradient id="{prefix}-sheen" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.22"/>
+      <stop offset="0.45" stop-color="#FFFFFF" stop-opacity="0"/>
     </linearGradient>
   </defs>
-  <g stroke="#ECFEFF" stroke-opacity="0.35" stroke-width="2.5" stroke-linejoin="round">
-    {chr(10).join('    ' + f for f in facets).strip()}
-    <polygon points="{fmt(table)}" fill="url(#{prefix}-table)"/>
+  <g clip-path="url(#{prefix}-clip)">
+    <g stroke="#F0FFF8" stroke-opacity="0.45" stroke-width="2.2" stroke-linejoin="round">
+    {polys}
+    </g>
+    <g stroke="#FFFFFF" stroke-opacity="0.35" stroke-width="2" stroke-linecap="round">
+    {lines}
+    </g>
+    <polygon points="{fmt(outer)}" fill="url(#{prefix}-sheen)"/>
   </g>
-  <polygon points="{fmt(outer)}" fill="none" stroke="#042F2E" stroke-opacity="0.45" stroke-width="5" stroke-linejoin="round"/>
-  <path d="M{glint[0]:.1f} {glint[1] - 26:.1f} L{glint[0] + 6:.1f} {glint[1] - 6:.1f} L{glint[0] + 26:.1f} {glint[1]:.1f} L{glint[0] + 6:.1f} {glint[1] + 6:.1f} L{glint[0]:.1f} {glint[1] + 26:.1f} L{glint[0] - 6:.1f} {glint[1] + 6:.1f} L{glint[0] - 26:.1f} {glint[1]:.1f} L{glint[0] - 6:.1f} {glint[1] - 6:.1f} Z" fill="#FFFFFF" fill-opacity="0.9"/>"""
+  <polygon points="{fmt(outer)}" fill="none" stroke="#0E4A40" stroke-opacity="0.5" stroke-width="5" stroke-linejoin="round"/>"""
 
 
 icon = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Zeolite">
   <title>Zeolite</title>
-  {gem("zi")}
+  {crystal("zi")}
 </svg>
 """
 
-wordmark = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 360" width="1240" height="360" role="img" aria-label="Zeolite">
+wordmark = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1160 360" width="1160" height="360" role="img" aria-label="Zeolite">
   <title>Zeolite</title>
   <g transform="translate(20 20) scale(0.625)">
-  {gem("zw")}
+  {crystal("zw")}
   </g>
-  <text x="380" y="228" font-family="Inter, 'Segoe UI', Roboto, system-ui, sans-serif" font-size="150" font-weight="650" letter-spacing="-3" fill="#0F6F69">Zeolite</text>
+  <text x="380" y="228" font-family="Inter, 'Segoe UI', Roboto, system-ui, sans-serif" font-size="150" font-weight="650" letter-spacing="-3" fill="#1F7466">Zeolite</text>
 </svg>
 """
 
