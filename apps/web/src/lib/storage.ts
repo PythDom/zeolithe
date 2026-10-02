@@ -73,6 +73,15 @@ export function fsAccessSupported(): boolean {
 export class FsAccessStorage implements VaultStorage {
   constructor(private root: DirHandle) {}
 
+  /** The folder handle (remembered to reopen the vault later). */
+  get handle(): FileSystemDirectoryHandle {
+    return this.root;
+  }
+
+  static fromHandle(handle: FileSystemDirectoryHandle): FsAccessStorage {
+    return new FsAccessStorage(handle as DirHandle);
+  }
+
   static async pick(): Promise<FsAccessStorage> {
     const picker = (window as unknown as { showDirectoryPicker(o: object): Promise<DirHandle> }).showDirectoryPicker;
     return new FsAccessStorage(await picker({ mode: "readwrite" }));

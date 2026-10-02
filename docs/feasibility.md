@@ -48,6 +48,12 @@ platforms.
 | Android shell  | Capacitor                                                      |
 | Sync           | Syncthing (Syncthing-Fork on Android; official app discontinued) |
 
+Portable use on a locked-down PC (no install, no admin rights) is covered
+two ways: the single-file `Zeolite.html` opened in Edge/Chrome (folder access
+through the File System Access API, last vault remembered), available now;
+and later a portable `Zeolite.exe` from the Tauri build (no installer; uses the
+WebView2 runtime that ships with Windows 10/11).
+
 Rejected options:
 
 - Pure PWA: Android browsers can't reliably reach a real folder, so notes

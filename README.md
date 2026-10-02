@@ -16,6 +16,22 @@ is shared between Windows and Android.
 | `assets/logo` | Logo: an icon and a wordmark (SVG). |
 | `docs` | Specification. |
 
+## Portable use (no install, e.g. a work PC)
+
+`npm run build:portable` produces **one file**: `apps/web/dist-portable/Zeolite.html`
+(about 4.6 MB, everything included, works offline).
+
+1. Copy `Zeolite.html` anywhere: your documents, a USB stick, a network share,
+   or next to your vault folder.
+2. Open it with **Edge** or **Chrome** (double-click, or drag it into the browser).
+3. Press 📂 **Open folder** and choose your vault. Next time, press
+   **Reopen "<vault>"** and confirm access once.
+
+Nothing is installed and no admin rights are needed; notes stay plain `.md`
+files in your folder (Syncthing keeps syncing them as usual). Firefox cannot
+open folders. A portable Windows app (`Zeolite.exe`, no installer, using the
+WebView2 runtime built into Windows 10/11) will come with the Tauri shell.
+
 ## Development
 
 ```sh

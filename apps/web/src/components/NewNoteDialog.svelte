@@ -50,17 +50,44 @@
     if (!category && taxonomy.categories[0]) category = taxonomy.categories[0].code;
   });
 
-  // Suggest a template named after the Sub-PARA, the PARA or the note type.
+  // Last template used per note type (per device).
+  const LAST_KEY = "zeolite.lastTemplate";
+  function lastTemplates(): Record<string, string> {
+    try {
+      return JSON.parse(localStorage.getItem(LAST_KEY) ?? "{}");
+    } catch {
+      return {};
+    }
+  }
+  function rememberTemplate(k: Kind, path: string) {
+    try {
+      localStorage.setItem(LAST_KEY, JSON.stringify({ ...lastTemplates(), [k]: path }));
+    } catch {
+      // Not remembered (storage blocked); the suggestion still works.
+    }
+  }
+
+  /**
+   * Proposed template: one named after the Sub-PARA or PARA (PARA notes),
+   * else the last one used for this note type, else one named after the type.
+   */
+  const suggested = $derived.by(() => {
+    const byName = (names: (string | undefined)[]) => {
+      const wanted = names.filter((x): x is string => !!x).map((x) => x.toLowerCase());
+      return templates.find((t) => wanted.includes(templateName(t).toLowerCase()));
+    };
+    const taxonomyMatch = kind === "para" ? byName([findSubPara(taxonomy, para, sub)?.tag, findPara(taxonomy, para)?.tag]) : undefined;
+    const last = lastTemplates()[kind];
+    const typeNames: Record<Kind, string[]> = {
+      para: ["PARA", "PARA note"],
+      journal: ["Journal", "Daily", "Daily note"],
+      inbox: ["Inbox"],
+      free: ["Free", "Free note", "Note", "Default"],
+    };
+    return taxonomyMatch ?? (last && templates.includes(last) ? last : undefined) ?? byName(typeNames[kind]) ?? "";
+  });
   $effect(() => {
-    if (templateTouched) return;
-    const names = [
-      kind === "para" ? findSubPara(taxonomy, para, sub)?.tag : undefined,
-      kind === "para" ? findPara(taxonomy, para)?.tag : undefined,
-      kind === "para" ? "PARA" : kind,
-    ]
-      .filter((x): x is string => !!x)
-      .map((x) => x.toLowerCase());
-    template = templates.find((t) => names.includes(templateName(t).toLowerCase())) ?? "";
+    if (!templateTouched) template = suggested;
   });
 
   const previewId = $derived.by(() => {
@@ -94,6 +121,7 @@
         note = applied;
         cursor = applied.cursor;
       }
+      rememberTemplate(kind, template);
       onCreate(note, cursor);
     } catch (err) {
       error = (err as Error).message;
@@ -108,9 +136,28 @@
     <h2>New note</h2>
     <div class="kinds" role="radiogroup">
       {#each [["para", "PARA note"], ["journal", "Journal"], ["inbox", "Inbox"], ["free", "Free note"]] as [k, label]}
-        <label class:active={kind === k}><input type="radio" bind:group={kind} value={k} />{label}</label>
+        <label class:active={kind === k}><input type="radio" bind:group={kind} value={k} onchange={() => (templateTouched = false)} />{label}</label>
       {/each}
     </div>
+
+    {#if templates.length}
+      <div class="tpl" role="radiogroup" aria-label="Template">
+        <span class="lbl">Template</span>
+        <div class="tpl-list">
+          {#each ["", ...templates] as t}
+            <button
+              type="button"
+              role="radio"
+              aria-checked={template === t}
+              class:active={template === t}
+              onclick={() => ((template = t), (templateTouched = true))}
+            >
+              {t ? templateName(t) : "None"}{#if t && t === suggested}<small>suggested</small>{/if}
+            </button>
+          {/each}
+        </div>
+      </div>
+    {/if}
 
     {#if kind === "para"}
       {#if paras.length === 0}
@@ -146,12 +193,6 @@
       <p class="hint">Opens or creates today's journal note.</p>
     {/if}
 
-    <label>Template
-      <select bind:value={template} onchange={() => (templateTouched = true)}>
-        <option value="">None</option>
-        {#each templates as t}<option value={t}>{templateName(t)}</option>{/each}
-      </select>
-    </label>
 
     {#if error}<p class="warn">{error}</p>{/if}
     <div class="actions">
@@ -223,6 +264,44 @@
   }
   .kinds input {
     display: none;
+  }
+  .tpl {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .lbl {
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .tpl-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .tpl-list button {
+    display: inline-flex;
+    gap: 6px;
+    align-items: baseline;
+    padding: 5px 10px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--bg);
+    color: var(--fg);
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .tpl-list button.active {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+    font-weight: 600;
+  }
+  .tpl-list small {
+    color: var(--muted);
+    font-size: 10.5px;
+    font-weight: 400;
   }
   .id code {
     font-size: 16px;

@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.json",
-    "build:single": "vite build --mode single --outDir dist-single && node scripts/make-artifact.mjs"
+    "build:single": "vite build --mode single --outDir dist-single && node scripts/make-artifact.mjs",
+    "build:portable": "vite build --mode single --outDir dist-portable && node -e \"require('fs').renameSync('dist-portable/index.html','dist-portable/Zeolite.html')\""
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.3",

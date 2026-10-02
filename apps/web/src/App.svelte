@@ -36,6 +36,7 @@
   import { chordDiagram, createRenderer } from "./lib/render";
   import { FsAccessStorage, fsAccessSupported, MemoryStorage } from "./lib/storage";
   import { Vault } from "./lib/vault.svelte";
+  import { loadLastVault, regainAccess, saveLastVault } from "./lib/last-vault";
   import logo from "../../../assets/logo/zeolite-icon.svg";
 
   type Mode = "edit" | "split" | "view";
@@ -53,6 +54,8 @@
   let showTaxonomy = $state(false);
   let showTemplates = $state(false);
   let showExport = $state(false);
+  let lastVault = $state<FileSystemDirectoryHandle | undefined>();
+  if (fsAccessSupported()) loadLastVault().then((h) => (lastVault = h));
   let drawer = $state(false);
   let status = $state("");
   let editor = $state<ReturnType<typeof Editor>>();
@@ -289,9 +292,24 @@
   async function openFolder() {
     try {
       await flush();
-      await loadVault(new Vault(await FsAccessStorage.pick()));
+      const storage = await FsAccessStorage.pick();
+      await loadVault(new Vault(storage));
+      await saveLastVault(storage.handle);
+      lastVault = storage.handle;
     } catch (e) {
       if ((e as Error).name !== "AbortError") fail(e);
+    }
+  }
+
+  /** Reopen the remembered vault folder (one click to confirm access). */
+  async function reopenVault() {
+    if (!lastVault) return;
+    try {
+      if (!(await regainAccess(lastVault))) return fail(new Error("Access to the folder was not granted."));
+      await flush();
+      await loadVault(new Vault(FsAccessStorage.fromHandle(lastVault)));
+    } catch (e) {
+      fail(e);
     }
   }
 
@@ -334,6 +352,9 @@
       <button onclick={() => (showTemplates = true)} title="Templates">📄</button>
       <button onclick={openFolder} disabled={!fsAccessSupported()} title={fsAccessSupported() ? "Open a vault folder" : "Folder access needs Chrome/Edge desktop here; native apps come next"}>📂</button>
     </div>
+    {#if lastVault && vault.name !== lastVault.name}
+      <button class="reopen" onclick={reopenVault} title="Reopen your last vault folder">📂 Reopen “{lastVault.name}”</button>
+    {/if}
     <Sidebar {vault} {current} bind:tab bind:query onOpen={open} onQuery={() => (showQuery = true)} onTaxonomy={() => (showTaxonomy = true)} />
   </aside>
   <button class="scrim" aria-label="Close menu" onclick={() => (drawer = false)}></button>
@@ -486,6 +507,19 @@
     background: var(--accent);
     color: var(--on-accent);
     font-weight: 600;
+  }
+  .reopen {
+    margin: 0 12px 10px;
+    padding: 7px 10px;
+    border: 1px dashed var(--accent);
+    border-radius: 6px;
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
   }
   main {
     position: relative;
