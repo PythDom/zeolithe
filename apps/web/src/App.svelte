@@ -30,6 +30,7 @@
   import TaxonomyManager from "./components/TaxonomyManager.svelte";
   import TemplateManager from "./components/TemplateManager.svelte";
   import ExportDialog from "./components/ExportDialog.svelte";
+  import RenameDialog from "./components/RenameDialog.svelte";
   import Preview from "./components/Preview.svelte";
   import Sidebar from "./components/Sidebar.svelte";
   import Toolbar from "./components/Toolbar.svelte";
@@ -56,6 +57,7 @@
   let showTaxonomy = $state(false);
   let showTemplates = $state(false);
   let showExport = $state(false);
+  let showRename = $state(false);
   let lastVault = $state<FileSystemDirectoryHandle | undefined>();
   if (fsAccessSupported()) loadLastVault().then((h) => (lastVault = h));
   let drawer = $state(false);
@@ -350,6 +352,7 @@
 
 <svelte:window onkeydown={(e) => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "n") { e.preventDefault(); showNew = true; }
+  if (e.key === "F2" && current) { e.preventDefault(); flush().then(() => (showRename = true)); }
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "p" && current) { e.preventDefault(); flush().then(() => (showExport = true)); }
   if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "q") { e.preventDefault(); showQuery = true; }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "e") { e.preventDefault(); mode = mode === "view" ? "edit" : "view"; }
@@ -382,7 +385,11 @@
       <button class="menu" aria-label="Menu" onclick={() => (drawer = !drawer)}>☰</button>
       <div class="crumbs">
         {#if record?.id}<span class="id">{record.id}</span>{/if}
-        <span class="path">{current ?? "No note open"}</span>
+        {#if current}
+          <button class="path" onclick={async () => { await flush(); showRename = true; }} title="Rename or move this note (F2)">{current}</button>
+        {:else}
+          <span class="path">No note open</span>
+        {/if}
       </div>
       {#if collision}<button class="warnbtn" onclick={renumber}>Renumber</button>{/if}
       {#if record?.id && !isArchived(vault.taxonomy, record.path)}
@@ -428,6 +435,21 @@
     {#if status}<button class="status" onclick={() => (status = "")}>{status}</button>{/if}
   </main>
 </div>
+
+{#if showRename && current}
+  <RenameDialog
+    {vault}
+    path={current}
+    {content}
+    onRename={async (to, text) => {
+      const from = current!;
+      await moveCurrent(to, text);
+      showRename = false;
+      status = to === from ? "Heading updated" : `Renamed to ${to}`;
+    }}
+    onClose={() => (showRename = false)}
+  />
+{/if}
 
 {#if showExport && current}
   <ExportDialog
@@ -582,11 +604,22 @@
     white-space: nowrap;
   }
   .crumbs .path {
+    min-width: 0;
+    padding: 2px 6px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: none;
+    font: inherit;
+    cursor: pointer;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     color: var(--muted);
     font-size: 13px;
+  }
+  .crumbs button.path:hover {
+    border-color: var(--border);
+    color: var(--fg);
   }
   .notebar .warnbtn {
     border-color: var(--warn);

@@ -73,6 +73,8 @@ Done:
   with natural-language dates.
 - Attn points: insert, resolve, convert to task.
 - New-note dialog: PARA ID generation, Journal, Inbox and Free notes.
+- Rename or move a note: click its path at the top, or press F2. PARA
+  notes keep their ID; links across the vault are updated.
 - Archiving.
 - ID collision detection and renumbering, with link updates.
 - Sync-conflict listing.
