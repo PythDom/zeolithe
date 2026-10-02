@@ -9,6 +9,7 @@ import {
   parseSheet,
   sheetChords,
   splitFrontmatter,
+  targetSpelling,
   transposeChord,
   transposeSheet,
   type Instrument,
@@ -41,6 +42,8 @@ export interface ChordView {
   /** Selected fingering index for a chord. */
   variant(symbol: string, instrument: Instrument): number;
   diagrams: boolean;
+  /** Autoscroll state of the note (speed 1–10, saved in its properties). */
+  autoscroll?: { on: boolean; speed: number };
 }
 
 const INSTRUMENT_LABEL: Record<Instrument, string> = { guitar: "Guitar", ukulele: "Ukulele", mandolin: "Mandolin" };
@@ -337,7 +340,13 @@ export function createRenderer(ctx: RenderContext) {
     const view = ctx.chords;
     const shift = view?.transpose(block) ?? 0;
     const text = shift ? transposeSheet(source, shift) : source;
-    const chordSpan = (sym: string, inline = false) => `<span class="chord${inline ? " inline" : ""}" data-chord="${esc(sym)}">${esc(sym.replace(/\[[^\]]*\]$/, ""))}</span>`;
+    // A custom shape ([x13333]) is hidden but its width kept, so the following
+    // chords stay above their syllables.
+    const chordSpan = (sym: string, inline = false) => {
+      const shown = sym.replace(/\[[^\]]*\]$/, "");
+      const pad = inline ? "" : " ".repeat(sym.length - shown.length);
+      return `<span class="chord${inline ? " inline" : ""}" data-chord="${esc(sym)}">${esc(shown)}</span>${pad}`;
+    };
     const lines = parseSheet(text).map((l) => {
       if (l.kind === "section") return `<span class="chord-section">${esc(l.text)}</span>`;
       if (!l.chords.length) return esc(l.text);
@@ -354,7 +363,7 @@ export function createRenderer(ctx: RenderContext) {
     });
 
     const first = sheetChords(source)[0];
-    const key = first && shift ? ` <span class="chords-key">${esc(first.replace(/\[[^\]]*\]$/, ""))} → ${esc(transposeChord(first, shift))}</span>` : "";
+    const key = first && shift ? ` <span class="chords-key">${esc(first.replace(/\[[^\]]*\]$/, ""))} → ${esc(transposeChord(first, shift, targetSpelling(source, shift)))}</span>` : "";
     const sign = shift > 0 ? `+${shift}` : String(shift);
     const bar = `<div class="chords-bar">
       <span class="chords-instr">${INSTRUMENT_LABEL[instrument]}</span>
@@ -364,6 +373,12 @@ export function createRenderer(ctx: RenderContext) {
         <button type="button" data-act="up" data-block="${block}" aria-label="Transpose up">+1 ♯</button>
       </span>${key}
       ${shift ? `<button type="button" data-act="reset" data-block="${block}">Reset</button><button type="button" data-act="apply" data-block="${block}" title="Rewrite this block with the transposed chords">Write to note</button>` : ""}
+      <span class="chords-scroll" title="Autoscroll (speed is saved in the note)">
+        <button type="button" data-act="scroll" class="${view?.autoscroll?.on ? "on" : ""}">${view?.autoscroll?.on ? "⏸ Stop" : "▶ Autoscroll"}</button>
+        <button type="button" data-act="slower" aria-label="Slower">−</button>
+        <span class="chords-speed">${view?.autoscroll?.speed ?? 3}</span>
+        <button type="button" data-act="faster" aria-label="Faster">+</button>
+      </span>
       <button type="button" class="chords-toggle" data-act="diagrams">${view?.diagrams === false ? "Show diagrams" : "Hide diagrams"}</button>
     </div>`;
 

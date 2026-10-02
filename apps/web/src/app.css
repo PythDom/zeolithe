@@ -426,6 +426,22 @@ body {
 .markdown .chords-bar button:hover {
   border-color: var(--accent);
 }
+.markdown .chords-scroll {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.markdown .chords-scroll button.on {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.markdown .chords-speed {
+  min-width: 1.4em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
 .markdown .chords-toggle {
   margin-left: auto;
 }

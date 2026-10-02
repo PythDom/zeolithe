@@ -84,7 +84,10 @@ Done:
   blocks (also `chords-ukulele`, `chords-mandolin`), chords over lyrics or
   inline in [brackets], custom shapes like `Bbadd13[x13333]`. Diagrams
   (guitar, ukulele; click for other fingerings, hover a chord), transpose
-  ♭/♯ in the view, then "Write to note". Chords highlighted in the editor.
+  ♭/♯ in the view (sharps or flats follow the new key), then "Write to
+  note". Autoscroll for playing (speed saved in the note as `autoscroll`,
+  screen kept awake). PDF export keeps chords aligned (monospaced font) and
+  adds the diagrams. Chords highlighted in the editor.
 - Templates (Obsidian-compatible variables): pick one in New note
   (auto-suggested by Sub-PARA, PARA or note type), insert one with
   📄 Template, manage them with the 📄 button in the sidebar.

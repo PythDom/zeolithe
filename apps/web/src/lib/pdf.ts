@@ -3,7 +3,21 @@
  * clickable table of contents with page numbers, page numbers in the footer,
  * embedded images and Dataview results. pdfmake is loaded on first use.
  */
-import { displayValue, isLink, splitFrontmatter, type QueryResult, type Value } from "@zeolite/core";
+import {
+  chordDiagramSvg,
+  chordsFenceInstrument,
+  displayValue,
+  isLink,
+  lookupFingerings,
+  parseSheet,
+  sheetChords,
+  splitFrontmatter,
+  transposeSheet,
+  type Instrument,
+  type QueryResult,
+  type Value,
+} from "@zeolite/core";
+import { CHORD_DBS } from "./chord-db";
 import type Token from "markdown-it/lib/token.mjs";
 import { createMarkdown } from "./render";
 
@@ -24,6 +38,12 @@ export interface PdfContext {
   /** Raw bytes of an attachment (by link target), if it exists. */
   readAsset(target: string): Promise<Blob | undefined>;
   runQuery(source: string, thisPath: string): QueryResult;
+  /** Chord sheets as shown on screen (transposition, fingerings, diagrams). */
+  chords?: {
+    transpose(path: string, block: number): number;
+    variant(symbol: string, instrument: Instrument): number;
+    diagrams: boolean;
+  };
 }
 
 export interface PdfOptions {
@@ -56,11 +76,11 @@ const IMAGE = /\.(png|jpe?g|gif|webp|svg|bmp)$/i;
  */
 const GLYPHS: Record<string, string> = {
   "→": "->", "⇒": "=>", "⟶": "->", "➜": "->", "←": "<-", "⇐": "<=", "↔": "<->",
-  "↑": "^", "↓": "v", "✓": "(ok)", "✔": "(ok)", "☑": "[x]", "☐": "[ ]", "✗": "x", "✘": "x", "⚠": "!",
+  "↑": "^", "↓": "v", "♭": "b", "♯": "#", "♮": "", "✓": "(ok)", "✔": "(ok)", "☑": "[x]", "☐": "[ ]", "✗": "x", "✘": "x", "⚠": "!",
 };
 export function pdfText(s: string): string {
   return s
-    .replace(/[→⇒⟶➜←⇐↔↑↓✓✔☑☐✗✘⚠]/g, (c) => GLYPHS[c] ?? "")
+    .replace(/[→⇒⟶➜←⇐↔↑↓♭♯♮✓✔☑☐✗✘⚠]/g, (c) => GLYPHS[c] ?? "")
     .replace(/[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}]\uFE0F?\s?|\uFE0F|\u200D/gu, "");
 }
 const TASK_PREFIX = /^\s*(?:[-*+]|\d+[.)])\s+\[.\]\s?/;
@@ -128,6 +148,7 @@ const thinBox = {
 
 class Builder {
   private md = createMarkdown();
+  private chordBlock = 0;
   hasToc = false;
 
   constructor(
@@ -192,6 +213,8 @@ class Builder {
             out.push({ toc: { title: { text: "CONTENTS", style: "tocTitle" } }, margin: [0, 0, 0, 12] });
           } else if (lang === "dataview" || lang === "query") {
             out.push(this.query(tok.content));
+          } else if (chordsFenceInstrument(tok.info)) {
+            out.push(this.chordSheet(tok.content.replace(/\n$/, ""), chordsFenceInstrument(tok.info)!, this.chordBlock++));
           } else {
             out.push(this.code(tok.content));
           }
@@ -246,6 +269,62 @@ class Builder {
       },
       margin: [0, 2, 0, 8],
     };
+  }
+
+  /**
+   * A chord sheet: diagrams row, then the sheet in a monospaced font so
+   * chords stay above their syllables. A chord line and the lyrics under it
+   * are kept on the same page.
+   */
+  private chordSheet(source: string, instrument: Instrument, block: number): Node {
+    const view = this.ctx.chords;
+    const shift = view?.transpose(this.note.path, block) ?? 0;
+    const text = shift ? transposeSheet(source, shift) : source;
+    const parts: Node[] = [];
+
+    if (view?.diagrams !== false) {
+      const colors = { line: "#8a9896", dot: C.fg, text: C.fg, onDot: "#ffffff" };
+      const cards = sheetChords(text).map((sym) => {
+        const list = lookupFingerings(CHORD_DBS[instrument], sym, instrument);
+        const f = list.length ? list[(view?.variant(sym, instrument) ?? 0) % list.length]! : null;
+        return { svg: chordDiagramSvg(sym.replace(/\[[^\]]*\]$/, ""), f, instrument, colors, 60), width: 60 };
+      });
+      for (let i = 0; i < cards.length; i += 8) {
+        parts.push({ columns: cards.slice(i, i + 8), columnGap: 4, margin: [0, 0, 0, 4] });
+      }
+    }
+
+    const lines = parseSheet(text);
+    const lineNode = (l: (typeof lines)[number]): Node => {
+      if (l.kind === "empty") return { text: " ", style: "sheet" };
+      if (l.kind === "section") return { text: pdfText(l.text), style: "sheet", bold: true, color: C.muted, margin: [0, 4, 0, 0] };
+      // Custom shapes ([x13333]) become spaces so later chords keep their columns.
+      if (l.kind === "chords") return { text: pdfText(l.text.replace(/(\S)(\[[^\]]*\])/g, (_m, c: string, shape: string) => c + " ".repeat(shape.length))), style: "sheet", bold: true, color: C.accent };
+      if (!l.chords.length) return { text: pdfText(l.text), style: "sheet" };
+      const runs: Run[] = [];
+      let col = 0;
+      for (const c of l.chords) {
+        runs.push({ text: pdfText(l.text.slice(col, c.start - 1)) });
+        runs.push({ text: c.symbol.replace(/\[[^\]]*\]$/, ""), bold: true, color: C.accent, background: C.soft });
+        col = c.end + 1;
+      }
+      runs.push({ text: pdfText(l.text.slice(col)) });
+      return { text: runs, style: "sheet" };
+    };
+    const sheet: Node[] = [];
+    for (let i = 0; i < lines.length; i++) {
+      const l = lines[i]!;
+      const next = lines[i + 1];
+      if (l.kind === "chords" && next?.kind === "lyrics") {
+        sheet.push({ stack: [lineNode(l), lineNode(next)], unbreakable: true });
+        i++;
+      } else {
+        sheet.push(lineNode(l));
+      }
+    }
+    if (shift) parts.unshift({ text: `TRANSPOSED ${shift > 0 ? "+" : ""}${shift}`, style: "label" });
+    parts.push({ stack: sheet, margin: [0, 2, 0, 0] });
+    return { stack: parts, margin: [0, 2, 0, 12] };
   }
 
   private code(text: string): Node {
@@ -504,8 +583,15 @@ let pdfMakePromise: Promise<PdfMake> | null = null;
 /** pdfmake and its fonts (~2 MB) are only loaded when exporting. */
 function loadPdfMake(): Promise<PdfMake> {
   pdfMakePromise ??= (async () => {
-    const [{ default: pdfMake }, { default: vfs }] = await Promise.all([import("pdfmake/build/pdfmake"), import("pdfmake/build/vfs_fonts")]);
-    (pdfMake as { addVirtualFileSystem(v: unknown): void }).addVirtualFileSystem(vfs);
+    const [{ default: pdfMake }, { default: vfs }, mono] = await Promise.all([
+      import("pdfmake/build/pdfmake"),
+      import("pdfmake/build/vfs_fonts"),
+      import("./pdf-fonts"),
+    ]);
+    const pm = pdfMake as { addVirtualFileSystem(v: unknown): void; addFonts(f: unknown): void };
+    pm.addVirtualFileSystem(vfs);
+    pm.addVirtualFileSystem(mono.monoVfs);
+    pm.addFonts(mono.monoFonts);
     return pdfMake as PdfMake;
   })();
   return pdfMakePromise;
@@ -557,7 +643,8 @@ export async function exportPdf(notes: PdfNote[], ctx: PdfContext, opts: PdfOpti
       h5: { fontSize: 10.5, bold: true, margin: [0, 6, 0, 2] },
       h6: { fontSize: 10.5, bold: true, italics: true, margin: [0, 6, 0, 2] },
       p: { margin: [0, 0, 0, 7] },
-      code: { fontSize: 9, lineHeight: 1.2 },
+      code: { font: "RobotoMono", fontSize: 8.5, lineHeight: 1.25 },
+      sheet: { font: "RobotoMono", fontSize: 9.5, lineHeight: 1.2, preserveLeadingSpaces: true },
       table: { fontSize: 9.5 },
       label: { fontSize: 7.5, bold: true, color: C.muted, characterSpacing: 0.6, margin: [0, 0, 0, 3] },
       tocTitle: { fontSize: 8, bold: true, color: C.muted, characterSpacing: 0.8, margin: [0, 0, 0, 4] },

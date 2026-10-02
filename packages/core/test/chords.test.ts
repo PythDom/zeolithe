@@ -63,13 +63,15 @@ describe("transpose", () => {
   });
   it("prefers the spelling already used in the sheet", () => {
     expect(sheetSpelling("Bb  Eb  F")).toBe("flats");
-    expect(transposeSheet("Bb  Eb  F", 1)).toBe("B   E   Gb");
+    expect(transposeSheet("Bb  Eb  F", 1)).toBe("B   E   F#"); // key of B uses sharps
+    expect(transposeSheet("G  G7  C  D  Em", 1)).toBe("Ab Ab7 Db Eb Fm"); // key of Ab: Db, not C#
+    expect(transposeSheet("Am  Dm  E", 1)).toBe("Bbm Ebm F"); // Bbm = relative of Db major
     expect(sheetSpelling("A  C#m  F#")).toBe("sharps");
   });
   it("keeps chords above the same columns", () => {
     const src = "Am        F         C    G\nHello darkness, my old friend";
     const out = transposeSheet(src, 1);
-    expect(out).toBe("Bbm       F#        C#   Ab\nHello darkness, my old friend");
+    expect(out).toBe("Bbm       Gb        Db   Ab\nHello darkness, my old friend");
     const cols = (l: string) => [...l.matchAll(/\S+/g)].map((m) => m.index);
     expect(cols(out.split("\n")[0]!)).toEqual(cols(src.split("\n")[0]!));
     // Growing chords eat spaces but keep at least one.

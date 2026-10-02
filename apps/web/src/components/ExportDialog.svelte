@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { NoteRecord } from "@zeolite/core";
+  import type { Instrument, NoteRecord } from "@zeolite/core";
   import { exportPdf, type PdfNote, type PdfOptions } from "../lib/pdf";
   import type { Vault } from "../lib/vault.svelte";
 
@@ -7,10 +7,12 @@
     vault: Vault;
     /** The open note (with unsaved edits already flushed). */
     current: string;
+    /** Chord sheets as shown on screen, so the PDF matches. */
+    chords?: { transpose(path: string, block: number): number; variant(symbol: string, instrument: Instrument): number; diagrams: boolean };
     onSaved: (path: string) => void;
     onClose: () => void;
   }
-  let { vault, current, onSaved, onClose }: Props = $props();
+  let { vault, current, chords, onSaved, onClose }: Props = $props();
 
   const record = $derived(vault.records.get(current));
   const folder = $derived(record?.folder ?? "");
@@ -49,6 +51,7 @@
       const blob = await exportPdf(notes.map(toPdfNote), {
         readAsset: (t) => vault.readAsset(t),
         runQuery: (src, path) => vault.runQuery(src, path),
+        chords,
       }, $state.snapshot(opts));
       result = { blob, url: URL.createObjectURL(blob), name: fileName };
     } catch (e) {
@@ -94,7 +97,7 @@
           <label class="check"><input type="checkbox" bind:checked={opts.toc} onchange={() => (result = null)} /> Table of contents (when the note has none)</label>
         </div>
       </fieldset>
-      <p class="hint">Text stays selectable; the table of contents links to its pages; Dataview blocks show their current results.</p>
+      <p class="hint">Text stays selectable; the table of contents links to its pages; Dataview blocks show their current results; chord sheets keep their chords aligned, with diagrams and the transposition shown on screen.</p>
       {#if error}<p class="error">{error}</p>{/if}
       {#if result}
         <p class="ok">✓ {result.name} · {size(result.blob)}</p>

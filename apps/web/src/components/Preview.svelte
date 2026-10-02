@@ -8,8 +8,45 @@
     onChordAction?: (action: string, block: number, chord: string, instrument: string) => void;
     /** Diagram HTML for the hover popup over a chord. */
     chordTip?: (chord: string, instrument: string) => string;
+    /** Autoscroll speed (1–10) while playing, null when stopped. */
+    autoscroll?: number | null;
+    /** Called when autoscroll reaches the end of the note. */
+    onAutoscrollEnd?: () => void;
   }
-  let { html, onOpenLink, onToggleTask, onTag, onChordAction, chordTip }: Props = $props();
+  let { html, onOpenLink, onToggleTask, onTag, onChordAction, chordTip, autoscroll = null, onAutoscrollEnd }: Props = $props();
+
+  let pane: HTMLDivElement;
+
+  // Autoscroll: smooth scrolling at a steady speed, screen kept awake.
+  $effect(() => {
+    const speed = autoscroll;
+    if (!speed || !pane) return;
+    const pxPerSecond = 6 + speed * 8;
+    let last = performance.now();
+    let carry = 0;
+    let frame = 0;
+    let lock: { release(): Promise<void> } | undefined;
+    (navigator as Navigator & { wakeLock?: { request(t: string): Promise<{ release(): Promise<void> }> } }).wakeLock
+      ?.request("screen")
+      .then((l) => (lock = l))
+      .catch(() => {});
+    const step = (now: number) => {
+      carry += ((now - last) / 1000) * pxPerSecond;
+      last = now;
+      const whole = Math.floor(carry);
+      if (whole > 0) {
+        pane.scrollTop += whole;
+        carry -= whole;
+      }
+      if (pane.scrollTop + pane.clientHeight >= pane.scrollHeight - 1) return onAutoscrollEnd?.();
+      frame = requestAnimationFrame(step);
+    };
+    frame = requestAnimationFrame(step);
+    return () => {
+      cancelAnimationFrame(frame);
+      lock?.release().catch(() => {});
+    };
+  });
 
   let tip = $state<{ html: string; x: number; y: number } | null>(null);
 
@@ -53,7 +90,7 @@
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-<div class="preview" onclick={click} onmouseover={over} onmouseleave={() => (tip = null)} onfocusin={() => (tip = null)}>
+<div class="preview" bind:this={pane} onclick={click} onmouseover={over} onmouseleave={() => (tip = null)} onfocusin={() => (tip = null)}>
   <article class="markdown">{@html html}</article>
 </div>
 {#if tip}

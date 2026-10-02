@@ -149,6 +149,23 @@ export function sheetSpelling(text: string): Spelling {
   return sharps > flats ? "sharps" : flats > sharps ? "flats" : "common";
 }
 
+/**
+ * Spelling for a sheet transposed by `semitones`, from the key it lands in:
+ * the first chord is taken as the key (a minor chord counts as its relative
+ * major). Flat keys use flats, sharp keys sharps; C and F#/Gb follow the
+ * sheet's own preference.
+ */
+export function targetSpelling(text: string, semitones: number): Spelling {
+  const first = sheetChords(text)[0];
+  const p = first ? parseChord(first) : null;
+  if (!p) return sheetSpelling(text);
+  const minor = /^(m(?!aj)|min|mi|-)/.test(p.quality);
+  const key = (((noteIndex(p.root) + semitones + (minor ? 3 : 0)) % 12) + 12) % 12;
+  if ([5, 10, 3, 8, 1].includes(key)) return "flats"; // F Bb Eb Ab Db
+  if ([7, 2, 9, 4, 11].includes(key)) return "sharps"; // G D A E B
+  return sheetSpelling(text);
+}
+
 export function transposeChord(symbol: string, semitones: number, spelling: Spelling = "common"): string {
   const p = parseChord(symbol);
   if (!p) return symbol;
@@ -175,7 +192,7 @@ function shrinkSpaces(gap: string, n: number): string {
  * chords stay above the same syllables: longer symbols eat following spaces,
  * shorter ones are padded.
  */
-export function transposeSheet(text: string, semitones: number, spelling: Spelling = sheetSpelling(text)): string {
+export function transposeSheet(text: string, semitones: number, spelling: Spelling = targetSpelling(text, semitones)): string {
   const rawLines = text.split("\n");
   return parseSheet(text)
     .map((line, i) => {

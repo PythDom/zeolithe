@@ -18,6 +18,8 @@
     createFreeNote,
     createJournalNote,
     transposeChordBlock,
+    splitFrontmatter,
+    withFrontmatter,
     type Instrument,
     type NewNote,
   } from "@zeolite/core";
@@ -63,6 +65,12 @@
   let transposed = $state<Record<string, number>>({});
   let fingerings = $state<Record<string, number>>({});
   let showDiagrams = $state(true);
+  let scrolling = $state(false);
+  /** Autoscroll speed of the open note: its `autoscroll` property, else 3. */
+  const scrollSpeed = $derived.by(() => {
+    const v = Number(record?.frontmatter.autoscroll);
+    return Number.isFinite(v) && v >= 1 ? Math.min(10, Math.round(v)) : 3;
+  });
 
   const render = $derived(
     createRenderer({
@@ -74,6 +82,9 @@
         variant: (sym, instrument) => fingerings[`${instrument}:${sym}`] ?? 0,
         get diagrams() {
           return showDiagrams;
+        },
+        get autoscroll() {
+          return { on: scrolling, speed: scrollSpeed };
         },
       },
     }),
@@ -108,6 +119,7 @@
 
   async function open(path: string, line?: number) {
     await flush();
+    scrolling = false;
     current = path;
     content = vault.read(path);
     editor?.setContent(content);
@@ -214,6 +226,12 @@
     if (action === "reset") transposed[key] = 0;
     if (action === "variant") fingerings[`${instrument}:${chord}`] = (fingerings[`${instrument}:${chord}`] ?? 0) + 1;
     if (action === "diagrams") showDiagrams = !showDiagrams;
+    if (action === "scroll") scrolling = !scrolling;
+    if (action === "slower" || action === "faster") {
+      // Saved in the note, like the Chord Sheets plugin, so each song keeps its speed.
+      const speed = Math.max(1, Math.min(10, scrollSpeed + (action === "faster" ? 1 : -1)));
+      if (speed !== scrollSpeed) await replaceContent(withFrontmatter(content, { ...splitFrontmatter(content).data, autoscroll: speed }));
+    }
     if (action === "apply" && shift) {
       transposed[key] = 0;
       await replaceContent(transposeChordBlock(content, block, shift));
@@ -397,7 +415,7 @@
         {/if}
         {#if mode !== "edit"}
           <section class="pane">
-            <Preview {html} onOpenLink={openLink} onToggleTask={toggleTask} {onTag} onChordAction={chordAction} {chordTip} />
+            <Preview {html} onOpenLink={openLink} onToggleTask={toggleTask} {onTag} onChordAction={chordAction} {chordTip} autoscroll={scrolling ? scrollSpeed : null} onAutoscrollEnd={() => (scrolling = false)} />
           </section>
         {/if}
       </div>
@@ -412,7 +430,15 @@
 </div>
 
 {#if showExport && current}
-  <ExportDialog {vault} {current} onSaved={(p) => ((showExport = false), (status = `Saved ${p}`))} onClose={() => (showExport = false)} />
+  <ExportDialog
+    {vault}
+    {current}
+    chords={{
+      transpose: (path, block) => transposed[`${path}#${block}`] ?? 0,
+      variant: (sym, instrument) => fingerings[`${instrument}:${sym}`] ?? 0,
+      diagrams: showDiagrams,
+    }}
+    onSaved={(p) => ((showExport = false), (status = `Saved ${p}`))} onClose={() => (showExport = false)} />
 {/if}
 
 {#if showTemplates}
