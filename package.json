@@ -10,6 +10,10 @@
     "dev": "npm run dev -w @zeolite/web",
     "build": "npm run build -w @zeolite/web",
     "test": "npm test -w @zeolite/core",
-    "check": "npm run check --workspaces --if-present"
+    "check": "npm run check --workspaces --if-present",
+    "taxonomy": "tsx scripts/taxonomy.ts"
+  },
+  "devDependencies": {
+    "tsx": "^4.23.15"
   }
 }

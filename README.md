@@ -24,7 +24,21 @@ npm test          # core unit tests
 npm run check     # type checks
 npm run dev       # UI on http://localhost:5173 (demo vault in memory)
 npm run build
+npm run taxonomy -- list --vault "path/to/vault"   # manage the taxonomy (see below)
 ```
+
+### Taxonomy from the command line
+
+```sh
+npm run taxonomy -- add category Aviation            # next free code
+npm run taxonomy -- add sub 01 Drones --code 08      # Sub-PARA under PARA 01
+npm run taxonomy -- add para Ideas --folder "05 Ideas"
+npm run taxonomy -- rename category 06 Programmes --notes   # --notes: also in every note
+npm run taxonomy -- remove sub 01 07                 # refused while IDs use it
+```
+
+Add `--vault "path/to/vault"` to each command, or run it from inside the
+vault folder. In the app, use Tags → ⚙ Manage taxonomy.
 
 In the browser the app starts with an in-memory demo vault. **📂 Open folder**
 works on a real vault in Chrome or Edge desktop, through the File System
