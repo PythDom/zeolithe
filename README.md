@@ -20,9 +20,9 @@ is shared between Windows and Android.
 
 ## Windows and Android apps
 
-GitHub builds both apps on every push (workflow **Build apps**). Open the
-latest run under the repository's **Actions** tab and download them from
-**Artifacts**:
+GitHub builds both apps on request: **Actions → Build apps → Run workflow**
+(pushes only run the checks and the portable HTML). When the run is finished,
+download the files from its **Artifacts** section:
 
 | Artifact | What it is |
 | -------- | ---------- |
@@ -105,6 +105,13 @@ Done:
 - New-note dialog: PARA ID generation, Journal, Inbox and Free notes.
 - Rename or move a note: click its path at the top, or press F2. PARA
   notes keep their ID; links across the vault are updated.
+- Close the open note (✕ in the top bar).
+- Move a note to another folder by dragging it onto the folder in the Files
+  list (or onto "vault root" below the list); links are updated.
+- Delete a folder (🗑 next to its name): it moves to `.trash` with
+  everything in it; the notes linking into it are listed first.
+- Demo vault clearly marked as not saved; opening an empty folder offers to
+  set it up (taxonomy, templates, a first note).
 - Delete a note (🗑 in the top bar): it moves to the vault's `.trash`
   folder, like Obsidian; links to it are listed first.
 - Opening an Obsidian vault: nothing to convert. Zeolite follows the vault's

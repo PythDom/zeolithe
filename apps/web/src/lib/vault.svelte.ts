@@ -193,6 +193,41 @@ export class Vault {
     return target;
   }
 
+  /** Files inside a folder (any depth). */
+  filesIn(folder: string): string[] {
+    return this.files.filter((f) => f.startsWith(`${folder}/`));
+  }
+
+  /**
+   * Move a whole folder to .trash (like Obsidian), keeping its structure:
+   * `Projects/a.md` → `.trash/Projects/a.md`. Returns the trash folder.
+   */
+  async trashFolder(folder: string): Promise<string> {
+    const files = this.filesIn(folder);
+    const name = folder.split("/").pop()!;
+    const all = new Set(await this.storage.list());
+    let target = `.trash/${name}`;
+    for (let i = 1; [...all].some((f) => f.startsWith(`${target}/`)); i++) target = `.trash/${name} ${i}`;
+    for (const f of files) await this.storage.rename(f, `${target}/${f.slice(folder.length + 1)}`);
+    // The emptied folder itself (may hold hidden or ignored files we do not track).
+    await this.storage.removeDir?.(folder).catch(() => {});
+    const gone = new Set(files);
+    for (const f of files) this.contents.delete(f);
+    this.files = this.files.filter((f) => !gone.has(f));
+    const next = new Map(this.records);
+    for (const f of files) next.delete(f);
+    this.records = next;
+    if (files.includes(TAXONOMY_PATH)) this.refreshTaxonomy();
+    return target;
+  }
+
+  /** Notes outside a folder that link to notes inside it. */
+  linksIntoFolder(folder: string): NoteRecord[] {
+    const inside = this.notes.filter((r) => r.path.startsWith(`${folder}/`)).map((r) => r.path);
+    const set = new Set(this.notes.filter((r) => !r.path.startsWith(`${folder}/`)).flatMap((r) => (inside.some((p) => this.backlinks(p).includes(r)) ? [r] : [])));
+    return [...set];
+  }
+
   /** Notes that link to (or embed) a note. */
   backlinks(path: string): NoteRecord[] {
     const name = linkNameOf(path);

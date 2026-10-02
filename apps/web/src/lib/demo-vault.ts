@@ -213,3 +213,27 @@ created: ${created}
 `,
   };
 }
+
+/** Files written into an empty folder set up as a new vault: taxonomy, starter templates, a first note. */
+export function starterVault(now = new Date()): Record<string, string> {
+  const demo = demoVault(now);
+  const out: Record<string, string> = {};
+  for (const [path, content] of Object.entries(demo)) {
+    if (typeof content === "string" && (path === TAXONOMY_PATH || path.startsWith("_system/Templates/"))) out[path] = content;
+  }
+  out["Start here.md"] = `---
+created: ${toIsoMinute(now)}
+---
+# Start here
+
+This vault is a folder of plain Markdown files: Zeolite, Obsidian or any text
+editor can open it, and Syncthing can keep it in sync.
+
+- **＋ New note** creates numbered PARA notes (\`XX.YY.ZZ.NNN\`), journal, inbox or free notes.
+- Your codes are in \`_system/Taxonomy.md\` (Tags → ⚙ Manage taxonomy).
+- Templates are in \`_system/Templates/\` (📄 in the sidebar).
+
+- [ ] Create my first note
+`;
+  return out;
+}

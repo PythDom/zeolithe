@@ -106,6 +106,11 @@ export class TauriStorage implements VaultStorage {
     await remove(this.abs(path));
   }
 
+  async removeDir(path: string) {
+    const { remove } = await import("@tauri-apps/plugin-fs");
+    await remove(this.abs(path), { recursive: true });
+  }
+
   /** Ask for the vault folder. The choice is kept in the app's file access scope across restarts. */
   static async pick(): Promise<TauriStorage | null> {
     const { open } = await import("@tauri-apps/plugin-dialog");
@@ -270,6 +275,11 @@ export class CapacitorStorage implements VaultStorage {
   async remove(path: string) {
     const { Filesystem } = await import("@capacitor/filesystem");
     await Filesystem.deleteFile({ path: this.abs(path) });
+  }
+
+  async removeDir(path: string) {
+    const { Filesystem } = await import("@capacitor/filesystem");
+    await Filesystem.rmdir({ path: this.abs(path), recursive: true });
   }
 
   static async reopen(path: string): Promise<CapacitorStorage | null> {

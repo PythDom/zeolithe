@@ -37,7 +37,7 @@
   import Preview from "./components/Preview.svelte";
   import Sidebar from "./components/Sidebar.svelte";
   import Toolbar from "./components/Toolbar.svelte";
-  import { demoVault } from "./lib/demo-vault";
+  import { demoVault, starterVault } from "./lib/demo-vault";
   import { insertBlock } from "./lib/editor-commands";
   import { chordDiagram, createRenderer } from "./lib/render";
   import { folderAccessProblem, FsAccessStorage, fsAccessSupported, memoryCopyFromFiles, MemoryStorage } from "./lib/storage";
@@ -51,6 +51,7 @@
   const narrow = () => window.matchMedia("(max-width: 800px)").matches;
 
   const demo = new Vault(new MemoryStorage("Demo vault", demoVault()));
+  let offerSetup = $state(false);
   let vault = $state<Vault>(demo);
   let current = $state<string | null>(null);
   let content = $state("");
@@ -68,6 +69,7 @@
   let folderInput = $state<HTMLInputElement>();
   let showDelete = $state(false);
   let showChangeId = $state(false);
+  let deleteFolder = $state<string | null>(null);
   let lastVault = $state<FileSystemDirectoryHandle | undefined>();
   let androidPicker = $state(false);
   const shell = platform();
@@ -125,6 +127,8 @@
   async function loadVault(v: Vault) {
     await v.load();
     vault = v;
+    // An empty real folder: offer to set it up as a new vault.
+    offerSetup = v !== demo && !readOnlyCopy && !v.files.some((f) => f.toLowerCase().endsWith(".md"));
     current = null;
     content = "";
     const start = ["Welcome.md"].find((p) => v.exists(p)) ?? v.notes[0]?.path;
@@ -326,11 +330,67 @@
   }
 
 
+  /** Close the open note (unsaved edits are saved first). */
+  async function closeNote() {
+    await flush();
+    current = null;
+    content = "";
+    scrolling = false;
+  }
+
+  /** Drag & drop: move a note into another folder ("" = vault root); links are updated. */
+  async function moveNote(path: string, folder: string) {
+    const name = path.split("/").pop()!;
+    const to = folder ? `${folder}/${name}` : name;
+    if (to === path) return;
+    if (vault.exists(to)) return fail(new Error(`A note named “${name}” already exists in ${folder || "the vault root"}.`));
+    try {
+      if (path === current) await moveCurrent(to, content);
+      else {
+        await flush();
+        await vault.move(path, to);
+      }
+      status = `Moved to ${folder || "the vault root"}`;
+    } catch (e) {
+      fail(e);
+    }
+  }
+
+  /** Move a folder and everything in it to .trash. */
+  async function trashFolder(folder: string) {
+    await flush();
+    const closeIt = !!current && current.startsWith(`${folder}/`);
+    if (closeIt) clearTimeout(saveTimer);
+    try {
+      const to = await vault.trashFolder(folder);
+      if (closeIt) {
+        current = null;
+        content = "";
+      }
+      status = `Moved “${folder}” to ${to}`;
+    } catch (e) {
+      fail(e);
+    }
+    deleteFolder = null;
+  }
+
+  /** Write the starter files (taxonomy, templates, first note) into an empty vault. */
+  async function setUpVault() {
+    offerSetup = false;
+    try {
+      for (const [path, content] of Object.entries(starterVault())) await vault.save(path, content);
+      await open("Start here.md");
+      status = "Vault set up: taxonomy, templates and a first note";
+    } catch (e) {
+      fail(e);
+    }
+  }
+
   /** Native shells: open a vault folder by path and remember it. */
   async function openNative(storage: TauriStorage | CapacitorStorage) {
     await flush();
-    await loadVault(new Vault(storage));
     readOnlyCopy = false;
+    await loadVault(new Vault(storage));
     rememberVaultPath(storage.root);
   }
 
@@ -350,8 +410,8 @@
     try {
       await flush();
       const storage = await FsAccessStorage.pick();
-      await loadVault(new Vault(storage));
       readOnlyCopy = false;
+      await loadVault(new Vault(storage));
       await saveLastVault(storage.handle);
       lastVault = storage.handle;
     } catch (e) {
@@ -367,8 +427,8 @@
     folderHelp = null;
     try {
       await flush();
-      await loadVault(new Vault(await memoryCopyFromFiles(files)));
       readOnlyCopy = true;
+      await loadVault(new Vault(await memoryCopyFromFiles(files)));
     } catch (err) {
       fail(err);
     }
@@ -445,11 +505,27 @@
     {#if lastVault && vault.name !== lastVault.name}
       <button class="reopen" onclick={reopenVault} title="Reopen your last vault folder">📂 Reopen “{lastVault.name}”</button>
     {/if}
-    <Sidebar {vault} {current} bind:tab bind:query onOpen={open} onQuery={() => (showQuery = true)} onTaxonomy={() => (showTaxonomy = true)} />
+    <Sidebar
+      {vault}
+      {current}
+      bind:tab
+      bind:query
+      onOpen={open}
+      onQuery={() => (showQuery = true)}
+      onTaxonomy={() => (showTaxonomy = true)}
+      onMoveNote={moveNote}
+      onDeleteFolder={(f) => (deleteFolder = f)}
+    />
   </aside>
   <button class="scrim" aria-label="Close menu" onclick={() => (drawer = false)}></button>
 
   <main>
+    {#if vault === demo}
+      <div class="demo" role="status">
+        Demo vault: nothing here is saved.
+        <button onclick={openFolder}>📂 Open or create your vault</button>
+      </div>
+    {/if}
     {#if readOnlyCopy}
       <div class="readonly" role="status">Read-only copy of “{vault.name.replace(" (read-only copy)", "")}”: changes stay in this window and are not saved to your files.</div>
     {/if}
@@ -473,6 +549,7 @@
       {/if}
       {#if current}<button class="pdf" onclick={async () => { await flush(); showExport = true; }} title="Export to PDF (Ctrl+P)">PDF</button>{/if}
       {#if current}<button class="trash" onclick={async () => { await flush(); showDelete = true; }} title="Delete note (moves it to .trash)" aria-label="Delete note">🗑</button>{/if}
+      {#if current}<button class="close" onclick={closeNote} title="Close this note" aria-label="Close note">✕</button>{/if}
       <div class="modes" role="radiogroup" aria-label="Mode">
         <button class:active={mode === "edit"} onclick={() => (mode = "edit")}>Edit</button>
         <button class="split" class:active={mode === "split"} onclick={() => (mode = "split")}>Split</button>
@@ -514,6 +591,44 @@
 </div>
 
 <input bind:this={folderInput} type="file" webkitdirectory multiple hidden onchange={openReadOnlyCopy} />
+
+{#if deleteFolder}
+  {@const inside = vault.filesIn(deleteFolder)}
+  {@const notes = inside.filter((f) => f.toLowerCase().endsWith(".md")).length}
+  {@const linked = vault.linksIntoFolder(deleteFolder)}
+  <div class="backdrop" role="presentation" onclick={(e) => e.target === e.currentTarget && (deleteFolder = null)}>
+    <div class="help" role="alertdialog" aria-labelledby="df-title">
+      <h2 id="df-title">Delete the folder “{deleteFolder}”?</h2>
+      <p>
+        It holds {notes} note{notes === 1 ? "" : "s"}{inside.length > notes ? ` and ${inside.length - notes} other file${inside.length - notes === 1 ? "" : "s"}` : ""}
+        (sub-folders included). Everything moves to the vault's <code>.trash</code> folder, like in Obsidian, and can be recovered from there with your file explorer.
+      </p>
+      {#if linked.length}
+        <p class="warn">{linked.length} note{linked.length > 1 ? "s" : ""} outside the folder link{linked.length > 1 ? "" : "s"} into it: {linked.slice(0, 5).map((r) => r.name).join(", ")}{linked.length > 5 ? "…" : ""}</p>
+      {/if}
+      {#if deleteFolder.startsWith("_system")}
+        <p class="warn">This folder holds Zeolite's settings (taxonomy, templates).</p>
+      {/if}
+      <div class="help-actions">
+        <button onclick={() => (deleteFolder = null)}>Cancel</button>
+        <button class="danger" onclick={() => trashFolder(deleteFolder!)}>Move folder to trash</button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+{#if offerSetup}
+  <div class="backdrop" role="presentation">
+    <div class="help" role="alertdialog" aria-labelledby="setup-title">
+      <h2 id="setup-title">“{vault.name}” is empty</h2>
+      <p>Set it up as a new Zeolite vault? This adds your taxonomy (<code>_system/Taxonomy.md</code>), three starter templates and a “Start here” note. Everything stays plain Markdown files.</p>
+      <div class="help-actions">
+        <button onclick={() => (offerSetup = false)}>Keep it empty</button>
+        <button class="primary" onclick={setUpVault}>Set up the vault</button>
+      </div>
+    </div>
+  </div>
+{/if}
 
 {#if androidPicker}
   <AndroidFolderDialog
@@ -841,6 +956,26 @@
   .scrim {
     display: none;
   }
+  .demo {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    padding: 6px 12px;
+    background: var(--accent-soft);
+    color: var(--fg);
+    font-size: 13px;
+  }
+  .demo button {
+    padding: 3px 10px;
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    background: var(--accent);
+    color: var(--on-accent);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
   .readonly {
     padding: 6px 12px;
     background: var(--warn-soft);
@@ -893,6 +1028,16 @@
     color: var(--fg);
     font: inherit;
     cursor: pointer;
+  }
+  .help .warn {
+    padding: 8px 10px;
+    border-radius: 6px;
+    background: var(--warn-soft);
+  }
+  .help-actions .danger {
+    border-color: var(--danger);
+    background: var(--danger);
+    color: #fff;
   }
   .help-actions .primary {
     border-color: var(--accent);

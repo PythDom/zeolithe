@@ -16,6 +16,8 @@ export interface VaultStorage {
   writeBinary(path: string, data: Blob): Promise<void>;
   rename(from: string, to: string): Promise<void>;
   remove(path: string): Promise<void>;
+  /** Remove a folder that has been emptied (optional; left in place otherwise). */
+  removeDir?(path: string): Promise<void>;
 }
 
 /** Folders never read or written by the app. */
@@ -182,5 +184,10 @@ export class FsAccessStorage implements VaultStorage {
   async remove(path: string) {
     const [dir, name] = await this.dirOf(path, false);
     await dir.removeEntry(name);
+  }
+
+  async removeDir(path: string) {
+    const [dir, name] = await this.dirOf(path, false);
+    await dir.removeEntry(name, { recursive: true });
   }
 }

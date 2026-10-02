@@ -10,8 +10,41 @@
     onOpen: (path: string, line?: number) => void;
     onQuery: () => void;
     onTaxonomy: () => void;
+    /** A note was dropped on a folder ("" = vault root). */
+    onMoveNote: (path: string, folder: string) => void;
+    onDeleteFolder: (folder: string) => void;
   }
-  let { vault, current, tab = $bindable(), query = $bindable(), onOpen, onQuery, onTaxonomy }: Props = $props();
+  let { vault, current, tab = $bindable(), query = $bindable(), onOpen, onQuery, onTaxonomy, onMoveNote, onDeleteFolder }: Props = $props();
+
+  // Drag & drop of notes onto folders.
+  const DRAG_TYPE = "application/x-zeolite-note";
+  let dragging = $state<string | null>(null);
+  let dropTarget = $state<string | null>(null);
+  const folderOf = (path: string) => (path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "");
+
+  function dragStart(e: DragEvent, path: string) {
+    dragging = path;
+    e.dataTransfer?.setData(DRAG_TYPE, path);
+    e.dataTransfer?.setData("text/plain", path);
+    if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
+  }
+  function dragOver(e: DragEvent, folder: string) {
+    if (!dragging || folderOf(dragging) === folder) return;
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+    dropTarget = folder;
+  }
+  function drop(e: DragEvent, folder: string) {
+    e.preventDefault();
+    const path = e.dataTransfer?.getData(DRAG_TYPE) || dragging;
+    dragging = null;
+    dropTarget = null;
+    if (path && folderOf(path) !== folder) onMoveNote(path, folder);
+  }
+  function dragEnd() {
+    dragging = null;
+    dropTarget = null;
+  }
 
   const today = toIsoDate(new Date());
 
@@ -90,16 +123,49 @@
   {#if tab === "files"}
     {#each folders as [dir, files]}
       {#if dir}
-        <button class="folder" onclick={() => (collapsed[dir] = !collapsed[dir])}>{collapsed[dir] ? "▸" : "▾"} {dir}</button>
+        <div
+          class="folder-row"
+          class:over={dropTarget === dir}
+          role="group"
+          ondragover={(e) => dragOver(e, dir)}
+          ondragleave={() => dropTarget === dir && (dropTarget = null)}
+          ondrop={(e) => drop(e, dir)}
+        >
+          <button class="folder" onclick={() => (collapsed[dir] = !collapsed[dir])}>{collapsed[dir] ? "▸" : "▾"} {dir}</button>
+          <button class="folder-del" title="Delete folder “{dir}” (moves it to .trash)" aria-label="Delete folder {dir}" onclick={() => onDeleteFolder(dir)}>🗑</button>
+        </div>
       {/if}
       {#if !collapsed[dir]}
         {#each files as f}
-          <button class="file" class:indent={!!dir} class:active={f === current} onclick={() => onOpen(f)} title={f}>
+          <button
+            class="file"
+            class:indent={!!dir}
+            class:active={f === current}
+            class:dragged={f === dragging}
+            draggable="true"
+            ondragstart={(e) => dragStart(e, f)}
+            ondragend={dragEnd}
+            onclick={() => onOpen(f)}
+            title="{f} (drag onto a folder to move it)"
+          >
             {label(f)}
           </button>
         {/each}
       {/if}
     {/each}
+    {#if dragging}
+      <div
+        class="root-drop"
+        class:over={dropTarget === ""}
+        role="region"
+        aria-label="Move to the vault root"
+        ondragover={(e) => dragOver(e, "")}
+        ondragleave={() => (dropTarget = null)}
+        ondrop={(e) => drop(e, "")}
+      >
+        ⤒ Drop here to move to the vault root
+      </div>
+    {/if}
   {:else if tab === "tags"}
     <button class="build" onclick={onTaxonomy}>⚙ Manage taxonomy…</button>
     <label class="toggle"><input type="checkbox" bind:checked={showUnused} /> Show unused taxonomy tags</label>
@@ -208,6 +274,57 @@
     margin-top: 6px;
     color: var(--muted);
     font-weight: 600;
+  }
+  .folder-row {
+    display: flex;
+    align-items: center;
+    margin-top: 6px;
+    border-radius: 6px;
+  }
+  .folder-row .folder {
+    flex: 1;
+    min-width: 0;
+    margin-top: 0;
+  }
+  .folder-row.over,
+  .root-drop.over {
+    outline: 2px dashed var(--accent);
+    background: var(--accent-soft);
+  }
+  .folder-del {
+    padding: 2px 6px;
+    border: none;
+    border-radius: 6px;
+    background: none;
+    font-size: 12px;
+    opacity: 0;
+    cursor: pointer;
+  }
+  .folder-row:hover .folder-del,
+  .folder-del:focus-visible {
+    opacity: 0.7;
+  }
+  .folder-del:hover {
+    opacity: 1;
+    background: var(--hover);
+  }
+  /* Touch screens have no hover: keep the button visible. */
+  @media (hover: none) {
+    .folder-del {
+      opacity: 0.6;
+    }
+  }
+  .root-drop {
+    margin: 4px 0 8px;
+    padding: 8px;
+    border: 1px dashed var(--border);
+    border-radius: 6px;
+    color: var(--muted);
+    font-size: 12.5px;
+    text-align: center;
+  }
+  .file.dragged {
+    opacity: 0.5;
   }
   .file.indent {
     padding-left: 22px;
