@@ -34,6 +34,12 @@
     if (v) transformLines(v, (l) => setDue(l, iso));
   }
   const duePreview = $derived(parseNaturalDate(dueText));
+
+  function attn(fn: (l: string) => string) {
+    attnOpen = false;
+    const v = view();
+    if (v) transformLines(v, fn);
+  }
 </script>
 
 <div class="toolbar" role="toolbar" aria-label="Formatting">
@@ -63,39 +69,41 @@
   </div>
   <div class="group tasks">
     <button class="accent" title="Task" onclick={lines(makeTask)}>☐ Task</button>
-    <div class="pop">
-      <button class="accent" title="Task with deadline" onclick={() => ((dueOpen = !dueOpen), (attnOpen = false), (dueText = ""))}>📅 Due</button>
-      {#if dueOpen}
-        <div class="menu">
-          <input type="date" onchange={(e) => applyDue((e.currentTarget as HTMLInputElement).value || null)} />
-          <input
-            placeholder="or type: friday, +3d, oct 15"
-            bind:value={dueText}
-            onkeydown={(e) => e.key === "Enter" && applyDue(duePreview)}
-          />
-          <small>{dueText ? (duePreview ?? "not recognised") : ""}</small>
-          <div class="quick">
-            {#each ["today", "tomorrow", "friday", "next week", "end of month"] as q}
-              <button onclick={() => applyDue(parseNaturalDate(q))}>{q}</button>
-            {/each}
-          </div>
-        </div>
-      {/if}
-    </div>
+    <button class="accent" class:on={dueOpen} title="Task with deadline" onclick={() => ((dueOpen = !dueOpen), (attnOpen = false), (dueText = ""))}>📅 Due</button>
     <button class="accent" title="Cycle state: open → done → cancelled → deferred" onclick={lines((l) => cycleTaskStatus(l))}>✔ State</button>
     <button class="accent" title="Assign a person" onclick={run((v) => insertText(v, "@"))}>👤</button>
-    <div class="pop">
-      <button class="attn" title="Attn point" onclick={() => ((attnOpen = !attnOpen), (dueOpen = false))}>⚠ Attn ▾</button>
-      {#if attnOpen}
-        <div class="menu">
-          <button onclick={() => { attnOpen = false; const v = view(); if (v) transformLines(v, makeAttn); }}>⚠ New Attn point</button>
-          <button onclick={() => { attnOpen = false; const v = view(); if (v) transformLines(v, (l) => toggleAttnResolved(l)); }}>✓ Resolve / reopen</button>
-          <button onclick={() => { attnOpen = false; const v = view(); if (v) transformLines(v, convertAttnToTask); }}>☐ Convert to task</button>
-        </div>
-      {/if}
-    </div>
+    <button class="attn" class:on={attnOpen} title="Attn point" onclick={() => ((attnOpen = !attnOpen), (dueOpen = false))}>⚠ Attn ▾</button>
   </div>
 </div>
+
+{#if dueOpen}
+  <div class="options" role="group" aria-label="Deadline">
+    <input type="date" aria-label="Pick a date" onchange={(e) => applyDue((e.currentTarget as HTMLInputElement).value || null)} />
+    <input
+      class="natural"
+      aria-label="Type a date"
+      placeholder="or type: friday, +3d, oct 15"
+      bind:value={dueText}
+      onkeydown={(e) => e.key === "Enter" && applyDue(duePreview)}
+    />
+    {#if dueText}
+      <button class="primary" disabled={!duePreview} onclick={() => applyDue(duePreview)}>{duePreview ? `Set ${duePreview}` : "Not recognised"}</button>
+    {/if}
+    {#each ["today", "tomorrow", "friday", "next week", "end of month"] as q}
+      <button onclick={() => applyDue(parseNaturalDate(q))}>{q}</button>
+    {/each}
+    <button class="close" aria-label="Close" onclick={() => (dueOpen = false)}>✕</button>
+  </div>
+{/if}
+
+{#if attnOpen}
+  <div class="options" role="group" aria-label="Attn point">
+    <button onclick={() => attn(makeAttn)}>⚠ New Attn point</button>
+    <button onclick={() => attn((l) => toggleAttnResolved(l))}>✓ Resolve / reopen</button>
+    <button onclick={() => attn(convertAttnToTask)}>☐ Convert to task</button>
+    <button class="close" aria-label="Close" onclick={() => (attnOpen = false)}>✕</button>
+  </div>
+{/if}
 
 <style>
   .toolbar {
@@ -124,13 +132,6 @@
     }
     .tasks {
       order: -1;
-    }
-    /* The row scrolls, so menus are placed against the viewport. */
-    .menu {
-      position: fixed;
-      top: 104px;
-      left: 8px;
-      right: 8px;
     }
   }
   button {
@@ -163,47 +164,46 @@
     color: inherit;
     padding: 0 2px;
   }
-  .pop {
-    position: relative;
+  button.on {
+    background: var(--accent-soft);
+    border-color: var(--border);
   }
-  .menu {
-    position: absolute;
-    z-index: 20;
-    top: 34px;
-    left: 0;
+  .options {
     display: flex;
-    flex-direction: column;
+    flex-wrap: wrap;
     gap: 6px;
-    min-width: 230px;
-    padding: 10px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--panel);
-    box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
+    align-items: center;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+    background: var(--accent-soft);
   }
-  .menu button {
-    text-align: left;
+  .options button {
+    border-color: var(--border);
+    background: var(--bg);
   }
-  .menu input {
-    padding: 6px 8px;
+  .options button.primary {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: var(--on-accent);
+  }
+  .options button:disabled {
+    opacity: 0.6;
+  }
+  .options .close {
+    margin-left: auto;
+  }
+  .options input {
+    height: 30px;
+    padding: 0 8px;
     border: 1px solid var(--border);
     border-radius: 6px;
     background: var(--bg);
     color: var(--fg);
     font: inherit;
+    font-size: 13px;
   }
-  .menu small {
-    color: var(--muted);
-    min-height: 1em;
-  }
-  .quick {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-  }
-  .quick button {
-    border-color: var(--border);
-    font-size: 12px;
-    height: 26px;
+  .options .natural {
+    flex: 1 1 180px;
+    min-width: 0;
   }
 </style>
