@@ -3,7 +3,10 @@ import {
   findCollisions,
   linkNameOf,
   parseTaxonomy,
+  renameInlineTag,
   replaceLinkTarget,
+  splitFrontmatter,
+  withFrontmatter,
   runQuery,
   TAXONOMY_PATH,
   type IdCollision,
@@ -171,6 +174,31 @@ export class Vault {
       for (let i = 1; i <= parts.length; i++) if (parts[0]) set.add(parts.slice(0, i).join("/"));
     }
     return [...set].sort();
+  }
+
+  /**
+   * Rename a tag in every note: frontmatter `tags` and inline #tags (nested
+   * children follow). Returns the number of notes changed.
+   */
+  async renameTag(from: string, to: string): Promise<number> {
+    let changed = 0;
+    for (const r of this.notes) {
+      const text = this.read(r.path);
+      let next = renameInlineTag(text, from, to);
+      const { data, hasFrontmatter } = splitFrontmatter(next);
+      if (hasFrontmatter && Array.isArray(data.tags)) {
+        const tags = data.tags.map((t) => {
+          const s = String(t).replace(/^#/, "");
+          return s === from ? to : s.startsWith(`${from}/`) ? to + s.slice(from.length) : t;
+        });
+        if (tags.some((t, i) => t !== (data.tags as unknown[])[i])) next = withFrontmatter(next, { ...data, tags });
+      }
+      if (next !== text) {
+        await this.save(r.path, next);
+        changed++;
+      }
+    }
+    return changed;
   }
 
   tagCounts(): Map<string, number> {

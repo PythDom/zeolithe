@@ -17,6 +17,7 @@
   import Editor from "./components/Editor.svelte";
   import NewNoteDialog from "./components/NewNoteDialog.svelte";
   import QueryBuilder from "./components/QueryBuilder.svelte";
+  import TaxonomyManager from "./components/TaxonomyManager.svelte";
   import Preview from "./components/Preview.svelte";
   import Sidebar from "./components/Sidebar.svelte";
   import Toolbar from "./components/Toolbar.svelte";
@@ -39,6 +40,7 @@
   let query = $state("");
   let showNew = $state(false);
   let showQuery = $state(false);
+  let showTaxonomy = $state(false);
   let drawer = $state(false);
   let status = $state("");
   let editor = $state<ReturnType<typeof Editor>>();
@@ -252,7 +254,7 @@
       <button onclick={journal} title="Today's journal">📓</button>
       <button onclick={openFolder} disabled={!fsAccessSupported()} title={fsAccessSupported() ? "Open a vault folder" : "Folder access needs Chrome/Edge desktop here; native apps come next"}>📂</button>
     </div>
-    <Sidebar {vault} {current} bind:tab bind:query onOpen={open} onQuery={() => (showQuery = true)} />
+    <Sidebar {vault} {current} bind:tab bind:query onOpen={open} onQuery={() => (showQuery = true)} onTaxonomy={() => (showTaxonomy = true)} />
   </aside>
   <button class="scrim" aria-label="Close menu" onclick={() => (drawer = false)}></button>
 
@@ -299,6 +301,10 @@
     {#if status}<button class="status" onclick={() => (status = "")}>{status}</button>{/if}
   </main>
 </div>
+
+{#if showTaxonomy}
+  <TaxonomyManager {vault} onOpenNote={(p) => ((showTaxonomy = false), open(p))} onClose={() => (showTaxonomy = false)} />
+{/if}
 
 {#if showQuery}
   <QueryBuilder

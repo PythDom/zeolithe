@@ -9,8 +9,9 @@
     query: string;
     onOpen: (path: string, line?: number) => void;
     onQuery: () => void;
+    onTaxonomy: () => void;
   }
-  let { vault, current, tab = $bindable(), query = $bindable(), onOpen, onQuery }: Props = $props();
+  let { vault, current, tab = $bindable(), query = $bindable(), onOpen, onQuery, onTaxonomy }: Props = $props();
 
   const today = toIsoDate(new Date());
 
@@ -97,6 +98,7 @@
       {/if}
     {/each}
   {:else if tab === "tags"}
+    <button class="build" onclick={onTaxonomy}>⚙ Manage taxonomy…</button>
     <label class="toggle"><input type="checkbox" bind:checked={showUnused} /> Show unused taxonomy tags</label>
     {#each tagGroups as g}
       {#if g.tags.some((t) => t.count > 0 || showUnused)}
