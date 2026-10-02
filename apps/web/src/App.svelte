@@ -12,7 +12,7 @@
     createFreeNote,
     createJournalNote,
     type NewNote,
-  } from "@zeolithe/core";
+  } from "@zeolite/core";
   import { EditorView } from "@codemirror/view";
   import Editor from "./components/Editor.svelte";
   import NewNoteDialog from "./components/NewNoteDialog.svelte";
@@ -26,7 +26,7 @@
   import { createRenderer } from "./lib/render";
   import { FsAccessStorage, fsAccessSupported, MemoryStorage } from "./lib/storage";
   import { Vault } from "./lib/vault.svelte";
-  import logo from "../../../assets/logo/zeolithe-icon.svg";
+  import logo from "../../../assets/logo/zeolite-icon.svg";
 
   type Mode = "edit" | "split" | "view";
   const narrow = () => window.matchMedia("(max-width: 800px)").matches;
@@ -245,7 +245,7 @@
     <header class="brand">
       <img src={logo} alt="" width="28" height="28" />
       <div>
-        <div class="title">Zeolithe</div>
+        <div class="title">Zeolite</div>
         <div class="vault" title={vault.name}>{vault.name}</div>
       </div>
     </header>

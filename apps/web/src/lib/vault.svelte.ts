@@ -14,7 +14,7 @@ import {
   type NoteRecord,
   type QueryResult,
   type Taxonomy,
-} from "@zeolithe/core";
+} from "@zeolite/core";
 import type { VaultStorage } from "./storage";
 
 const IMAGE_EXT = /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i;

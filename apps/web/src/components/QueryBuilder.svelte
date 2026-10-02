@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { buildQuery, DEFAULT_QUERY, queryBlock, type QuerySpec, type Taxonomy } from "@zeolithe/core";
+  import { buildQuery, DEFAULT_QUERY, queryBlock, type QuerySpec, type Taxonomy } from "@zeolite/core";
   import { untrack } from "svelte";
   import Preview from "./Preview.svelte";
 

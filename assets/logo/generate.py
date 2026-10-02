@@ -1,4 +1,4 @@
-"""Generate the Zeolithe logo: a hexagonal cut gem seen from above.
+"""Generate the Zeolite logo: a hexagonal cut gem seen from above.
 
 Faceting follows a brilliant cut: a flat table in the middle, star facets
 around it, and upper-girdle facets out to the girdle. Each facet is shaded
@@ -66,22 +66,22 @@ def gem(prefix):
   <path d="M{glint[0]:.1f} {glint[1] - 26:.1f} L{glint[0] + 6:.1f} {glint[1] - 6:.1f} L{glint[0] + 26:.1f} {glint[1]:.1f} L{glint[0] + 6:.1f} {glint[1] + 6:.1f} L{glint[0]:.1f} {glint[1] + 26:.1f} L{glint[0] - 6:.1f} {glint[1] + 6:.1f} L{glint[0] - 26:.1f} {glint[1]:.1f} L{glint[0] - 6:.1f} {glint[1] - 6:.1f} Z" fill="#FFFFFF" fill-opacity="0.9"/>"""
 
 
-icon = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Zeolithe">
-  <title>Zeolithe</title>
+icon = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Zeolite">
+  <title>Zeolite</title>
   {gem("zi")}
 </svg>
 """
 
-wordmark = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 360" width="1240" height="360" role="img" aria-label="Zeolithe">
-  <title>Zeolithe</title>
+wordmark = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 360" width="1240" height="360" role="img" aria-label="Zeolite">
+  <title>Zeolite</title>
   <g transform="translate(20 20) scale(0.625)">
   {gem("zw")}
   </g>
-  <text x="380" y="228" font-family="Inter, 'Segoe UI', Roboto, system-ui, sans-serif" font-size="150" font-weight="650" letter-spacing="-3" fill="#0F6F69">Zeolithe</text>
+  <text x="380" y="228" font-family="Inter, 'Segoe UI', Roboto, system-ui, sans-serif" font-size="150" font-weight="650" letter-spacing="-3" fill="#0F6F69">Zeolite</text>
 </svg>
 """
 
-with open("zeolithe-icon.svg", "w") as f:
+with open("zeolite-icon.svg", "w") as f:
     f.write(icon)
-with open("zeolithe-wordmark.svg", "w") as f:
+with open("zeolite-wordmark.svg", "w") as f:
     f.write(wordmark)

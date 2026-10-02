@@ -132,7 +132,7 @@ export function taxonomyTemplate(tax: Taxonomy): string {
       "# Taxonomy",
       "",
       "Codes used to build note identifiers `XX.YY.ZZ.NNN` (PARA . Category . Sub-PARA . sequence).",
-      "Manage it from Zeolithe (Manage taxonomy) or edit the tables directly.",
+      "Manage it from Zeolite (Manage taxonomy) or edit the tables directly.",
       "",
       "## PARA (XX)",
       "",

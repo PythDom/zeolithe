@@ -9,7 +9,7 @@
     numberablePara,
     type NewNote,
     type Taxonomy,
-  } from "@zeolithe/core";
+  } from "@zeolite/core";
 
   interface Props {
     taxonomy: Taxonomy;

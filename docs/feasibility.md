@@ -1,8 +1,8 @@
-# Zeolithe: feasibility study and specification
+# Zeolite: feasibility study and specification
 
 Status: specification agreed, no code written yet.
 
-Zeolithe is a note-taking and note-collecting app in the spirit of Obsidian.
+Zeolite is a note-taking and note-collecting app in the spirit of Obsidian.
 Notes are plain Markdown files in a folder (the *vault*), shared between a
 Windows PC and an Android phone, and compatible with existing Obsidian vaults.
 

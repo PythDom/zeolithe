@@ -1,6 +1,6 @@
 /**
  * Build Dataview queries from a simple form. The generated text is plain DQL,
- * so the same block works in Zeolithe and in Obsidian with Dataview.
+ * so the same block works in Zeolite and in Obsidian with Dataview.
  */
 
 export type QueryTarget = "tasks" | "attn" | "notes" | "table";

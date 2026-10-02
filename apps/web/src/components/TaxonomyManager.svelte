@@ -12,7 +12,7 @@
     type Taxonomy,
     type TaxonomyEntry,
     type TaxonomyKind,
-  } from "@zeolithe/core";
+  } from "@zeolite/core";
   import type { Vault } from "../lib/vault.svelte";
 
   interface Props {

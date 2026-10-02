@@ -1,6 +1,6 @@
-<p align="center"><img src="assets/logo/zeolithe-wordmark.svg" alt="Zeolithe" width="420"></p>
+<p align="center"><img src="assets/logo/zeolite-wordmark.svg" alt="Zeolite" width="420"></p>
 
-Zeolithe is a note-taking and note-collecting app in the spirit of Obsidian.
+Zeolite is a note-taking and note-collecting app in the spirit of Obsidian.
 Notes are plain Markdown files, compatible with Obsidian vaults, and the app
 is shared between Windows and Android.
 

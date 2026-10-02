@@ -12,7 +12,7 @@
  * due, status, …) and functions date(), dur(), contains(), icontains(),
  * startswith(), endswith(), lower(), upper(), length(), default().
  *
- * Zeolithe extension: `LIST Attn` lists individual Attn points (with their own
+ * Zeolite extension: `LIST Attn` lists individual Attn points (with their own
  * `resolved` field) instead of notes.
  */
 import { toIsoDate } from "./dates";

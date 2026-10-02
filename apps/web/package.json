@@ -1,5 +1,5 @@
 {
-  "name": "@zeolithe/web",
+  "name": "@zeolite/web",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -21,7 +21,7 @@
     "@codemirror/state": "^6.5.2",
     "@codemirror/view": "^6.38.6",
     "@lezer/highlight": "^1.2.5",
-    "@zeolithe/core": "*",
+    "@zeolite/core": "*",
     "dompurify": "^3.2.7",
     "highlight.js": "^11.11.1",
     "markdown-it": "^14.1.0"

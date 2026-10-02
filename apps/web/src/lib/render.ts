@@ -1,4 +1,4 @@
-import { displayValue, generateToc, headingLinkText, isLink, splitFrontmatter, type QueryResult, type ResultRow, type Value } from "@zeolithe/core";
+import { displayValue, generateToc, headingLinkText, isLink, splitFrontmatter, type QueryResult, type ResultRow, type Value } from "@zeolite/core";
 import DOMPurify from "dompurify";
 import hljs from "highlight.js/lib/common";
 import MarkdownIt from "markdown-it";

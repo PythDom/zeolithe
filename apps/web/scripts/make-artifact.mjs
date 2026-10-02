@@ -15,5 +15,5 @@ const title = /<title>[\s\S]*?<\/title>/.exec(keep)[0];
 // Libraries embed a literal U+FFFD inside JS string literals; the host rejects
 // that character, so write it as the equivalent escape sequence.
 const page = `${title}\n${keep.replace(title, "")}\n${body}\n`.replaceAll("\uFFFD", "\\uFFFD");
-writeFileSync("dist-single/zeolithe.html", page);
-console.log("wrote dist-single/zeolithe.html");
+writeFileSync("dist-single/zeolite.html", page);
+console.log("wrote dist-single/zeolite.html");

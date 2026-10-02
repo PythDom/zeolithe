@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { isArchived, toIsoDate } from "@zeolithe/core";
+  import { isArchived, toIsoDate } from "@zeolite/core";
   import type { Vault } from "../lib/vault.svelte";
 
   interface Props {

@@ -7,7 +7,7 @@
     parseNaturalDate,
     setDue,
     toggleAttnResolved,
-  } from "@zeolithe/core";
+  } from "@zeolite/core";
   import type { EditorView } from "@codemirror/view";
   import { insertBlock, insertText, toggleLinePrefix, transformLines, wrapSelection } from "../lib/editor-commands";
 

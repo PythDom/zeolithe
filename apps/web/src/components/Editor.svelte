@@ -9,7 +9,7 @@
   import { drawSelection, EditorView, keymap, placeholder } from "@codemirror/view";
   import { syntaxHighlighting, HighlightStyle } from "@codemirror/language";
   import { tags as t } from "@lezer/highlight";
-  import { convertDueFields } from "@zeolithe/core";
+  import { convertDueFields } from "@zeolite/core";
   import { onMount } from "svelte";
 
   interface Props {

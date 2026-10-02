@@ -1,5 +1,5 @@
 {
-  "name": "zeolithe",
+  "name": "zeolite",
   "private": true,
   "type": "module",
   "workspaces": [
@@ -7,9 +7,9 @@
     "apps/*"
   ],
   "scripts": {
-    "dev": "npm run dev -w @zeolithe/web",
-    "build": "npm run build -w @zeolithe/web",
-    "test": "npm test -w @zeolithe/core",
+    "dev": "npm run dev -w @zeolite/web",
+    "build": "npm run build -w @zeolite/web",
+    "test": "npm test -w @zeolite/core",
     "check": "npm run check --workspaces --if-present"
   }
 }

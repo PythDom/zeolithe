@@ -1,6 +1,6 @@
 import taxonomy from "../../../../docs/taxonomy.md?raw";
-import logo from "../../../../assets/logo/zeolithe-icon.svg?raw";
-import { TAXONOMY_PATH, toIsoDate, toIsoMinute } from "@zeolithe/core";
+import logo from "../../../../assets/logo/zeolite-icon.svg?raw";
+import { TAXONOMY_PATH, toIsoDate, toIsoMinute } from "@zeolite/core";
 
 /** A small in-memory vault so the app can be tried without opening a folder. */
 export function demoVault(now = new Date()): Record<string, string | Blob> {
@@ -9,16 +9,16 @@ export function demoVault(now = new Date()): Record<string, string | Blob> {
   const created = toIsoMinute(now);
   return {
     [TAXONOMY_PATH]: taxonomy,
-    "attachments/zeolithe-icon.svg": new Blob([logo], { type: "image/svg+xml" }),
+    "attachments/zeolite-icon.svg": new Blob([logo], { type: "image/svg+xml" }),
     "Welcome.md": `---
 created: ${created}
 ---
-# Welcome to Zeolithe
+# Welcome to Zeolite
 
 This is a **demo vault** kept in memory. Use **Open folder** to work on a real
 vault (Chromium/Edge desktop for now; native Windows and Android apps next).
 
-![[zeolithe-icon.svg|96]]
+![[zeolite-icon.svg|96]]
 
 \`\`\`toc
 \`\`\`
@@ -124,7 +124,7 @@ created: ${created}
 ---
 # ${day}
 
-- Started using Zeolithe.
+- Started using Zeolite.
 - [ ] Try the new-note dialog
 `,
   };
