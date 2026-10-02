@@ -3,8 +3,14 @@
     createFreeNote,
     createInboxNote,
     createJournalNote,
+    createFromTemplate,
     createParaNote,
+    findCategory,
+    findPara,
+    findSubPara,
     idPrefix,
+    parseId,
+    templateName,
     nextId,
     numberablePara,
     type NewNote,
@@ -14,10 +20,14 @@
   interface Props {
     taxonomy: Taxonomy;
     existingIds: string[];
-    onCreate: (note: NewNote) => void;
+    templates: string[];
+    readTemplate: (path: string) => string;
+    onCreate: (note: NewNote, cursor: number | null) => void;
     onClose: () => void;
   }
-  let { taxonomy, existingIds, onCreate, onClose }: Props = $props();
+  let { taxonomy, existingIds, templates, readTemplate, onCreate, onClose }: Props = $props();
+  let template = $state("");
+  let templateTouched = $state(false);
 
   type Kind = "para" | "journal" | "inbox" | "free";
   let kind = $state<Kind>("para");
@@ -40,6 +50,19 @@
     if (!category && taxonomy.categories[0]) category = taxonomy.categories[0].code;
   });
 
+  // Suggest a template named after the Sub-PARA, the PARA or the note type.
+  $effect(() => {
+    if (templateTouched) return;
+    const names = [
+      kind === "para" ? findSubPara(taxonomy, para, sub)?.tag : undefined,
+      kind === "para" ? findPara(taxonomy, para)?.tag : undefined,
+      kind === "para" ? "PARA" : kind,
+    ]
+      .filter((x): x is string => !!x)
+      .map((x) => x.toLowerCase());
+    template = templates.find((t) => names.includes(templateName(t).toLowerCase())) ?? "";
+  });
+
   const previewId = $derived.by(() => {
     if (kind !== "para" || !para || !sub || !category) return "";
     try {
@@ -58,7 +81,20 @@
       else if (kind === "journal") note = createJournalNote();
       else if (kind === "inbox") note = createInboxNote(title);
       else note = createFreeNote(folder, title);
-      onCreate(note);
+      let cursor: number | null = null;
+      if (template) {
+        const id = note.id ? parseId(note.id) : null;
+        const applied = createFromTemplate(note, readTemplate(template), {
+          title: note.path.split("/").pop()!.replace(/\.md$/, "").replace(/^\d{2}\.\d{2}\.\d{2}\.\d{3} /, ""),
+          id: note.id,
+          para: id ? findPara(taxonomy, id.para)?.tag : undefined,
+          category: id ? findCategory(taxonomy, id.category)?.tag : undefined,
+          subpara: id ? findSubPara(taxonomy, id.para, id.sub)?.tag : undefined,
+        });
+        note = applied;
+        cursor = applied.cursor;
+      }
+      onCreate(note, cursor);
     } catch (err) {
       error = (err as Error).message;
     }
@@ -109,6 +145,13 @@
     {:else}
       <p class="hint">Opens or creates today's journal note.</p>
     {/if}
+
+    <label>Template
+      <select bind:value={template} onchange={() => (templateTouched = true)}>
+        <option value="">None</option>
+        {#each templates as t}<option value={t}>{templateName(t)}</option>{/each}
+      </select>
+    </label>
 
     {#if error}<p class="warn">{error}</p>{/if}
     <div class="actions">

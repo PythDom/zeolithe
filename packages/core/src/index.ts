@@ -13,3 +13,4 @@ export * from "./toc";
 export * from "./query";
 export * from "./query-builder";
 export * from "./taxonomy-edit";
+export * from "./templates";

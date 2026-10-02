@@ -8,6 +8,12 @@
     renumberNote,
     taxonomyTags,
     toggleTaskDone,
+    insertTemplate,
+    createFromTemplate,
+    templateName,
+    findCategory,
+    findPara,
+    findSubPara,
     upsertStaticToc,
     createFreeNote,
     createJournalNote,
@@ -18,6 +24,7 @@
   import NewNoteDialog from "./components/NewNoteDialog.svelte";
   import QueryBuilder from "./components/QueryBuilder.svelte";
   import TaxonomyManager from "./components/TaxonomyManager.svelte";
+  import TemplateManager from "./components/TemplateManager.svelte";
   import Preview from "./components/Preview.svelte";
   import Sidebar from "./components/Sidebar.svelte";
   import Toolbar from "./components/Toolbar.svelte";
@@ -41,6 +48,7 @@
   let showNew = $state(false);
   let showQuery = $state(false);
   let showTaxonomy = $state(false);
+  let showTemplates = $state(false);
   let drawer = $state(false);
   let status = $state("");
   let editor = $state<ReturnType<typeof Editor>>();
@@ -49,7 +57,7 @@
     createRenderer({
       resolveAsset: (t) => vault.resolveAsset(t),
       resolveNote: (t) => vault.resolveNote(t),
-      runQuery: (src) => vault.runQuery(src),
+      runQuery: (src) => vault.runQuery(src, current ?? undefined),
     }),
   );
   const html = $derived(current ? render(content) : "");
@@ -97,6 +105,34 @@
     view.focus();
   }
 
+  function goToOffset(offset: number) {
+    const view = editor?.getView();
+    if (!view) return;
+    const pos = Math.min(offset, view.state.doc.length);
+    view.dispatch({ selection: { anchor: pos }, effects: EditorView.scrollIntoView(pos, { y: "center" }) });
+    view.focus();
+  }
+
+  /** Insert a template at the cursor (after the frontmatter if the cursor is in it). */
+  async function applyTemplate(path: string) {
+    const view = editor?.getView();
+    if (!view || !current) return;
+    const id = record?.id ? parseId(record.id) : null;
+    const tax = vault.taxonomy;
+    const head = view.state.selection.main.head;
+    const fmEnd = /^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/.exec(content)?.[0].length ?? 0;
+    const at = head < fmEnd ? content.length : head;
+    const r = insertTemplate(content, at, vault.read(path), {
+      title: record?.title ?? "",
+      id: record?.id,
+      para: id ? findPara(tax, id.para)?.tag : undefined,
+      category: id ? findCategory(tax, id.category)?.tag : undefined,
+      subpara: id ? findSubPara(tax, id.para, id.sub)?.tag : undefined,
+    });
+    await replaceContent(r.text);
+    goToOffset(r.cursor);
+  }
+
   function onChange(text: string) {
     content = text;
     scheduleSave();
@@ -109,12 +145,14 @@
     await flush();
   }
 
-  async function create(note: NewNote) {
+  async function create(note: NewNote, cursor: number | null = null) {
     showNew = false;
     try {
-      const path = vault.exists(note.path) ? note.path : await vault.create(note);
+      const existed = vault.exists(note.path);
+      const path = existed ? note.path : await vault.create(note);
       await open(path);
       if (mode === "view") mode = "edit";
+      if (!existed && cursor !== null) queueMicrotask(() => goToOffset(cursor));
     } catch (e) {
       fail(e);
     }
@@ -205,7 +243,11 @@
   }
 
   async function journal() {
-    await create(createJournalNote());
+    const note = createJournalNote();
+    const tpl = vault.templates().find((t) => templateName(t).toLowerCase() === "journal");
+    if (!tpl || vault.exists(note.path)) return create(note);
+    const applied = createFromTemplate(note, vault.read(tpl), { title: note.path.split("/").pop()!.replace(/\.md$/, "") });
+    await create(applied, applied.cursor);
   }
 
   async function openFolder() {
@@ -252,6 +294,7 @@
     <div class="actions">
       <button class="primary" onclick={() => (showNew = true)} title="Ctrl+N">＋ New note</button>
       <button onclick={journal} title="Today's journal">📓</button>
+      <button onclick={() => (showTemplates = true)} title="Templates">📄</button>
       <button onclick={openFolder} disabled={!fsAccessSupported()} title={fsAccessSupported() ? "Open a vault folder" : "Folder access needs Chrome/Edge desktop here; native apps come next"}>📂</button>
     </div>
     <Sidebar {vault} {current} bind:tab bind:query onOpen={open} onQuery={() => (showQuery = true)} onTaxonomy={() => (showTaxonomy = true)} />
@@ -278,7 +321,14 @@
 
     {#if current}
       {#if mode !== "view"}
-        <Toolbar view={() => editor?.getView()} onStaticToc={staticToc} onQuery={() => (showQuery = true)} />
+        <Toolbar
+          view={() => editor?.getView()}
+          onStaticToc={staticToc}
+          onQuery={() => (showQuery = true)}
+          templates={() => vault.templates()}
+          onTemplate={applyTemplate}
+          onManageTemplates={() => (showTemplates = true)}
+        />
       {/if}
       <div class="panes mode-{mode}">
         {#if mode !== "view"}
@@ -302,6 +352,10 @@
   </main>
 </div>
 
+{#if showTemplates}
+  <TemplateManager {vault} onEdit={(p) => ((showTemplates = false), open(p), mode === "view" && (mode = "split"))} onClose={() => (showTemplates = false)} />
+{/if}
+
 {#if showTaxonomy}
   <TaxonomyManager {vault} onOpenNote={(p) => ((showTaxonomy = false), open(p))} onClose={() => (showTaxonomy = false)} />
 {/if}
@@ -322,7 +376,14 @@
 {/if}
 
 {#if showNew}
-  <NewNoteDialog taxonomy={vault.taxonomy} existingIds={vault.existingIds} onCreate={create} onClose={() => (showNew = false)} />
+  <NewNoteDialog
+    taxonomy={vault.taxonomy}
+    existingIds={vault.existingIds}
+    templates={vault.templates()}
+    readTemplate={(p) => vault.read(p)}
+    onCreate={create}
+    onClose={() => (showNew = false)}
+  />
 {/if}
 
 <style>

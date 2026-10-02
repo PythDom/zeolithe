@@ -64,6 +64,11 @@ Done:
 - Task and Attn panel, simple search.
 - Dataview queries: the common subset of the query language renders live
   results, and ticking a task in the results updates its note.
+- Templates (Obsidian-compatible variables): pick one in New note
+  (auto-suggested by Sub-PARA, PARA or note type), insert one with
+  📄 Template, manage them with the 📄 button in the sidebar.
+- Taxonomy management in the app (Tags → ⚙ Manage taxonomy) and from the
+  command line.
 - Query builder (🔍 Query): build a query from a form, insert it in a note or
   save it as a search note in `Searches/`.
 

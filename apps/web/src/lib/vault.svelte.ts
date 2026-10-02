@@ -1,6 +1,7 @@
 import {
   buildNoteRecord,
   findCollisions,
+  isTemplatePath,
   linkNameOf,
   parseTaxonomy,
   renameInlineTag,
@@ -70,9 +71,23 @@ export class Vault {
     this.taxonomy = text ? parseTaxonomy(text) : { paras: [], categories: [], subParas: {}, warnings: ["No _system/Taxonomy.md in this vault."] };
   }
 
-  /** Notes that count as real notes (Syncthing conflict copies excluded). */
+  /** Notes that count as real notes (conflict copies and templates excluded). */
   get notes(): NoteRecord[] {
-    return [...this.records.values()].filter((r) => !r.conflict);
+    return [...this.records.values()].filter((r) => !r.conflict && !isTemplatePath(r.path));
+  }
+
+  /** Template note paths (in _system/Templates/). */
+  templates(): string[] {
+    return this.files.filter((f) => isTemplatePath(f) && f.toLowerCase().endsWith(".md"));
+  }
+
+  async remove(path: string) {
+    await this.storage.remove(path);
+    this.contents.delete(path);
+    this.files = this.files.filter((f) => f !== path);
+    const next = new Map(this.records);
+    next.delete(path);
+    this.records = next;
   }
 
   get conflicts(): NoteRecord[] {
@@ -162,8 +177,8 @@ export class Vault {
     return undefined;
   }
 
-  runQuery(source: string): QueryResult {
-    return runQuery(source, this.notes);
+  runQuery(source: string, thisPath?: string): QueryResult {
+    return runQuery(source, this.notes, new Date(), thisPath);
   }
 
   /** Folders that contain notes. */

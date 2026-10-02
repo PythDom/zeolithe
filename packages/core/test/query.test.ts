@@ -87,6 +87,10 @@ describe("runQuery", () => {
     expect(texts("LIST FROM [[01.02.05.001 F35 status]]")).toEqual(["02.00.00.001 Team meeting"]);
     expect(texts("LIST SORT file.ctime DESC LIMIT 1")).toEqual(["01.02.05.001 F35 status"]);
   });
+  it("supports this.file fields", () => {
+    const r = runQuery('TASK WHERE status = " " AND file.name = this.file.name', notes, today, "02 Areas/02.00.00.001 Team meeting.md");
+    expect(r.groups[0]!.rows.map((x) => x.task!.text)).toEqual(["Plan training"]);
+  });
   it("reports readable errors", () => {
     expect(() => parseQuery("SELECT *")).toThrow(QueryError);
     expect(() => parseQuery("TASK WHERE (due")).toThrow(/Missing/);

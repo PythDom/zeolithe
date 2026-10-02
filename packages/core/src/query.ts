@@ -505,12 +505,15 @@ function lookup(fields: Fields, name: string): Value {
   return v === undefined ? null : v;
 }
 
+/** Fields of the note containing the query, for `this.…` references. */
+let thisFields: Fields = new Map();
+
 function evalExpr(e: Expr, row: Fields, today: Date): Value {
   switch (e.k) {
     case "lit":
       return e.v;
     case "id":
-      return lookup(row, e.name);
+      return /^this\./i.test(e.name) ? lookup(thisFields, e.name.slice(5)) : lookup(row, e.name);
     case "not":
       return !truthy(evalExpr(e.e, row, today));
     case "neg": {
@@ -654,8 +657,14 @@ export interface QueryResult {
   count: number;
 }
 
-export function runQuery(source: string, notes: NoteRecord[], today: Date = new Date()): QueryResult {
+/**
+ * Run a query. `thisPath` is the note containing the query, used by
+ * `this.file.name` and other `this.…` fields.
+ */
+export function runQuery(source: string, notes: NoteRecord[], today: Date = new Date(), thisPath?: string): QueryResult {
   const q = parseQuery(source);
+  const self = thisPath ? notes.find((n) => n.path === thisPath) : undefined;
+  thisFields = self ? noteFields(self) : new Map();
   const attnList = q.type === "LIST" && q.fields.length === 1 && q.fields[0]!.expr.k === "id" && q.fields[0]!.expr.name.toLowerCase() === "attn";
 
   const rows: Row[] = [];

@@ -15,8 +15,12 @@
     view: () => EditorView | undefined;
     onStaticToc: () => void;
     onQuery: () => void;
+    templates: () => string[];
+    onTemplate: (path: string) => void;
+    onManageTemplates: () => void;
   }
-  let { view, onStaticToc, onQuery }: Props = $props();
+  let { view, onStaticToc, onQuery, templates, onTemplate, onManageTemplates }: Props = $props();
+  let tplOpen = $state(false);
 
   let dueOpen = $state(false);
   let dueText = $state("");
@@ -68,13 +72,14 @@
     <button title="Insert dynamic table of contents" onclick={run((v) => insertBlock(v, "```toc\n```"))}>TOC</button>
     <button title="Write/update a static table of contents" onclick={onStaticToc}>TOC⇣</button>
     <button class="accent" title="Build a Dataview query" onclick={onQuery}>🔍 Query</button>
+    <button class="accent" class:on={tplOpen} title="Insert a template" onclick={() => ((tplOpen = !tplOpen), (dueOpen = false), (attnOpen = false))}>📄 Template</button>
   </div>
   <div class="group tasks">
     <button class="accent" title="Task" onclick={lines(makeTask)}>☐ Task</button>
-    <button class="accent" class:on={dueOpen} title="Task with deadline" onclick={() => ((dueOpen = !dueOpen), (attnOpen = false), (dueText = ""))}>📅 Due</button>
+    <button class="accent" class:on={dueOpen} title="Task with deadline" onclick={() => ((dueOpen = !dueOpen), (attnOpen = false), (tplOpen = false), (dueText = ""))}>📅 Due</button>
     <button class="accent" title="Cycle state: open → done → cancelled → deferred" onclick={lines((l) => cycleTaskStatus(l))}>✔ State</button>
     <button class="accent" title="Assign a person" onclick={run((v) => insertText(v, "@"))}>👤</button>
-    <button class="attn" class:on={attnOpen} title="Attn point" onclick={() => ((attnOpen = !attnOpen), (dueOpen = false))}>⚠ Attn ▾</button>
+    <button class="attn" class:on={attnOpen} title="Attn point" onclick={() => ((attnOpen = !attnOpen), (dueOpen = false), (tplOpen = false))}>⚠ Attn ▾</button>
   </div>
 </div>
 
@@ -95,6 +100,18 @@
       <button onclick={() => applyDue(parseNaturalDate(q))}>{q}</button>
     {/each}
     <button class="close" aria-label="Close" onclick={() => (dueOpen = false)}>✕</button>
+  </div>
+{/if}
+
+{#if tplOpen}
+  <div class="options" role="group" aria-label="Templates">
+    {#each templates() as t}
+      <button onclick={() => ((tplOpen = false), onTemplate(t))}>{t.split("/").pop()!.replace(/\.md$/i, "")}</button>
+    {:else}
+      <span class="none">No templates yet.</span>
+    {/each}
+    <button onclick={() => ((tplOpen = false), onManageTemplates())}>⚙ Manage templates…</button>
+    <button class="close" aria-label="Close" onclick={() => (tplOpen = false)}>✕</button>
   </div>
 {/if}
 
@@ -190,6 +207,10 @@
   }
   .options button:disabled {
     opacity: 0.6;
+  }
+  .options .none {
+    color: var(--muted);
+    font-size: 13px;
   }
   .options .close {
     margin-left: auto;

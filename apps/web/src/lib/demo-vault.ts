@@ -95,6 +95,57 @@ created: ${created}
 
 Attn:: Confirm room booking [resolved:: ${day}]
 `,
+    "_system/Templates/Journal.md": `---
+tags: [Journal]
+---
+# {{date:dddd D MMMM YYYY}}
+
+## Plan
+- [ ] {{cursor}}
+
+## Log
+
+## Attn
+`,
+    "_system/Templates/Team_meetings.md": `---
+type: meeting
+---
+# {{title}}
+
+**{{id}}** · {{date:dddd D MMMM YYYY}}, {{time}} · #{{subpara}}
+
+## Attendees
+- @{{cursor}}
+
+## Agenda
+1.
+
+## Decisions
+
+## Actions
+- [ ]
+`,
+    "_system/Templates/Project.md": `---
+status: active
+---
+# {{title}}
+
+\`\`\`toc
+\`\`\`
+
+## Goal
+
+{{cursor}}
+
+## Open actions
+
+\`\`\`dataview
+TASK
+WHERE status = " " AND file.name = this.file.name
+\`\`\`
+
+## Notes
+`,
     "Searches/Open Attn points.md": `---
 created: ${created}
 ---
