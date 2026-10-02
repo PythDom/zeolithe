@@ -13,6 +13,7 @@
     templateName,
     nextId,
     numberablePara,
+    type JournalSettings,
     type NewNote,
     type Taxonomy,
   } from "@zeolite/core";
@@ -21,11 +22,13 @@
     taxonomy: Taxonomy;
     existingIds: string[];
     templates: string[];
+    /** Daily notes folder and format (from Obsidian's settings). */
+    journal?: JournalSettings;
     readTemplate: (path: string) => string;
     onCreate: (note: NewNote, cursor: number | null) => void;
     onClose: () => void;
   }
-  let { taxonomy, existingIds, templates, readTemplate, onCreate, onClose }: Props = $props();
+  let { taxonomy, existingIds, templates, readTemplate, journal, onCreate, onClose }: Props = $props();
   let template = $state("");
   let templateTouched = $state(false);
 
@@ -105,7 +108,7 @@
     try {
       let note: NewNote;
       if (kind === "para") note = createParaNote({ taxonomy, para, category, sub, title, existingIds });
-      else if (kind === "journal") note = createJournalNote();
+      else if (kind === "journal") note = createJournalNote(new Date(), journal);
       else if (kind === "inbox") note = createInboxNote(title);
       else note = createFreeNote(folder, title);
       let cursor: number | null = null;
@@ -190,7 +193,7 @@
       <!-- svelte-ignore a11y_autofocus -->
       <label>Title <input bind:value={title} autofocus placeholder="Note title" /></label>
     {:else}
-      <p class="hint">Opens or creates today's journal note.</p>
+      <p class="hint">Opens or creates today's journal note{journal ? ` in ${journal.folder || "the vault root"}` : ""}.</p>
     {/if}
 
 

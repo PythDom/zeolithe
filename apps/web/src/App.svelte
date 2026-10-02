@@ -31,6 +31,7 @@
   import TemplateManager from "./components/TemplateManager.svelte";
   import ExportDialog from "./components/ExportDialog.svelte";
   import RenameDialog from "./components/RenameDialog.svelte";
+  import DeleteDialog from "./components/DeleteDialog.svelte";
   import Preview from "./components/Preview.svelte";
   import Sidebar from "./components/Sidebar.svelte";
   import Toolbar from "./components/Toolbar.svelte";
@@ -58,6 +59,7 @@
   let showTemplates = $state(false);
   let showExport = $state(false);
   let showRename = $state(false);
+  let showDelete = $state(false);
   let lastVault = $state<FileSystemDirectoryHandle | undefined>();
   if (fsAccessSupported()) loadLastVault().then((h) => (lastVault = h));
   let drawer = $state(false);
@@ -302,12 +304,17 @@
   }
 
   async function journal() {
-    const note = createJournalNote();
-    const tpl = vault.templates().find((t) => templateName(t).toLowerCase() === "journal");
+    const settings = vault.settings.journal;
+    const note = createJournalNote(new Date(), settings);
+    // Obsidian's Daily Notes template if set, else a template named "Journal".
+    const tpl =
+      (settings.template && vault.exists(settings.template) ? settings.template : undefined) ??
+      vault.templates().find((t) => templateName(t).toLowerCase() === "journal");
     if (!tpl || vault.exists(note.path)) return create(note);
     const applied = createFromTemplate(note, vault.read(tpl), { title: note.path.split("/").pop()!.replace(/\.md$/, "") });
     await create(applied, applied.cursor);
   }
+
 
   async function openFolder() {
     try {
@@ -335,7 +342,7 @@
 
   async function onFile(file: File) {
     const name = file.name && file.name !== "image.png" ? file.name : `Pasted image ${new Date().toISOString().replace(/[:.]/g, "-")}.png`;
-    const path = await vault.addAttachment(file, name);
+    const path = await vault.addAttachment(file, name, current);
     return `![[${path.split("/").pop()}]]`;
   }
 
@@ -396,6 +403,7 @@
         <button class="ghost" onclick={archive} title="Move to 04 Archives and tag #Archives">Archive</button>
       {/if}
       {#if current}<button class="pdf" onclick={async () => { await flush(); showExport = true; }} title="Export to PDF (Ctrl+P)">PDF</button>{/if}
+      {#if current}<button class="trash" onclick={async () => { await flush(); showDelete = true; }} title="Delete note (moves it to .trash)" aria-label="Delete note">🗑</button>{/if}
       <div class="modes" role="radiogroup" aria-label="Mode">
         <button class:active={mode === "edit"} onclick={() => (mode = "edit")}>Edit</button>
         <button class="split" class:active={mode === "split"} onclick={() => (mode = "split")}>Split</button>
@@ -435,6 +443,24 @@
     {#if status}<button class="status" onclick={() => (status = "")}>{status}</button>{/if}
   </main>
 </div>
+
+{#if showDelete && current}
+  <DeleteDialog
+    {vault}
+    path={current}
+    onDelete={async () => {
+      const path = current!;
+      clearTimeout(saveTimer);
+      current = null;
+      const to = await vault.trash(path);
+      showDelete = false;
+      status = `Moved to ${to}`;
+      const next = vault.notes[0]?.path;
+      if (next) await open(next);
+    }}
+    onClose={() => (showDelete = false)}
+  />
+{/if}
 
 {#if showRename && current}
   <RenameDialog
@@ -492,6 +518,7 @@
     existingIds={vault.existingIds}
     templates={vault.templates()}
     readTemplate={(p) => vault.read(p)}
+    journal={vault.settings.journal}
     onCreate={create}
     onClose={() => (showNew = false)}
   />
@@ -620,6 +647,9 @@
   .crumbs button.path:hover {
     border-color: var(--border);
     color: var(--fg);
+  }
+  .notebar .trash {
+    padding: 6px 8px;
   }
   .notebar .warnbtn {
     border-color: var(--warn);

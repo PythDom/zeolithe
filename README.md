@@ -75,6 +75,12 @@ Done:
 - New-note dialog: PARA ID generation, Journal, Inbox and Free notes.
 - Rename or move a note: click its path at the top, or press F2. PARA
   notes keep their ID; links across the vault are updated.
+- Delete a note (🗑 in the top bar): it moves to the vault's `.trash`
+  folder, like Obsidian; links to it are listed first.
+- Opening an Obsidian vault: nothing to convert. Zeolite follows the vault's
+  `.obsidian` settings (templates folder, daily notes folder/format/template,
+  attachment folder). The only Zeolite file is `_system/Taxonomy.md`, needed
+  for numbering only; the app offers to create it (Tags → ⚙ Manage taxonomy).
 - Archiving.
 - ID collision detection and renumbering, with link updates.
 - Sync-conflict listing.

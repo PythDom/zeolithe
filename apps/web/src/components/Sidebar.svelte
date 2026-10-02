@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { isArchived, toIsoDate } from "@zeolite/core";
+  import { isArchived, TAXONOMY_PATH, toIsoDate } from "@zeolite/core";
   import type { Vault } from "../lib/vault.svelte";
 
   interface Props {
@@ -70,7 +70,7 @@
 </nav>
 
 <div class="panel">
-  {#if vault.collisions.length || vault.conflicts.length || vault.taxonomy.warnings.length}
+  {#if vault.collisions.length || vault.conflicts.length || vault.taxonomy.warnings.length || !vault.exists(TAXONOMY_PATH)}
     <div class="alerts">
       {#each vault.collisions as c}
         <div class="alert">⚠ ID {c.id} used twice. Renumber
@@ -80,7 +80,10 @@
       {#each vault.conflicts as c}
         <div class="alert">⇄ Sync conflict: <button class="link" onclick={() => onOpen(c.path)}>{label(c.path)}</button></div>
       {/each}
-      {#each vault.taxonomy.warnings as w}<div class="alert">⚠ {w}</div>{/each}
+      {#if !vault.exists(TAXONOMY_PATH)}
+        <div class="alert">No taxonomy in this vault yet, so notes are not numbered. <button class="link" onclick={onTaxonomy}>Set it up</button></div>
+      {/if}
+      {#each vault.taxonomy.warnings.filter((w) => !w.startsWith("No _system/Taxonomy.md")) as w}<div class="alert">⚠ {w}</div>{/each}
     </div>
   {/if}
 

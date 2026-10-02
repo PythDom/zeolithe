@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { TEMPLATES_FOLDER, sanitizeTitle, templateName, templateStarter } from "@zeolite/core";
+  import { sanitizeTitle, templateName, templateStarter } from "@zeolite/core";
   import type { Vault } from "../lib/vault.svelte";
 
   interface Props {
@@ -16,6 +16,8 @@
   let error = $state("");
 
   const templates = $derived(vault.templates());
+  // The vault's templates folder (Obsidian's Templates setting, else _system/Templates).
+  const TEMPLATES_FOLDER = $derived(vault.settings.templatesFolder);
   const pathFor = (name: string) => `${TEMPLATES_FOLDER}/${sanitizeTitle(name)}.md`;
 
   async function create(e: SubmitEvent) {

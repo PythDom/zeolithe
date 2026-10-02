@@ -13,6 +13,7 @@
     type TaxonomyEntry,
     type TaxonomyKind,
   } from "@zeolite/core";
+  import { DEFAULT_TAXONOMY } from "../lib/default-taxonomy";
   import type { Vault } from "../lib/vault.svelte";
 
   interface Props {
@@ -88,8 +89,15 @@
     await apply((t) => removeEntry(t, kind, entry.code, ids, para), `Removed ${entry.code} · #${entry.tag}`);
   }
 
-  async function create() {
-    await apply((t) => t, "Created the taxonomy note");
+  /** Create the taxonomy note: from the default table, or empty. */
+  async function create(withDefault: boolean) {
+    error = "";
+    try {
+      await vault.save(TAXONOMY_PATH, withDefault ? DEFAULT_TAXONOMY : taxonomyTemplate(parseTaxonomy("")));
+      message = `Created ${TAXONOMY_PATH}`;
+    } catch (e) {
+      error = (e as Error).message;
+    }
   }
 
   const label: Record<TaxonomyKind, string> = { para: "PARA", category: "Categories", sub: "Sub-PARA" };
@@ -107,8 +115,13 @@
 
     {#if !exists}
       <div class="body">
-        <p>This vault has no <code>{TAXONOMY_PATH}</code> yet. Create it, then add PARAs, categories and Sub-PARAs here.</p>
-        <button class="primary" onclick={create}>Create taxonomy note</button>
+        <p>This vault has no <code>{TAXONOMY_PATH}</code> yet. It defines the PARA, Category and Sub-PARA codes used to number notes. Everything else works without it.</p>
+        <div class="create">
+          <button class="primary" onclick={() => create(true)}>Create with the default table</button>
+          <button class="ghost" onclick={() => create(false)}>Create empty</button>
+        </div>
+        <p class="hint">The default table is your PARA list (01 Projets … 04 Archives) with its categories and Sub-PARAs. PARA folders are named like <code>01 Projets</code>; if your vault uses other folder names, change the Folder column in the note.</p>
+        {#if error}<p class="error">{error}</p>{/if}
       </div>
     {:else}
       <nav class="tabs">
@@ -253,6 +266,11 @@
   }
   .hint {
     margin: 0;
+  }
+  .create {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
   }
   .list {
     max-height: 46vh;

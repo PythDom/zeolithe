@@ -2,6 +2,10 @@ import {
   buildNoteRecord,
   findCollisions,
   isTemplatePath,
+  attachmentFolder,
+  readObsidianSettings,
+  DEFAULT_SETTINGS,
+  type VaultSettings,
   linkNameOf,
   parseTaxonomy,
   renameInlineTag,
@@ -16,7 +20,10 @@ import {
   type QueryResult,
   type Taxonomy,
 } from "@zeolite/core";
-import type { VaultStorage } from "./storage";
+import { IGNORED_DIRS, type VaultStorage } from "./storage";
+
+/** Paths inside ignored folders (.obsidian, .trash, .git…) are not shown. */
+const visible = (path: string) => !path.split("/").slice(0, -1).some((d) => IGNORED_DIRS.has(d));
 
 const IMAGE_EXT = /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i;
 
@@ -47,8 +54,24 @@ export class Vault {
     return this.storage.name;
   }
 
+  /** Settings read from the vault's .obsidian folder (templates, daily notes, attachments). */
+  settings = $state<VaultSettings>(structuredClone(DEFAULT_SETTINGS));
+
+  private async readOptional(path: string): Promise<string | undefined> {
+    try {
+      return await this.storage.readText(path);
+    } catch {
+      return undefined;
+    }
+  }
+
   async load() {
-    const files = (await this.storage.list()).sort((a, b) => a.localeCompare(b));
+    this.settings = readObsidianSettings({
+      templates: await this.readOptional(".obsidian/templates.json"),
+      dailyNotes: await this.readOptional(".obsidian/daily-notes.json"),
+      app: await this.readOptional(".obsidian/app.json"),
+    });
+    const files = (await this.storage.list()).filter(visible).sort((a, b) => a.localeCompare(b));
     const records = new Map<string, NoteRecord>();
     for (const path of files) {
       if (!path.toLowerCase().endsWith(".md")) continue;
@@ -73,12 +96,12 @@ export class Vault {
 
   /** Notes that count as real notes (conflict copies and templates excluded). */
   get notes(): NoteRecord[] {
-    return [...this.records.values()].filter((r) => !r.conflict && !isTemplatePath(r.path));
+    return [...this.records.values()].filter((r) => !r.conflict && !isTemplatePath(r.path, this.settings.templatesFolder));
   }
 
   /** Template note paths (in _system/Templates/). */
   templates(): string[] {
-    return this.files.filter((f) => isTemplatePath(f) && f.toLowerCase().endsWith(".md"));
+    return this.files.filter((f) => isTemplatePath(f, this.settings.templatesFolder) && f.toLowerCase().endsWith(".md"));
   }
 
   async remove(path: string) {
@@ -151,10 +174,38 @@ export class Vault {
     return to;
   }
 
-  async addAttachment(file: Blob, name: string): Promise<string> {
+  /**
+   * Move a note to the vault's .trash folder (like Obsidian), so it can be
+   * recovered from the file system. Returns the trash path.
+   */
+  async trash(path: string): Promise<string> {
+    const name = path.split("/").pop()!;
+    let target = `.trash/${name}`;
+    const all = await this.storage.list();
+    for (let i = 1; all.includes(target); i++) target = `.trash/${name.replace(/(\.[^.]*)?$/, ` ${i}$1`)}`;
+    await this.storage.rename(path, target);
+    this.contents.delete(path);
+    this.files = this.files.filter((f) => f !== path);
+    const next = new Map(this.records);
+    next.delete(path);
+    this.records = next;
+    if (path === TAXONOMY_PATH) this.refreshTaxonomy();
+    return target;
+  }
+
+  /** Notes that link to (or embed) a note. */
+  backlinks(path: string): NoteRecord[] {
+    const name = linkNameOf(path);
+    const bare = path.replace(/\.md$/i, "");
+    return this.notes.filter((r) => r.path !== path && r.links.some((l) => l.target === name || l.target === bare || linkNameOf(l.target) === name));
+  }
+
+  async addAttachment(file: Blob, name: string, notePath: string | null = null): Promise<string> {
     const clean = name.replace(/[\\/:*?"<>|#^[\]]/g, "-");
-    let path = `attachments/${clean}`;
-    for (let i = 1; this.files.includes(path); i++) path = `attachments/${clean.replace(/(\.[^.]*)?$/, ` ${i}$1`)}`;
+    const dir = attachmentFolder(this.settings, notePath);
+    const at = (n: string) => (dir ? `${dir}/${n}` : n);
+    let path = at(clean);
+    for (let i = 1; this.files.includes(path); i++) path = at(clean.replace(/(\.[^.]*)?$/, ` ${i}$1`));
     await this.storage.writeBinary(path, file);
     this.files = [...this.files, path].sort((a, b) => a.localeCompare(b));
     if (IMAGE_EXT.test(path)) this.assetUrls.set(path, URL.createObjectURL(file));

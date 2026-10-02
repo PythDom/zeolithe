@@ -1,4 +1,5 @@
 import { toIsoDate, toIsoMinute } from "./dates";
+import { formatDate } from "./templates";
 import { addFrontmatterTags, serializeFrontmatter, splitFrontmatter, withFrontmatter } from "./frontmatter";
 import { idFromFileName, nextId, noteFileName, parseId, sanitizeTitle, tagsForId } from "./ids";
 import { archivePara, findCategory, findPara, findSubPara, type Taxonomy } from "./taxonomy";
@@ -43,12 +44,23 @@ export function createParaNote(req: ParaNoteRequest): NewNote {
   };
 }
 
-/** `Journal/2026-10-02.md` — same as Obsidian's Daily Notes plugin. */
-export function createJournalNote(date: Date = new Date()): NewNote {
-  const day = toIsoDate(date);
+export interface JournalSettings {
+  /** Folder of daily notes (Obsidian's Daily Notes "folder"). */
+  folder: string;
+  /** File name format with moment tokens (Obsidian's Daily Notes "format"). */
+  format: string;
+}
+
+export const DEFAULT_JOURNAL: JournalSettings = { folder: JOURNAL_FOLDER, format: "YYYY-MM-DD" };
+
+/** `Journal/2026-10-02.md` by default; folder and format follow Obsidian's Daily Notes settings. */
+export function createJournalNote(date: Date = new Date(), settings: JournalSettings = DEFAULT_JOURNAL): NewNote {
+  const name = formatDate(date, settings.format || "YYYY-MM-DD").replace(/[\\:*?"<>|#^[\]]/g, "-");
+  const folder = settings.folder.replace(/^\/+|\/+$/g, "");
+  const title = name.split("/").pop()!;
   return {
-    path: `${JOURNAL_FOLDER}/${day}.md`,
-    content: `${serializeFrontmatter({ tags: ["Journal"], created: toIsoMinute(date) })}\n# ${day}\n\n`,
+    path: `${folder ? `${folder}/` : ""}${name}.md`,
+    content: `${serializeFrontmatter({ tags: ["Journal"], created: toIsoMinute(date) })}\n# ${title}\n\n`,
   };
 }
 

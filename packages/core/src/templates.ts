@@ -16,8 +16,8 @@ import type { NewNote } from "./notes";
 
 export const TEMPLATES_FOLDER = "_system/Templates";
 
-export function isTemplatePath(path: string): boolean {
-  return path.startsWith(`${TEMPLATES_FOLDER}/`);
+export function isTemplatePath(path: string, folder: string = TEMPLATES_FOLDER): boolean {
+  return path.startsWith(`${folder.replace(/\/+$/, "")}/`);
 }
 
 export function templateName(path: string): string {
