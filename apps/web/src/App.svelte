@@ -16,10 +16,12 @@
   import { EditorView } from "@codemirror/view";
   import Editor from "./components/Editor.svelte";
   import NewNoteDialog from "./components/NewNoteDialog.svelte";
+  import QueryBuilder from "./components/QueryBuilder.svelte";
   import Preview from "./components/Preview.svelte";
   import Sidebar from "./components/Sidebar.svelte";
   import Toolbar from "./components/Toolbar.svelte";
   import { demoVault } from "./lib/demo-vault";
+  import { insertBlock } from "./lib/editor-commands";
   import { createRenderer } from "./lib/render";
   import { FsAccessStorage, fsAccessSupported, MemoryStorage } from "./lib/storage";
   import { Vault } from "./lib/vault.svelte";
@@ -36,11 +38,18 @@
   let tab = $state<"files" | "tags" | "tasks" | "search">("files");
   let query = $state("");
   let showNew = $state(false);
+  let showQuery = $state(false);
   let drawer = $state(false);
   let status = $state("");
   let editor = $state<ReturnType<typeof Editor>>();
 
-  const render = $derived(createRenderer({ resolveAsset: (t) => vault.resolveAsset(t), resolveNote: (t) => vault.resolveNote(t) }));
+  const render = $derived(
+    createRenderer({
+      resolveAsset: (t) => vault.resolveAsset(t),
+      resolveNote: (t) => vault.resolveNote(t),
+      runQuery: (src) => vault.runQuery(src),
+    }),
+  );
   const html = $derived(current ? render(content) : "");
   const record = $derived(current ? vault.records.get(current) : undefined);
   const collision = $derived(current ? vault.collisions.find((c) => c.renumber.some((n) => n.path === current)) : undefined);
@@ -121,7 +130,15 @@
     await open(path, h?.line);
   }
 
-  async function toggleTask(line: number) {
+  async function toggleTask(line: number, path?: string) {
+    if (path && path !== current) {
+      // A task shown in query results from another note.
+      const other = vault.read(path).split("\n");
+      if (other[line] === undefined) return;
+      other[line] = toggleTaskDone(other[line]!);
+      await vault.save(path, other.join("\n"));
+      return;
+    }
     const lines = content.split("\n");
     if (lines[line] === undefined) return;
     lines[line] = toggleTaskDone(lines[line]!);
@@ -171,6 +188,20 @@
     }
   }
 
+  function insertQuery(block: string) {
+    const view = editor?.getView();
+    if (!view) return;
+    showQuery = false;
+    insertBlock(view, block);
+  }
+
+  async function saveSearch(title: string, block: string) {
+    showQuery = false;
+    const note = createFreeNote("Searches", title);
+    await create({ ...note, content: `${note.content}${block}\n` });
+    mode = mode === "edit" ? "split" : mode;
+  }
+
   async function journal() {
     await create(createJournalNote());
   }
@@ -203,6 +234,7 @@
 
 <svelte:window onkeydown={(e) => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "n") { e.preventDefault(); showNew = true; }
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "q") { e.preventDefault(); showQuery = true; }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "e") { e.preventDefault(); mode = mode === "view" ? "edit" : "view"; }
 }} />
 
@@ -220,7 +252,7 @@
       <button onclick={journal} title="Today's journal">📓</button>
       <button onclick={openFolder} disabled={!fsAccessSupported()} title={fsAccessSupported() ? "Open a vault folder" : "Folder access needs Chrome/Edge desktop here; native apps come next"}>📂</button>
     </div>
-    <Sidebar {vault} {current} bind:tab bind:query onOpen={open} />
+    <Sidebar {vault} {current} bind:tab bind:query onOpen={open} onQuery={() => (showQuery = true)} />
   </aside>
   <button class="scrim" aria-label="Close menu" onclick={() => (drawer = false)}></button>
 
@@ -244,7 +276,7 @@
 
     {#if current}
       {#if mode !== "view"}
-        <Toolbar view={() => editor?.getView()} onStaticToc={staticToc} />
+        <Toolbar view={() => editor?.getView()} onStaticToc={staticToc} onQuery={() => (showQuery = true)} />
       {/if}
       <div class="panes mode-{mode}">
         {#if mode !== "view"}
@@ -267,6 +299,21 @@
     {#if status}<button class="status" onclick={() => (status = "")}>{status}</button>{/if}
   </main>
 </div>
+
+{#if showQuery}
+  <QueryBuilder
+    taxonomy={vault.taxonomy}
+    tags={allTags()}
+    people={vault.people()}
+    folders={vault.folders()}
+    {render}
+    onInsert={current && mode !== "view" ? insertQuery : undefined}
+    onSave={saveSearch}
+    onOpenLink={(t, h) => ((showQuery = false), openLink(t, h))}
+    onToggleTask={toggleTask}
+    onClose={() => (showQuery = false)}
+  />
+{/if}
 
 {#if showNew}
   <NewNoteDialog taxonomy={vault.taxonomy} existingIds={vault.existingIds} onCreate={create} onClose={() => (showNew = false)} />

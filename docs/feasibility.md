@@ -275,6 +275,19 @@ Supported:
 Ticking a checkbox in a query result writes the change back to the source
 file.
 
+The **query builder** (🔍 Query in the toolbar, or Search → Build a Dataview
+query) generates these blocks from a form, so queries never have to be typed
+by hand:
+
+- **Find:** tasks, Attn points, notes or a table.
+- **Where:** tags, folder, skip Archives, status, deadline, person, text, ID
+  prefix and table columns.
+- **Show:** sort, group and limit.
+
+It shows the generated query (editable) with live results. The query can be
+inserted at the cursor or saved as a search note in `Searches/`; saved
+searches are listed in the Search tab.
+
 Example of open Attn points:
 
 ````markdown

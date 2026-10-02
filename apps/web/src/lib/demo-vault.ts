@@ -48,6 +48,18 @@ Typing \`[due:: friday]\` converts the date to ISO as soon as you close the brac
 Attn:: Something that needs attention @alice
 - Inline form works too: [Attn:: check this sentence]
 
+## Queries
+
+Dataview blocks show live results. Press **🔍 Query** in the toolbar to build
+one without writing it by hand.
+
+\`\`\`dataview
+TASK
+WHERE status = " " AND due AND due <= date(today) + dur(7 days)
+SORT due ASC
+GROUP BY file.link
+\`\`\`
+
 ## Numbering
 
 **New note → PARA note** picks PARA, Sub-PARA and Category from
@@ -82,6 +94,29 @@ created: ${created}
 - [ ] Update quality dashboard @carol
 
 Attn:: Confirm room booking [resolved:: ${day}]
+`,
+    "Searches/Open Attn points.md": `---
+created: ${created}
+---
+# Open Attn points
+
+\`\`\`dataview
+LIST Attn
+FROM "" AND -"04 Archives"
+WHERE Attn AND !resolved
+GROUP BY file.link
+\`\`\`
+`,
+    "Searches/Notes by ID.md": `---
+created: ${created}
+---
+# Notes by ID
+
+\`\`\`dataview
+TABLE id, file.tags, created
+WHERE id
+SORT id ASC
+\`\`\`
 `,
     [`Journal/${day}.md`]: `---
 tags: [Journal]

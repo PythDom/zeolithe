@@ -4,10 +4,12 @@ import {
   linkNameOf,
   parseTaxonomy,
   replaceLinkTarget,
+  runQuery,
   TAXONOMY_PATH,
   type IdCollision,
   type NewNote,
   type NoteRecord,
+  type QueryResult,
   type Taxonomy,
 } from "@zeolithe/core";
 import type { VaultStorage } from "./storage";
@@ -155,6 +157,20 @@ export class Vault {
     const name = target.split("/").pop();
     for (const [path, url] of this.assetUrls) if (path.split("/").pop() === name) return url;
     return undefined;
+  }
+
+  runQuery(source: string): QueryResult {
+    return runQuery(source, this.notes);
+  }
+
+  /** Folders that contain notes. */
+  folders(): string[] {
+    const set = new Set<string>();
+    for (const r of this.notes) {
+      const parts = r.folder.split("/");
+      for (let i = 1; i <= parts.length; i++) if (parts[0]) set.add(parts.slice(0, i).join("/"));
+    }
+    return [...set].sort();
   }
 
   tagCounts(): Map<string, number> {

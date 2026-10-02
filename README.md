@@ -48,12 +48,15 @@ Done:
 - Sync-conflict listing.
 - Tag panel grouped by the taxonomy.
 - Task and Attn panel, simple search.
+- Dataview queries: the common subset of the query language renders live
+  results, and ticking a task in the results updates its note.
+- Query builder (🔍 Query): build a query from a form, insert it in a note or
+  save it as a search note in `Searches/`.
 
 Next:
 
 - Native shells: Tauri on Windows, Capacitor on Android. Start with the
   Android folder-access spike.
 - SQLite WASM index with full-text search.
-- Dataview query subset.
 - Renaming and merging tags.
 - Live preview.

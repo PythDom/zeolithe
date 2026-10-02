@@ -14,8 +14,9 @@
   interface Props {
     view: () => EditorView | undefined;
     onStaticToc: () => void;
+    onQuery: () => void;
   }
-  let { view, onStaticToc }: Props = $props();
+  let { view, onStaticToc, onQuery }: Props = $props();
 
   let dueOpen = $state(false);
   let dueText = $state("");
@@ -66,6 +67,7 @@
   <div class="group">
     <button title="Insert dynamic table of contents" onclick={run((v) => insertBlock(v, "```toc\n```"))}>TOC</button>
     <button title="Write/update a static table of contents" onclick={onStaticToc}>TOC⇣</button>
+    <button class="accent" title="Build a Dataview query" onclick={onQuery}>🔍 Query</button>
   </div>
   <div class="group tasks">
     <button class="accent" title="Task" onclick={lines(makeTask)}>☐ Task</button>

@@ -1,4 +1,4 @@
-import { generateToc, headingLinkText, splitFrontmatter } from "@zeolithe/core";
+import { displayValue, generateToc, headingLinkText, isLink, splitFrontmatter, type QueryResult, type ResultRow, type Value } from "@zeolithe/core";
 import DOMPurify from "dompurify";
 import hljs from "highlight.js/lib/common";
 import MarkdownIt from "markdown-it";
@@ -11,6 +11,8 @@ export interface RenderContext {
   resolveAsset(target: string): string | undefined;
   /** Vault path of a linked note, if it exists. */
   resolveNote(target: string): string | undefined;
+  /** Run a Dataview query over the vault (throws QueryError on bad queries). */
+  runQuery(source: string): QueryResult;
 }
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
@@ -220,11 +222,64 @@ export function createRenderer(ctx: RenderContext) {
       const toc = generateToc(source, { minLevel: 2 });
       return `<nav class="toc"><div class="toc-title">Contents</div>${toc ? md.render(toc) : "<p><em>No headings yet.</em></p>"}</nav>`;
     }
-    if (lang === "dataview" || lang === "query") {
-      return `<div class="query-placeholder"><div class="query-title">Dataview query</div><pre><code>${esc(t.content)}</code></pre><div class="query-note">Query results arrive in phase 4.</div></div>`;
-    }
+    if (lang === "dataview" || lang === "query") return renderQuery(t.content);
     return fence(tokens, idx, opts, env, self);
   };
+
+  const noteLink = (path: string, name: string) =>
+    `<a class="wikilink" href="#" data-target="${esc(path.replace(/\.md$/i, ""))}" data-heading="">${esc(name)}</a>`;
+
+  const valueHtml = (v: Value): string => {
+    if (isLink(v)) return noteLink(v.link, v.name);
+    if (Array.isArray(v)) return v.map(valueHtml).join(", ");
+    return md.renderInline(displayValue(v));
+  };
+
+  const rowHtml = (res: QueryResult, row: ResultRow): string => {
+    if (row.task) {
+      const t = row.task;
+      const body = md.renderInline(t.raw.replace(/^\s*(?:[-*+]|\d+[.)])\s+\[.\]\s?/, ""));
+      const box =
+        t.status === "open" || t.status === "done"
+          ? `<input type="checkbox" class="task-box" data-path="${esc(row.path)}" data-line="${t.line}"${t.status === "done" ? " checked" : ""}>`
+          : `<span class="task-mark" title="${t.status}">${t.status === "cancelled" ? "✕" : t.status === "deferred" ? "➜" : esc(t.char)}</span>`;
+      return `<li class="task task-${t.status}">${box} ${body}</li>`;
+    }
+    if (row.attn) {
+      const a = row.attn;
+      return `<li class="attn-row${a.resolved ? " attn-resolved" : ""}"><span class="linefield linefield-attn">Attn</span> ${md.renderInline(a.text)} <span class="query-src">· ${noteLink(row.path, row.name)}</span></li>`;
+    }
+    const value = row.values.length ? `: ${row.values.map(valueHtml).join(" ")}` : "";
+    return `<li>${noteLink(row.path, row.name)}${value}</li>`;
+  };
+
+  const tableHtml = (res: QueryResult, rows: ResultRow[]): string => {
+    const head = res.headers.map((h) => `<th>${esc(h)}</th>`).join("");
+    const body = rows
+      .map((r) => `<tr>${res.withoutId ? "" : `<td>${noteLink(r.path, r.name)}</td>`}${r.values.map((v) => `<td>${valueHtml(v)}</td>`).join("")}</tr>`)
+      .join("");
+    return `<div class="query-table"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
+  };
+
+  /** Run a ```dataview block and render its results. */
+  function renderQuery(source: string): string {
+    let res: QueryResult;
+    try {
+      res = ctx.runQuery(source);
+    } catch (e) {
+      return `<div class="query query-error"><div class="query-title">Dataview query error</div><p>${esc((e as Error).message)}</p><pre><code>${esc(source)}</code></pre></div>`;
+    }
+    const groups = res.groups
+      .map((g) => {
+        const title = g.key !== undefined ? `<div class="query-group">${g.key === null ? "(none)" : valueHtml(g.key)} <span>${g.rows.length}</span></div>` : "";
+        const content = res.kind === "table" ? tableHtml(res, g.rows) : `<ul class="query-list">${g.rows.map((r) => rowHtml(res, r)).join("")}</ul>`;
+        return title + content;
+      })
+      .join("");
+    const noun = res.kind === "task" ? "task" : res.kind === "attn" ? "Attn point" : "note";
+    const empty = res.count === 0 ? `<p class="query-empty">No matching ${noun}s.</p>` : groups;
+    return `<div class="query"><div class="query-title">Dataview · ${res.count} ${noun}${res.count === 1 ? "" : "s"}</div>${empty}</div>`;
+  }
 
   return (markdown: string): string => {
     const { body, hasFrontmatter } = splitFrontmatter(markdown);

@@ -10,3 +10,5 @@ export * from "./tags";
 export * from "./tasks";
 export * from "./taxonomy";
 export * from "./toc";
+export * from "./query";
+export * from "./query-builder";

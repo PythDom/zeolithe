@@ -81,9 +81,20 @@ export function insertText(view: EditorView, text: string) {
   view.focus();
 }
 
-/** Insert a block on its own line(s) after the cursor's line. */
+/** End offset of the YAML frontmatter (0 when there is none). */
+function frontmatterEnd(doc: string): number {
+  const m = /^---\r?\n[\s\S]*?\r?\n(?:---|\.\.\.)(?:\r?\n|$)/.exec(doc);
+  return m ? m[0].length : 0;
+}
+
+/**
+ * Insert a block on its own line(s) after the cursor's line. A cursor inside
+ * the frontmatter (e.g. a freshly opened note) appends to the end instead.
+ */
 export function insertBlock(view: EditorView, block: string) {
-  const line = view.state.doc.lineAt(view.state.selection.main.head);
+  const head = view.state.selection.main.head;
+  const pos = head < frontmatterEnd(view.state.doc.toString()) ? view.state.doc.length : head;
+  const line = view.state.doc.lineAt(pos);
   const insert = (line.text.trim() ? "\n\n" : "") + block + "\n";
   view.dispatch({ changes: { from: line.to, insert }, selection: { anchor: line.to + insert.length } });
   view.focus();

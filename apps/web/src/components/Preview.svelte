@@ -2,7 +2,7 @@
   interface Props {
     html: string;
     onOpenLink: (target: string, heading: string) => void;
-    onToggleTask: (line: number) => void;
+    onToggleTask: (line: number, path?: string) => void;
     onTag: (tag: string) => void;
   }
   let { html, onOpenLink, onToggleTask, onTag }: Props = $props();
@@ -12,7 +12,7 @@
     const box = el.closest<HTMLInputElement>("input.task-box");
     if (box) {
       e.preventDefault();
-      onToggleTask(Number(box.dataset.line));
+      onToggleTask(Number(box.dataset.line), box.dataset.path);
       return;
     }
     const link = el.closest<HTMLAnchorElement>("a.wikilink");

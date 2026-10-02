@@ -8,8 +8,9 @@
     tab: "files" | "tags" | "tasks" | "search";
     query: string;
     onOpen: (path: string, line?: number) => void;
+    onQuery: () => void;
   }
-  let { vault, current, tab = $bindable(), query = $bindable(), onOpen }: Props = $props();
+  let { vault, current, tab = $bindable(), query = $bindable(), onOpen, onQuery }: Props = $props();
 
   const today = toIsoDate(new Date());
 
@@ -57,6 +58,7 @@
   const openAttn = $derived(vault.notes.flatMap((r) => r.attn.filter((a) => !a.resolved).map((a) => ({ r, a }))));
 
   const hits = $derived(vault.search(query));
+  const savedSearches = $derived(vault.notes.filter((r) => r.folder === "Searches"));
   const label = (path: string) => path.split("/").pop()!.replace(/\.md$/i, "");
 </script>
 
@@ -132,6 +134,13 @@
     {/each}
   {:else}
     <input class="search" type="search" placeholder="Words or #tag" bind:value={query} />
+    <button class="build" onclick={onQuery}>🔍 Build a Dataview query…</button>
+    {#if !query && savedSearches.length}
+      <h4>Saved searches</h4>
+      {#each savedSearches as s}
+        <button class="item" onclick={() => onOpen(s.path)}><span class="text">🔍 {s.name}</span></button>
+      {/each}
+    {/if}
     {#each hits as h}
       <button class="item" onclick={() => onOpen(h.record.path)}>
         <span class="text">{h.record.name}</span>
@@ -279,6 +288,17 @@
     background: var(--bg);
     color: var(--fg);
     font: inherit;
+  }
+  .build {
+    width: 100%;
+    margin-bottom: 8px;
+    padding: 7px 8px;
+    border: 1px dashed var(--accent);
+    border-radius: 6px;
+    background: none;
+    color: var(--accent-strong);
+    font-size: 13px;
+    cursor: pointer;
   }
   .empty {
     padding: 4px 8px;

@@ -303,15 +303,48 @@ body {
   margin: 0.3em 0;
   padding-left: 1.2em;
 }
-.markdown .query-placeholder {
+.markdown .query {
   margin: 1em 0;
   padding: 8px 14px;
-  border: 1px dashed var(--border);
+  border: 1px solid var(--border);
   border-radius: 8px;
 }
-.markdown .query-note {
+.markdown .query-error {
+  border-color: var(--danger);
+}
+.markdown .query-error p {
+  color: var(--danger);
+}
+.markdown .query-group {
+  margin: 0.8em 0 0.2em;
+  font-weight: 700;
+}
+.markdown .query-group span,
+.markdown .query-src,
+.markdown .query-empty {
   color: var(--muted);
-  font-size: 0.85em;
+  font-weight: 400;
+  font-size: 0.9em;
+}
+.markdown .query-list {
+  margin: 0.3em 0;
+  padding-left: 1.4em;
+}
+.markdown .query-list li.task {
+  margin-left: -1.4em;
+}
+.markdown .attn-row {
+  list-style: none;
+  margin-left: -1.4em;
+}
+.markdown .attn-row.attn-resolved {
+  color: var(--muted);
+}
+.markdown .query-table {
+  overflow-x: auto;
+}
+.markdown .query-table table {
+  margin: 0.4em 0;
 }
 .markdown .missing {
   color: var(--danger);
