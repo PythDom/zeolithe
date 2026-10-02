@@ -1,4 +1,22 @@
-import { displayValue, generateToc, headingLinkText, isLink, splitFrontmatter, type QueryResult, type ResultRow, type Value } from "@zeolite/core";
+import {
+  chordDiagramSvg,
+  chordsFenceInstrument,
+  displayValue,
+  generateToc,
+  headingLinkText,
+  isLink,
+  lookupFingerings,
+  parseSheet,
+  sheetChords,
+  splitFrontmatter,
+  transposeChord,
+  transposeSheet,
+  type Instrument,
+  type QueryResult,
+  type ResultRow,
+  type Value,
+} from "@zeolite/core";
+import { CHORD_DBS } from "./chord-db";
 import DOMPurify from "dompurify";
 import hljs from "highlight.js/lib/common";
 import MarkdownIt from "markdown-it";
@@ -13,6 +31,26 @@ export interface RenderContext {
   resolveNote(target: string): string | undefined;
   /** Run a Dataview query over the vault (throws QueryError on bad queries). */
   runQuery(source: string): QueryResult;
+  /** View state of chord sheets (transposition, fingerings, diagrams). */
+  chords?: ChordView;
+}
+
+export interface ChordView {
+  /** Semitones shown for the n-th chords block of the note. */
+  transpose(block: number): number;
+  /** Selected fingering index for a chord. */
+  variant(symbol: string, instrument: Instrument): number;
+  diagrams: boolean;
+}
+
+const INSTRUMENT_LABEL: Record<Instrument, string> = { guitar: "Guitar", ukulele: "Ukulele", mandolin: "Mandolin" };
+
+/** Diagram for a chord (used by the cards and the hover popup). */
+export function chordDiagram(symbol: string, instrument: Instrument, variant = 0, width = 84): { svg: string; count: number; index: number } {
+  const list = lookupFingerings(CHORD_DBS[instrument], symbol, instrument);
+  const index = list.length ? variant % list.length : 0;
+  const name = symbol.replace(/\[[^\]]*\]$/, "");
+  return { svg: chordDiagramSvg(name, list[index] ?? null, instrument, undefined, width), count: list.length, index };
 }
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
@@ -232,6 +270,8 @@ export function createRenderer(ctx: RenderContext) {
       return `<nav class="toc"><div class="toc-title">Contents</div>${toc ? md.render(toc) : "<p><em>No headings yet.</em></p>"}</nav>`;
     }
     if (lang === "dataview" || lang === "query") return renderQuery(t.content);
+    const instrument = chordsFenceInstrument(t.info);
+    if (instrument) return renderChords(t.content.replace(/\n$/, ""), instrument, chordBlock++);
     return fence(tokens, idx, opts, env, self);
   };
 
@@ -290,7 +330,59 @@ export function createRenderer(ctx: RenderContext) {
     return `<div class="query"><div class="query-title">Dataview · ${res.count} ${noun}${res.count === 1 ? "" : "s"}</div>${empty}</div>`;
   }
 
+  let chordBlock = 0;
+
+  /** A chords block: transpose bar, diagram cards and the sheet itself. */
+  function renderChords(source: string, instrument: Instrument, block: number): string {
+    const view = ctx.chords;
+    const shift = view?.transpose(block) ?? 0;
+    const text = shift ? transposeSheet(source, shift) : source;
+    const chordSpan = (sym: string, inline = false) => `<span class="chord${inline ? " inline" : ""}" data-chord="${esc(sym)}">${esc(sym.replace(/\[[^\]]*\]$/, ""))}</span>`;
+    const lines = parseSheet(text).map((l) => {
+      if (l.kind === "section") return `<span class="chord-section">${esc(l.text)}</span>`;
+      if (!l.chords.length) return esc(l.text);
+      let out = "";
+      let col = 0;
+      for (const c of l.chords) {
+        const before = l.kind === "lyrics" ? l.text.slice(col, c.start - 1) : l.text.slice(col, c.start);
+        out += l.kind === "chords" ? `<span class="chord-fill">${esc(before)}</span>` : esc(before);
+        out += chordSpan(c.symbol, l.kind === "lyrics");
+        col = l.kind === "lyrics" ? c.end + 1 : c.end;
+      }
+      const rest = l.text.slice(col);
+      return out + (l.kind === "chords" ? `<span class="chord-fill">${esc(rest)}</span>` : esc(rest));
+    });
+
+    const first = sheetChords(source)[0];
+    const key = first && shift ? ` <span class="chords-key">${esc(first.replace(/\[[^\]]*\]$/, ""))} → ${esc(transposeChord(first, shift))}</span>` : "";
+    const sign = shift > 0 ? `+${shift}` : String(shift);
+    const bar = `<div class="chords-bar">
+      <span class="chords-instr">${INSTRUMENT_LABEL[instrument]}</span>
+      <span class="chords-tr" title="Transpose">
+        <button type="button" data-act="down" data-block="${block}" aria-label="Transpose down">♭ −1</button>
+        <span class="chords-shift">${shift ? sign : "0"}</span>
+        <button type="button" data-act="up" data-block="${block}" aria-label="Transpose up">+1 ♯</button>
+      </span>${key}
+      ${shift ? `<button type="button" data-act="reset" data-block="${block}">Reset</button><button type="button" data-act="apply" data-block="${block}" title="Rewrite this block with the transposed chords">Write to note</button>` : ""}
+      <button type="button" class="chords-toggle" data-act="diagrams">${view?.diagrams === false ? "Show diagrams" : "Hide diagrams"}</button>
+    </div>`;
+
+    let cards = "";
+    if (view?.diagrams !== false) {
+      cards = sheetChords(text)
+        .map((sym) => {
+          const d = chordDiagram(sym, instrument, view?.variant(sym, instrument) ?? 0);
+          const more = d.count > 1;
+          return `<button type="button" class="chord-card" data-act="${more ? "variant" : ""}" data-chord="${esc(sym)}" data-instrument="${instrument}" title="${more ? `Fingering ${d.index + 1} of ${d.count}: click for the next one` : esc(sym)}">${d.svg}${more ? `<small>${d.index + 1}/${d.count}</small>` : ""}</button>`;
+        })
+        .join("");
+      cards = cards ? `<div class="chord-cards">${cards}</div>` : "";
+    }
+    return `<div class="chords" data-instrument="${instrument}">${bar}${cards}<pre class="chord-sheet">${lines.join("\n")}</pre></div>`;
+  }
+
   return (markdown: string): string => {
+    chordBlock = 0;
     const { body, hasFrontmatter } = splitFrontmatter(markdown);
     offset = hasFrontmatter ? markdown.slice(0, markdown.length - body.length).split("\n").length - 1 : 0;
     source = markdown;

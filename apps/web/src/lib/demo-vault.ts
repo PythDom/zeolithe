@@ -146,6 +146,39 @@ WHERE status = " " AND file.name = this.file.name
 
 ## Notes
 `,
+    "02 Areas/02.50.50.001 Amazing Grace.md": `---
+id: 02.50.50.001
+tags: [Areas, Music, Guitartabs]
+created: ${created}
+---
+# Amazing Grace
+
+Traditional (John Newton, 1779). Use **♭ −1 / +1 ♯** to transpose, click a
+diagram for another fingering, hover a chord to see its shape.
+
+\`\`\`chords
+[Verse 1]
+G            G7        C       G
+Amazing grace, how sweet the sound
+G                      D
+That saved a wretch like me
+G          G7         C        G
+I once was lost, but now am found
+G        Em      D      G
+Was blind, but now I see
+
+[Verse 2, inline chords]
+'Twas [G]grace that taught my [C]heart to [G]fear
+And grace my fears re[D]lieved
+\`\`\`
+
+Ukulele, with a custom shape:
+
+\`\`\`chords-ukulele
+C      F      C      G7    Bbadd9[3213]
+Amazing grace, how sweet the sound
+\`\`\`
+`,
     "Searches/Open Attn points.md": `---
 created: ${created}
 ---

@@ -17,6 +17,8 @@
     upsertStaticToc,
     createFreeNote,
     createJournalNote,
+    transposeChordBlock,
+    type Instrument,
     type NewNote,
   } from "@zeolite/core";
   import { EditorView } from "@codemirror/view";
@@ -31,7 +33,7 @@
   import Toolbar from "./components/Toolbar.svelte";
   import { demoVault } from "./lib/demo-vault";
   import { insertBlock } from "./lib/editor-commands";
-  import { createRenderer } from "./lib/render";
+  import { chordDiagram, createRenderer } from "./lib/render";
   import { FsAccessStorage, fsAccessSupported, MemoryStorage } from "./lib/storage";
   import { Vault } from "./lib/vault.svelte";
   import logo from "../../../assets/logo/zeolite-icon.svg";
@@ -54,12 +56,23 @@
   let drawer = $state(false);
   let status = $state("");
   let editor = $state<ReturnType<typeof Editor>>();
+  // Chord sheets: view-only transposition per note block, chosen fingerings.
+  let transposed = $state<Record<string, number>>({});
+  let fingerings = $state<Record<string, number>>({});
+  let showDiagrams = $state(true);
 
   const render = $derived(
     createRenderer({
       resolveAsset: (t) => vault.resolveAsset(t),
       resolveNote: (t) => vault.resolveNote(t),
       runQuery: (src) => vault.runQuery(src, current ?? undefined),
+      chords: {
+        transpose: (block) => transposed[`${current}#${block}`] ?? 0,
+        variant: (sym, instrument) => fingerings[`${instrument}:${sym}`] ?? 0,
+        get diagrams() {
+          return showDiagrams;
+        },
+      },
     }),
   );
   const html = $derived(current ? render(content) : "");
@@ -186,6 +199,27 @@
     lines[line] = toggleTaskDone(lines[line]!);
     await replaceContent(lines.join("\n"));
   }
+
+  async function chordAction(action: string, block: number, chord: string, instrument: string) {
+    const key = `${current}#${block}`;
+    const shift = transposed[key] ?? 0;
+    if (action === "up" || action === "down") {
+      // One semitone per click; a full octave brings it back to the original.
+      const next = shift + (action === "up" ? 1 : -1);
+      transposed[key] = Math.abs(next) >= 12 ? 0 : next;
+    }
+    if (action === "reset") transposed[key] = 0;
+    if (action === "variant") fingerings[`${instrument}:${chord}`] = (fingerings[`${instrument}:${chord}`] ?? 0) + 1;
+    if (action === "diagrams") showDiagrams = !showDiagrams;
+    if (action === "apply" && shift) {
+      transposed[key] = 0;
+      await replaceContent(transposeChordBlock(content, block, shift));
+      status = `Chords transposed ${shift > 0 ? "+" : ""}${shift} and written to the note`;
+    }
+  }
+
+  const chordTip = (chord: string, instrument: string) =>
+    chordDiagram(chord, instrument as Instrument, fingerings[`${instrument}:${chord}`] ?? 0, 96).svg;
 
   async function staticToc() {
     const view = editor?.getView();
@@ -342,7 +376,7 @@
         {/if}
         {#if mode !== "edit"}
           <section class="pane">
-            <Preview {html} onOpenLink={openLink} onToggleTask={toggleTask} {onTag} />
+            <Preview {html} onOpenLink={openLink} onToggleTask={toggleTask} {onTag} onChordAction={chordAction} {chordTip} />
           </section>
         {/if}
       </div>

@@ -21,6 +21,7 @@
     "@codemirror/state": "^6.5.2",
     "@codemirror/view": "^6.38.6",
     "@lezer/highlight": "^1.2.5",
+    "@tombatossals/chords-db": "^0.5.1",
     "@zeolite/core": "*",
     "dompurify": "^3.2.7",
     "highlight.js": "^11.11.1",

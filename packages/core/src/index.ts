@@ -14,3 +14,4 @@ export * from "./query";
 export * from "./query-builder";
 export * from "./taxonomy-edit";
 export * from "./templates";
+export * from "./chords";

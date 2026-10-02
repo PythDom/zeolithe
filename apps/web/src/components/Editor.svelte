@@ -11,6 +11,7 @@
   import { tags as t } from "@lezer/highlight";
   import { convertDueFields } from "@zeolite/core";
   import { onMount } from "svelte";
+  import { chordHighlight } from "../lib/chord-highlight";
 
   interface Props {
     content: string;
@@ -119,6 +120,7 @@
         keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab]),
         placeholder("Start writing…"),
         dueConverter,
+        chordHighlight,
         fileHandlers,
         EditorView.updateListener.of((u) => {
           if (u.docChanged) onChange(u.state.doc.toString());
@@ -172,6 +174,21 @@
   .editor :global(.cm-tooltip-autocomplete ul li[aria-selected]) {
     background: var(--accent);
     color: var(--on-accent);
+  }
+  /* Inside ```chords blocks: lyrics in the normal colour, chords highlighted. */
+  .editor :global(.cm-chord-line),
+  .editor :global(.cm-chord-line *) {
+    color: var(--fg) !important;
+  }
+  .editor :global(.cm-chord-line .cm-chord),
+  .editor :global(.cm-chord-line .cm-chord *) {
+    color: var(--accent-strong) !important;
+    font-weight: 700;
+  }
+  .editor :global(.cm-chord-line .cm-chord-section),
+  .editor :global(.cm-chord-line .cm-chord-section *) {
+    color: var(--muted) !important;
+    font-weight: 700;
   }
   .editor :global(.cm-panels) {
     background: var(--panel);

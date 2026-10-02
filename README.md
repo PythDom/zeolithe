@@ -64,6 +64,11 @@ Done:
 - Task and Attn panel, simple search.
 - Dataview queries: the common subset of the query language renders live
   results, and ticking a task in the results updates its note.
+- Chord sheets, compatible with Obsidian's Chord Sheets plugin: ```chords
+  blocks (also `chords-ukulele`, `chords-mandolin`), chords over lyrics or
+  inline in [brackets], custom shapes like `Bbadd13[x13333]`. Diagrams
+  (guitar, ukulele; click for other fingerings, hover a chord), transpose
+  ♭/♯ in the view, then "Write to note". Chords highlighted in the editor.
 - Templates (Obsidian-compatible variables): pick one in New note
   (auto-suggested by Sub-PARA, PARA or note type), insert one with
   📄 Template, manage them with the 📄 button in the sidebar.

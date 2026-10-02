@@ -4,11 +4,32 @@
     onOpenLink: (target: string, heading: string) => void;
     onToggleTask: (line: number, path?: string) => void;
     onTag: (tag: string) => void;
+    /** Chord-sheet buttons: transpose, fingerings, diagrams. */
+    onChordAction?: (action: string, block: number, chord: string, instrument: string) => void;
+    /** Diagram HTML for the hover popup over a chord. */
+    chordTip?: (chord: string, instrument: string) => string;
   }
-  let { html, onOpenLink, onToggleTask, onTag }: Props = $props();
+  let { html, onOpenLink, onToggleTask, onTag, onChordAction, chordTip }: Props = $props();
+
+  let tip = $state<{ html: string; x: number; y: number } | null>(null);
+
+  function over(e: MouseEvent) {
+    const el = (e.target as HTMLElement).closest<HTMLElement>(".chord-sheet .chord");
+    if (!el || !chordTip) return (tip = null);
+    const instrument = el.closest<HTMLElement>(".chords")?.dataset.instrument ?? "guitar";
+    const r = el.getBoundingClientRect();
+    tip = { html: chordTip(el.dataset.chord ?? "", instrument), x: r.left + r.width / 2, y: r.bottom + 6 };
+  }
 
   function click(e: MouseEvent) {
     const el = e.target as HTMLElement;
+    const act = el.closest<HTMLElement>("[data-act]");
+    if (act && act.dataset.act && onChordAction) {
+      e.preventDefault();
+      const instrument = act.dataset.instrument ?? act.closest<HTMLElement>(".chords")?.dataset.instrument ?? "guitar";
+      onChordAction(act.dataset.act, Number(act.dataset.block ?? 0), act.dataset.chord ?? "", instrument);
+      return;
+    }
     const box = el.closest<HTMLInputElement>("input.task-box");
     if (box) {
       e.preventDefault();
@@ -32,11 +53,26 @@
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-<div class="preview" onclick={click}>
+<div class="preview" onclick={click} onmouseover={over} onmouseleave={() => (tip = null)} onfocusin={() => (tip = null)}>
   <article class="markdown">{@html html}</article>
 </div>
+{#if tip}
+  <div class="chord-tip" style:left="{tip.x}px" style:top="{tip.y}px" role="tooltip">{@html tip.html}</div>
+{/if}
 
 <style>
+  .chord-tip {
+    position: fixed;
+    z-index: 60;
+    transform: translateX(-50%);
+    padding: 6px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--panel);
+    color: var(--fg);
+    box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
+    pointer-events: none;
+  }
   .preview {
     height: 100%;
     overflow: auto;
