@@ -202,6 +202,16 @@ export function createRenderer(ctx: RenderContext) {
     return `<a class="${cls}" href="#" data-target="${esc(target.trim())}" data-heading="${esc(heading ?? "")}">${esc(label)}</a>`;
   };
 
+  const linkOpen = r.link_open ?? ((t: Token[], i: number, o, _e, self) => self.renderToken(t, i, o));
+  r.link_open = (tokens: Token[], idx: number, opts, env, self) => {
+    const href = tokens[idx]!.attrGet("href") ?? "";
+    if (/^https?:/i.test(href)) {
+      tokens[idx]!.attrSet("target", "_blank");
+      tokens[idx]!.attrSet("rel", "noopener noreferrer");
+    }
+    return linkOpen(tokens, idx, opts, env, self);
+  };
+
   const fence = r.fence!;
   r.fence = (tokens: Token[], idx: number, opts, env, self) => {
     const t = tokens[idx]!;
@@ -223,6 +233,7 @@ export function createRenderer(ctx: RenderContext) {
     const html = md.render(body);
     return DOMPurify.sanitize(html, {
       ALLOW_DATA_ATTR: true,
+      ADD_ATTR: ["target"],
       // Attachments are shown through blob: URLs.
       ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel|blob):|[^a-z]|[a-z+.-]+(?:[^a-z+.\-:]|$))/i,
     });

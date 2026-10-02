@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "check": "svelte-check --tsconfig ./tsconfig.json"
+    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "build:single": "vite build --mode single --outDir dist-single && node scripts/make-artifact.mjs"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.3",
@@ -32,6 +33,7 @@
     "svelte": "^5.43.0",
     "svelte-check": "^4.3.3",
     "typescript": "^5.9.3",
-    "vite": "^7.1.12"
+    "vite": "^7.1.12",
+    "vite-plugin-singlefile": "^2.3.3"
   }
 }

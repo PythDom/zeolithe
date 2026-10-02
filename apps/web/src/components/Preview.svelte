@@ -27,11 +27,7 @@
       onTag(tag.dataset.tag ?? "");
       return;
     }
-    const a = el.closest<HTMLAnchorElement>("a[href]");
-    if (a && /^https?:/.test(a.getAttribute("href") ?? "")) {
-      e.preventDefault();
-      window.open(a.href, "_blank", "noopener");
-    }
+    // External links keep their default behaviour (they carry target=_blank).
   }
 </script>
 

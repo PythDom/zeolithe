@@ -112,8 +112,9 @@
   async function openLink(target: string, heading: string) {
     let path = target ? vault.resolveNote(target) : current ?? undefined;
     if (!path) {
-      if (!confirm(`"${target}" does not exist. Create it?`)) return;
+      // Like Obsidian: following a link to a missing note creates it.
       path = await vault.create(createFreeNote("", target));
+      status = `Created ${path}`;
     }
     const rec = vault.records.get(path);
     const h = heading ? rec?.headings.find((x) => headingLinkText(x.text) === headingLinkText(heading)) : undefined;
@@ -161,11 +162,10 @@
     if (!current || !record?.id) return;
     const id = parseId(record.id)!;
     const newId = nextId(id.para, id.category, id.sub, vault.existingIds);
-    if (!confirm(`Renumber ${record.id} → ${newId}? Links to this note are updated.`)) return;
     const r = renumberNote(current, content, newId);
     try {
       await moveCurrent(r.path, r.content);
-      status = `Renumbered to ${newId}`;
+      status = `Renumbered ${record.id} → ${newId}; links updated`;
     } catch (e) {
       fail(e);
     }
@@ -276,7 +276,7 @@
   .app {
     display: grid;
     grid-template-columns: 290px 1fr;
-    height: 100dvh;
+    height: 100%;
   }
   .sidebar {
     display: flex;
