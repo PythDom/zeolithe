@@ -67,6 +67,10 @@ Done:
 - Templates (Obsidian-compatible variables): pick one in New note
   (auto-suggested by Sub-PARA, PARA or note type), insert one with
   📄 Template, manage them with the 📄 button in the sidebar.
+- PDF export (PDF button or Ctrl+P): the note or its whole folder, real
+  selectable text, clickable table of contents with page numbers, page
+  numbers, images and current Dataview results; download it or save it to
+  `exports/` in the vault.
 - Taxonomy management in the app (Tags → ⚙ Manage taxonomy) and from the
   command line.
 - Query builder (🔍 Query): build a query from a form, insert it in a note or

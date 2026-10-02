@@ -25,6 +25,7 @@
   import QueryBuilder from "./components/QueryBuilder.svelte";
   import TaxonomyManager from "./components/TaxonomyManager.svelte";
   import TemplateManager from "./components/TemplateManager.svelte";
+  import ExportDialog from "./components/ExportDialog.svelte";
   import Preview from "./components/Preview.svelte";
   import Sidebar from "./components/Sidebar.svelte";
   import Toolbar from "./components/Toolbar.svelte";
@@ -49,6 +50,7 @@
   let showQuery = $state(false);
   let showTaxonomy = $state(false);
   let showTemplates = $state(false);
+  let showExport = $state(false);
   let drawer = $state(false);
   let status = $state("");
   let editor = $state<ReturnType<typeof Editor>>();
@@ -278,6 +280,7 @@
 
 <svelte:window onkeydown={(e) => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "n") { e.preventDefault(); showNew = true; }
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "p" && current) { e.preventDefault(); flush().then(() => (showExport = true)); }
   if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "q") { e.preventDefault(); showQuery = true; }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "e") { e.preventDefault(); mode = mode === "view" ? "edit" : "view"; }
 }} />
@@ -312,6 +315,7 @@
       {#if record?.id && !isArchived(vault.taxonomy, record.path)}
         <button class="ghost" onclick={archive} title="Move to 04 Archives and tag #Archives">Archive</button>
       {/if}
+      {#if current}<button class="pdf" onclick={async () => { await flush(); showExport = true; }} title="Export to PDF (Ctrl+P)">PDF</button>{/if}
       <div class="modes" role="radiogroup" aria-label="Mode">
         <button class:active={mode === "edit"} onclick={() => (mode = "edit")}>Edit</button>
         <button class="split" class:active={mode === "split"} onclick={() => (mode = "split")}>Split</button>
@@ -351,6 +355,10 @@
     {#if status}<button class="status" onclick={() => (status = "")}>{status}</button>{/if}
   </main>
 </div>
+
+{#if showExport && current}
+  <ExportDialog {vault} {current} onSaved={(p) => ((showExport = false), (status = `Saved ${p}`))} onClose={() => (showExport = false)} />
+{/if}
 
 {#if showTemplates}
   <TemplateManager {vault} onEdit={(p) => ((showTemplates = false), open(p), mode === "view" && (mode = "split"))} onClose={() => (showTemplates = false)} />

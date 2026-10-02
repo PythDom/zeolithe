@@ -136,9 +136,11 @@ function attnParagraphs(lineOffset: () => number) {
 
 // --- renderer -----------------------------------------------------------------
 
-export function createRenderer(ctx: RenderContext) {
-  let offset = 0;
-  let source = "";
+/**
+ * Markdown parser with Zeolite's Obsidian-flavoured extensions. Shared by the
+ * HTML preview and the PDF exporter so both read notes the same way.
+ */
+export function createMarkdown(lineOffset: () => number = () => 0): MarkdownIt {
   const md: MarkdownIt = new MarkdownIt({
     html: true,
     linkify: true,
@@ -164,10 +166,17 @@ export function createRenderer(ctx: RenderContext) {
   simpleInline(md, "tag", /^#([\p{L}\p{N}_\-/]*[\p{L}_\-/][\p{L}\p{N}_\-/]*)/u, "emphasis", "word");
   simpleInline(md, "person", /^@([\p{L}\p{N}_.-]*[\p{L}\p{N}_])/u, "emphasis", "word");
 
-  md.core.ruler.push("tasks", taskItems(() => offset));
+  md.core.ruler.push("tasks", taskItems(lineOffset));
   md.core.ruler.push("callouts", callouts);
   md.core.ruler.push("heading_ids", headingIds);
-  md.core.ruler.push("attn", attnParagraphs(() => offset));
+  md.core.ruler.push("attn", attnParagraphs(lineOffset));
+  return md;
+}
+
+export function createRenderer(ctx: RenderContext) {
+  let offset = 0;
+  let source = "";
+  const md = createMarkdown(() => offset);
 
   const r = md.renderer.rules;
   r.mark = (t: Token[], i: number) => `<mark>${md.renderInline((t[i]!.meta as RegExpExecArray)[1]!)}</mark>`;

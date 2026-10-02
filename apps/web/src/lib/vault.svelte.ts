@@ -169,6 +169,25 @@ export class Vault {
     return [...this.records.keys()].find((p) => linkNameOf(p) === name);
   }
 
+  /** Vault path of an attachment, matched by path or file name. */
+  resolveAssetPath(target: string): string | undefined {
+    if (this.files.includes(target)) return target;
+    const name = target.split("/").pop();
+    return this.files.find((f) => f.split("/").pop() === name);
+  }
+
+  async readAsset(target: string): Promise<Blob | undefined> {
+    const path = this.resolveAssetPath(target);
+    return path ? this.storage.readBinary(path) : undefined;
+  }
+
+  /** Write a binary file (e.g. an export), replacing any existing one. */
+  async writeFile(path: string, data: Blob): Promise<string> {
+    await this.storage.writeBinary(path, data);
+    if (!this.files.includes(path)) this.files = [...this.files, path].sort((a, b) => a.localeCompare(b));
+    return path;
+  }
+
   resolveAsset(target: string): string | undefined {
     const direct = this.assetUrls.get(target);
     if (direct) return direct;
