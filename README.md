@@ -27,6 +27,11 @@ is shared between Windows and Android.
 3. Press 📂 **Open folder** and choose your vault. Next time, press
    **Reopen "<vault>"** and confirm access once.
 
+If 📂 explains that the page cannot open folders, the file is usually being
+shown inside another app's viewer (mail, Teams, a chat app) or in Firefox:
+save it to disk and open the saved file with Edge or Chrome. Meanwhile
+"Open a read-only copy" works in any browser (changes are not saved).
+
 Nothing is installed and no admin rights are needed; notes stay plain `.md`
 files in your folder (Syncthing keeps syncing them as usual). Firefox cannot
 open folders. A portable Windows app (`Zeolite.exe`, no installer, using the

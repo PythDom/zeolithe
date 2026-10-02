@@ -70,6 +70,44 @@ export function fsAccessSupported(): boolean {
   return typeof window !== "undefined" && "showDirectoryPicker" in window;
 }
 
+/**
+ * Why this page cannot open a vault folder for editing, in plain words, or
+ * null when it can.
+ */
+export function folderAccessProblem(): string | null {
+  if (fsAccessSupported()) return null;
+  const ua = navigator.userAgent;
+  let embedded = false;
+  try {
+    embedded = window.top !== window.self;
+  } catch {
+    embedded = true;
+  }
+  if (embedded)
+    return "Zeolite is shown inside another app's viewer, which does not allow folder access. Save Zeolite.html to your computer, then open the saved file directly in Microsoft Edge or Google Chrome (right-click the file → Open with).";
+  if (!window.isSecureContext)
+    return "The page was opened from an address the browser does not trust for folder access. Open Zeolite.html from your disk (file) or over https.";
+  if ((navigator as Navigator & { brave?: unknown }).brave)
+    return "Brave turns folder access off by default. Use Edge or Chrome, or enable brave://flags/#file-system-access-api and restart Brave.";
+  if (/Firefox\//.test(ua)) return "Firefox cannot open folders for editing. Open Zeolite.html with Microsoft Edge or Google Chrome.";
+  if (/Android|iPhone|iPad/.test(ua)) return "Mobile browsers cannot open folders for editing. The Android app will.";
+  if (/Safari\//.test(ua) && !/Chrome|Chromium|Edg\//.test(ua)) return "Safari cannot open folders for editing. Open Zeolite.html with Microsoft Edge or Google Chrome.";
+  return "This browser does not offer folder access (it may be turned off by your organisation). Open Zeolite.html with a recent Microsoft Edge or Google Chrome.";
+}
+
+/** Folder chosen with <input webkitdirectory>, as an in-memory copy (read-only for the files on disk). */
+export async function memoryCopyFromFiles(files: FileList): Promise<MemoryStorage> {
+  const list = [...files];
+  const root = list[0]?.webkitRelativePath.split("/")[0] ?? "Vault";
+  const seed: Record<string, string | Blob> = {};
+  for (const f of list) {
+    const rel = f.webkitRelativePath.split("/").slice(1).join("/");
+    if (!rel || rel.split("/").slice(0, -1).some((d) => IGNORED_DIRS.has(d) && d !== ".obsidian")) continue;
+    seed[rel] = /\.(md|json)$/i.test(rel) ? await f.text() : f;
+  }
+  return new MemoryStorage(`${root} (read-only copy)`, seed);
+}
+
 export class FsAccessStorage implements VaultStorage {
   constructor(private root: DirHandle) {}
 

@@ -40,7 +40,7 @@
   import { demoVault } from "./lib/demo-vault";
   import { insertBlock } from "./lib/editor-commands";
   import { chordDiagram, createRenderer } from "./lib/render";
-  import { FsAccessStorage, fsAccessSupported, MemoryStorage } from "./lib/storage";
+  import { folderAccessProblem, FsAccessStorage, fsAccessSupported, memoryCopyFromFiles, MemoryStorage } from "./lib/storage";
   import { Vault } from "./lib/vault.svelte";
   import { loadLastVault, regainAccess, saveLastVault } from "./lib/last-vault";
   import logo from "../../../assets/logo/zeolite-icon.svg";
@@ -61,6 +61,9 @@
   let showTemplates = $state(false);
   let showExport = $state(false);
   let showRename = $state(false);
+  let folderHelp = $state<string | null>(null);
+  let readOnlyCopy = $state(false);
+  let folderInput = $state<HTMLInputElement>();
   let showDelete = $state(false);
   let showChangeId = $state(false);
   let lastVault = $state<FileSystemDirectoryHandle | undefined>();
@@ -320,15 +323,34 @@
 
 
   async function openFolder() {
+    const problem = folderAccessProblem();
+    if (problem) return (folderHelp = problem);
     try {
       await flush();
       const storage = await FsAccessStorage.pick();
       await loadVault(new Vault(storage));
+      readOnlyCopy = false;
       await saveLastVault(storage.handle);
       lastVault = storage.handle;
     } catch (e) {
       if ((e as Error).name !== "AbortError") fail(e);
     }
+  }
+
+  /** Fallback without folder access: load a copy of the folder; edits stay in memory. */
+  async function openReadOnlyCopy(e: Event) {
+    const input = e.currentTarget as HTMLInputElement;
+    const files = input.files;
+    if (!files?.length) return;
+    folderHelp = null;
+    try {
+      await flush();
+      await loadVault(new Vault(await memoryCopyFromFiles(files)));
+      readOnlyCopy = true;
+    } catch (err) {
+      fail(err);
+    }
+    input.value = "";
   }
 
   /** Reopen the remembered vault folder (one click to confirm access). */
@@ -381,7 +403,7 @@
       <button class="primary" onclick={() => (showNew = true)} title="Ctrl+N">＋ New note</button>
       <button onclick={journal} title="Today's journal">📓</button>
       <button onclick={() => (showTemplates = true)} title="Templates">📄</button>
-      <button onclick={openFolder} disabled={!fsAccessSupported()} title={fsAccessSupported() ? "Open a vault folder" : "Folder access needs Chrome/Edge desktop here; native apps come next"}>📂</button>
+      <button onclick={openFolder} title="Open a vault folder">📂</button>
     </div>
     {#if lastVault && vault.name !== lastVault.name}
       <button class="reopen" onclick={reopenVault} title="Reopen your last vault folder">📂 Reopen “{lastVault.name}”</button>
@@ -391,6 +413,9 @@
   <button class="scrim" aria-label="Close menu" onclick={() => (drawer = false)}></button>
 
   <main>
+    {#if readOnlyCopy}
+      <div class="readonly" role="status">Read-only copy of “{vault.name.replace(" (read-only copy)", "")}”: changes stay in this window and are not saved to your files.</div>
+    {/if}
     <header class="notebar">
       <button class="menu" aria-label="Menu" onclick={() => (drawer = !drawer)}>☰</button>
       <div class="crumbs">
@@ -450,6 +475,22 @@
     {#if status}<button class="status" onclick={() => (status = "")}>{status}</button>{/if}
   </main>
 </div>
+
+<input bind:this={folderInput} type="file" webkitdirectory multiple hidden onchange={openReadOnlyCopy} />
+
+{#if folderHelp}
+  <div class="backdrop" role="presentation" onclick={(e) => e.target === e.currentTarget && (folderHelp = null)}>
+    <div class="help" role="alertdialog" aria-labelledby="fh-title">
+      <h2 id="fh-title">This page can't open your vault for editing</h2>
+      <p>{folderHelp}</p>
+      <p class="muted">Meanwhile you can open a <b>read-only copy</b>: browse, search, run queries and export PDFs. Changes will not be saved to your files.</p>
+      <div class="help-actions">
+        <button onclick={() => (folderHelp = null)}>Close</button>
+        <button class="primary" onclick={() => folderInput?.click()}>Open a read-only copy…</button>
+      </div>
+    </div>
+  </div>
+{/if}
 
 {#if showChangeId && current}
   <ChangeIdDialog
@@ -747,6 +788,64 @@
   }
   .scrim {
     display: none;
+  }
+  .readonly {
+    padding: 6px 12px;
+    background: var(--warn-soft);
+    color: var(--fg);
+    font-size: 13px;
+  }
+  .backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: grid;
+    place-items: center;
+    padding: 16px;
+    background: rgb(0 0 0 / 0.35);
+  }
+  .help {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: min(500px, 100%);
+    padding: 20px;
+    border-radius: 12px;
+    background: var(--panel);
+    color: var(--fg);
+    box-shadow: 0 20px 60px rgb(0 0 0 / 0.3);
+  }
+  .help h2 {
+    margin: 0;
+    font-size: 18px;
+  }
+  .help p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .help .muted {
+    color: var(--muted);
+  }
+  .help-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  .help-actions button {
+    padding: 8px 14px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--fg);
+    font: inherit;
+    cursor: pointer;
+  }
+  .help-actions .primary {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: var(--on-accent);
   }
 
   @media (max-width: 800px) {
