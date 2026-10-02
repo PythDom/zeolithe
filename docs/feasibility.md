@@ -122,8 +122,8 @@ not split into Sub-PARA subfolders, because the ID prefix already sorts them.
 
 1. Press "New note" and choose a type: **PARA note**, **Journal**, **Inbox**
    or **Free note**.
-2. For a PARA note, choose the PARA, then the Sub-PARA (the list depends on
-   the PARA), then the Category. Each is a searchable dropdown.
+2. For a PARA note, choose the PARA, then the Category, then the Sub-PARA
+   (the list depends on the PARA), in the order of the ID `XX.YY.ZZ`.
 3. The generator finds the highest existing `NNN` for that `XX.YY.ZZ` prefix
    and adds 1, giving `001` if there is none.
 4. The file `01 Projets/01.02.05.001 Title.md` is created with:

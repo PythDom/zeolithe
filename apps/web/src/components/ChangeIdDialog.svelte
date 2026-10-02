@@ -85,11 +85,11 @@
       <label>PARA
         <select bind:value={para}>{#each paras as p}<option value={p.code}>{p.code} · #{p.tag}</option>{/each}</select>
       </label>
-      <label>Sub-PARA
-        <select bind:value={sub}>{#each subs as s}<option value={s.code}>{s.code} · #{s.tag}</option>{/each}</select>
-      </label>
       <label>Category
         <select bind:value={category}>{#each tax.categories as c}<option value={c.code}>{c.code} · #{c.tag}</option>{/each}</select>
+      </label>
+      <label>Sub-PARA
+        <select bind:value={sub}>{#each subs as s}<option value={s.code}>{s.code} · #{s.tag}</option>{/each}</select>
       </label>
       <div class="id">New ID <code>{preview}</code></div>
       <label class="check"><input type="checkbox" bind:checked={move} /> Move the note to <b>{folder}/</b></label>

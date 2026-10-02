@@ -171,14 +171,14 @@
             {#each paras as p}<option value={p.code}>{p.code} · #{p.tag}</option>{/each}
           </select>
         </label>
-        <label>Sub-PARA
-          <select bind:value={sub}>
-            {#each subs as s}<option value={s.code}>{s.code} · #{s.tag}</option>{/each}
-          </select>
-        </label>
         <label>Category
           <select bind:value={category}>
             {#each taxonomy.categories as c}<option value={c.code}>{c.code} · #{c.tag}</option>{/each}
+          </select>
+        </label>
+        <label>Sub-PARA
+          <select bind:value={sub}>
+            {#each subs as s}<option value={s.code}>{s.code} · #{s.tag}</option>{/each}
           </select>
         </label>
         <div class="id">ID <code>{previewId}</code> <small>prefix {idPrefix(para, category, sub)}</small></div>
