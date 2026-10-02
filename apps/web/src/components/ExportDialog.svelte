@@ -2,6 +2,9 @@
   import type { Instrument, NoteRecord } from "@zeolite/core";
   import { exportPdf, type PdfNote, type PdfOptions } from "../lib/pdf";
   import type { Vault } from "../lib/vault.svelte";
+  import { platform, tauriSaveAs } from "../lib/native";
+
+  const shell = platform();
 
   interface Props {
     vault: Vault;
@@ -108,7 +111,11 @@
         <button class="primary" disabled={busy} onclick={build}>{busy ? "Creating PDF…" : "Create PDF"}</button>
       {:else}
         <button onclick={saveToVault} title="Saves into exports/ in the vault (works on every device)">Save to vault</button>
-        <a class="primary" href={result.url} download={result.name}>Download</a>
+        {#if shell === "tauri"}
+          <button class="primary" onclick={async () => { if (result) { const p = await tauriSaveAs(result.name, result.blob); if (p) onSaved(p); } }}>Save as…</button>
+        {:else if shell === "web"}
+          <a class="primary" href={result.url} download={result.name}>Download</a>
+        {/if}
       {/if}
     </footer>
   </div>

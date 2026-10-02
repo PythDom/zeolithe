@@ -1,0 +1,91 @@
+name: Build apps
+
+# Builds the Windows app (Tauri), the Android app (Capacitor) and the
+# portable HTML file. Download them from the run's "Artifacts" section.
+on:
+  push:
+  workflow_dispatch:
+
+concurrency:
+  group: apps-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run check
+      - run: npm run build:portable
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Zeolite-portable-html
+          path: apps/web/dist-portable/Zeolite.html
+          if-no-files-found: error
+
+  windows:
+    needs: checks
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri -> target
+      - run: npm ci
+      # Builds the web UI (beforeBuildCommand), then the app and its installer.
+      - run: npx tauri build
+        working-directory: apps/desktop
+      - name: Collect files
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force out | Out-Null
+          Copy-Item apps/desktop/src-tauri/target/release/zeolite.exe out/Zeolite.exe
+          Copy-Item apps/desktop/src-tauri/target/release/bundle/nsis/*.exe out/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Zeolite-windows-portable-exe
+          path: out/Zeolite.exe
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Zeolite-windows-installer
+          path: out/*setup*.exe
+          if-no-files-found: error
+
+  android:
+    needs: checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+      - run: npm ci
+      - run: npm run build
+      - run: npx cap sync android
+        working-directory: apps/mobile
+      - run: ./gradlew assembleDebug --no-daemon
+        working-directory: apps/mobile/android
+      - run: cp apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk Zeolite-android.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Zeolite-android-apk
+          path: Zeolite-android.apk
+          if-no-files-found: error

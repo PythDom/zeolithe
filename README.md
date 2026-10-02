@@ -12,9 +12,34 @@ is shared between Windows and Android.
 | Path | Content |
 | ---- | ------- |
 | `packages/core` | Shared, platform-independent logic: taxonomy, `XX.YY.ZZ.NNN` IDs, tasks, Attn points, dates, tags, TOC. Unit-tested. |
-| `apps/web` | Shared UI (Svelte + CodeMirror 6). It runs in a browser today. The Tauri (Windows) and Capacitor (Android) shells will wrap it. |
+| `apps/web` | Shared UI (Svelte + CodeMirror 6), with one storage adapter per platform (browser, Windows, Android). |
+| `apps/desktop` | Windows app (Tauri 2): portable `Zeolite.exe` and an installer. |
+| `apps/mobile` | Android app (Capacitor 8): APK. |
 | `assets/logo` | Logo: an icon and a wordmark (SVG). |
 | `docs` | Specification. |
+
+## Windows and Android apps
+
+GitHub builds both apps on every push (workflow **Build apps**). Open the
+latest run under the repository's **Actions** tab and download them from
+**Artifacts**:
+
+| Artifact | What it is |
+| -------- | ---------- |
+| `Zeolite-windows-portable-exe` | `Zeolite.exe`: runs without installing (uses the WebView2 runtime built into Windows 10/11). |
+| `Zeolite-windows-installer` | Installer for the current user (no admin rights). |
+| `Zeolite-android-apk` | `Zeolite-android.apk`: install on the phone (allow "install unknown apps" once). |
+| `Zeolite-portable-html` | The single-file browser version. |
+
+- **Windows:** 📂 opens the system folder picker; the vault reopens by itself
+  at the next start.
+- **Android:** the first 📂 asks for **All files access** (as Obsidian and
+  Syncthing-Fork do), then an in-app browser picks the vault folder, e.g. the
+  one Syncthing syncs. It reopens by itself at the next start.
+
+Local builds: `npm run tauri -w @zeolite/desktop build` (needs Rust; on
+Windows the WebView2 runtime) and `npx cap sync android` in `apps/mobile`, then
+`./gradlew assembleDebug` in `apps/mobile/android` (needs the Android SDK).
 
 ## Portable use (no install, e.g. a work PC)
 
@@ -118,8 +143,8 @@ Done:
 
 Next:
 
-- Native shells: Tauri on Windows, Capacitor on Android. Start with the
-  Android folder-access spike.
+- Test the Android app on a device (folder access, Syncthing), then polish
+  the phone layout (toolbar above the keyboard).
 - SQLite WASM index with full-text search.
 - Renaming and merging tags.
 - Live preview.

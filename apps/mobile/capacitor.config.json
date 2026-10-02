@@ -1,0 +1,8 @@
+{
+  "appId": "org.zeolite.app",
+  "appName": "Zeolite",
+  "webDir": "../web/dist",
+  "android": {
+    "allowMixedContent": false
+  }
+}

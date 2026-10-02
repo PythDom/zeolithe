@@ -43,6 +43,8 @@
   import { folderAccessProblem, FsAccessStorage, fsAccessSupported, memoryCopyFromFiles, MemoryStorage } from "./lib/storage";
   import { Vault } from "./lib/vault.svelte";
   import { loadLastVault, regainAccess, saveLastVault } from "./lib/last-vault";
+  import { CapacitorStorage, lastVaultPath, platform, rememberVaultPath, TauriStorage } from "./lib/native";
+  import AndroidFolderDialog from "./components/AndroidFolderDialog.svelte";
   import logo from "../../../assets/logo/zeolite-icon.svg";
 
   type Mode = "edit" | "split" | "view";
@@ -67,7 +69,9 @@
   let showDelete = $state(false);
   let showChangeId = $state(false);
   let lastVault = $state<FileSystemDirectoryHandle | undefined>();
-  if (fsAccessSupported()) loadLastVault().then((h) => (lastVault = h));
+  let androidPicker = $state(false);
+  const shell = platform();
+  if (shell === "web" && fsAccessSupported()) loadLastVault().then((h) => (lastVault = h));
   let drawer = $state(false);
   let status = $state("");
   let editor = $state<ReturnType<typeof Editor>>();
@@ -322,7 +326,25 @@
   }
 
 
+  /** Native shells: open a vault folder by path and remember it. */
+  async function openNative(storage: TauriStorage | CapacitorStorage) {
+    await flush();
+    await loadVault(new Vault(storage));
+    readOnlyCopy = false;
+    rememberVaultPath(storage.root);
+  }
+
   async function openFolder() {
+    if (shell === "tauri") {
+      try {
+        const storage = await TauriStorage.pick();
+        if (storage) await openNative(storage);
+      } catch (e) {
+        fail(e);
+      }
+      return;
+    }
+    if (shell === "android") return (androidPicker = true);
     const problem = folderAccessProblem();
     if (problem) return (folderHelp = problem);
     try {
@@ -379,7 +401,22 @@
 
   const allTags = () => [...new Set([...taxonomyTags(vault.taxonomy), ...vault.tagCounts().keys()])].sort();
 
-  loadVault(demo);
+  /** Start on the last vault in the native apps, else on the demo vault. */
+  async function start() {
+    const last = shell !== "web" ? lastVaultPath() : null;
+    if (last) {
+      const storage = shell === "tauri" ? await TauriStorage.reopen(last) : await CapacitorStorage.reopen(last);
+      if (storage) {
+        try {
+          return await openNative(storage);
+        } catch {
+          // Fall back to the demo vault below.
+        }
+      }
+    }
+    await loadVault(demo);
+  }
+  start();
 </script>
 
 <svelte:window onkeydown={(e) => {
@@ -478,6 +515,20 @@
 
 <input bind:this={folderInput} type="file" webkitdirectory multiple hidden onchange={openReadOnlyCopy} />
 
+{#if androidPicker}
+  <AndroidFolderDialog
+    onChoose={async (path) => {
+      androidPicker = false;
+      try {
+        await openNative(new CapacitorStorage(path));
+      } catch (e) {
+        fail(e);
+      }
+    }}
+    onClose={() => (androidPicker = false)}
+  />
+{/if}
+
 {#if folderHelp}
   <div class="backdrop" role="presentation" onclick={(e) => e.target === e.currentTarget && (folderHelp = null)}>
     <div class="help" role="alertdialog" aria-labelledby="fh-title">
@@ -514,8 +565,9 @@
     onDelete={async () => {
       const path = current!;
       clearTimeout(saveTimer);
-      current = null;
+      // Errors are shown in the dialog; the note stays open until it is moved.
       const to = await vault.trash(path);
+      current = null;
       showDelete = false;
       status = `Moved to ${to}`;
       const next = vault.notes[0]?.path;
