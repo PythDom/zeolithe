@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Zeolithe">
+  <title>Zeolithe</title>
+  <defs>
+    <clipPath id="z-crystal"><path clip-rule="evenodd" d="M256.0,32.0 L450.0,144.0 L450.0,368.0 L256.0,480.0 L62.0,368.0 L62.0,144.0 Z M348.0,256.0 L302.0,335.7 L210.0,335.7 L164.0,256.0 L210.0,176.3 L302.0,176.3 Z"/></clipPath>
+  </defs>
+  <g clip-path="url(#z-crystal)" stroke="#ECFEFF" stroke-opacity="0.18" stroke-width="3" stroke-linejoin="round">
+    <polygon points="256.0,32.0 450.0,144.0 348.0,256.0" fill="#0F6F69"/>
+    <polygon points="450.0,144.0 302.0,335.7 348.0,256.0" fill="#0D9488"/>
+    <polygon points="450.0,144.0 450.0,368.0 302.0,335.7" fill="#0B3B3A"/>
+    <polygon points="450.0,368.0 210.0,335.7 302.0,335.7" fill="#0B3B3A"/>
+    <polygon points="450.0,368.0 256.0,480.0 210.0,335.7" fill="#0F6F69"/>
+    <polygon points="256.0,480.0 164.0,256.0 210.0,335.7" fill="#0B3B3A"/>
+    <polygon points="256.0,480.0 62.0,368.0 164.0,256.0" fill="#2DD4BF"/>
+    <polygon points="62.0,368.0 210.0,176.3 164.0,256.0" fill="#14B8A6"/>
+    <polygon points="62.0,368.0 62.0,144.0 210.0,176.3" fill="#99F6E4"/>
+    <polygon points="62.0,144.0 302.0,176.3 210.0,176.3" fill="#99F6E4"/>
+    <polygon points="62.0,144.0 256.0,32.0 302.0,176.3" fill="#2DD4BF"/>
+    <polygon points="256.0,32.0 348.0,256.0 302.0,176.3" fill="#99F6E4"/>
+  </g>
+  <path d="M256.0,32.0 L450.0,144.0 L450.0,368.0 L256.0,480.0 L62.0,368.0 L62.0,144.0 Z M348.0,256.0 L302.0,335.7 L210.0,335.7 L164.0,256.0 L210.0,176.3 L302.0,176.3 Z" fill="none" stroke="#042F2E" stroke-opacity="0.35" stroke-width="4" stroke-linejoin="round" fill-rule="evenodd"/>
+</svg>

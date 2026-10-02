@@ -1,0 +1,96 @@
+import taxonomy from "../../../../docs/taxonomy.md?raw";
+import logo from "../../../../assets/logo/zeolithe-icon.svg?raw";
+import { TAXONOMY_PATH, toIsoDate, toIsoMinute } from "@zeolithe/core";
+
+/** A small in-memory vault so the app can be tried without opening a folder. */
+export function demoVault(now = new Date()): Record<string, string | Blob> {
+  const day = toIsoDate(now);
+  const plus = (n: number) => toIsoDate(new Date(now.getFullYear(), now.getMonth(), now.getDate() + n));
+  const created = toIsoMinute(now);
+  return {
+    [TAXONOMY_PATH]: taxonomy,
+    "attachments/zeolithe-icon.svg": new Blob([logo], { type: "image/svg+xml" }),
+    "Welcome.md": `---
+created: ${created}
+---
+# Welcome to Zeolithe
+
+This is a **demo vault** kept in memory. Use **Open folder** to work on a real
+vault (Chromium/Edge desktop for now; native Windows and Android apps next).
+
+![[zeolithe-icon.svg|96]]
+
+\`\`\`toc
+\`\`\`
+
+## Writing
+
+Markdown basics: *italic*, **bold**, ~~strike~~, ==highlight==, \`code\`,
+[[01.02.05.001 F35 status review|wiki links]], #tags and @people.
+
+> [!tip] Callouts
+> Obsidian callouts render too.
+
+## Tasks
+
+Use the toolbar buttons, or type them:
+
+- [ ] Open task
+- [ ] Task with a deadline [due:: ${plus(3)}]
+- [x] Finished task [done:: ${day}]
+- [-] Cancelled task
+- [>] Deferred task
+
+Typing \`[due:: friday]\` converts the date to ISO as soon as you close the bracket.
+
+## Attn points
+
+Attn:: Something that needs attention @alice
+- Inline form works too: [Attn:: check this sentence]
+
+## Numbering
+
+**New note → PARA note** picks PARA, Sub-PARA and Category from
+\`_system/Taxonomy.md\` and assigns the next \`XX.YY.ZZ.NNN\` ID.
+`,
+    "01 Projets/01.02.05.001 F35 status review.md": `---
+id: 01.02.05.001
+tags: [Projets, SAS, F35]
+created: ${created}
+---
+# F35 status review
+
+## Actions
+
+- [ ] Draft report for the program office @alice #F35 [due:: ${plus(5)}]
+- [ ] Review supplier schedule [due:: ${plus(-1)}]
+- [x] Send meeting minutes [done:: ${day}]
+
+## Notes
+
+Attn:: Budget overrun risk on lot 3 @bob
+- Meeting went well, but [Attn:: supplier delay on T601] needs follow-up
+`,
+    "02 Areas/02.00.00.001 Weekly team meeting.md": `---
+id: 02.00.00.001
+tags: [Areas, General, Team_meetings]
+created: ${created}
+---
+# Weekly team meeting
+
+- [ ] Plan training sessions #Training [due:: ${plus(10)}]
+- [ ] Update quality dashboard @carol
+
+Attn:: Confirm room booking [resolved:: ${day}]
+`,
+    [`Journal/${day}.md`]: `---
+tags: [Journal]
+created: ${created}
+---
+# ${day}
+
+- Started using Zeolithe.
+- [ ] Try the new-note dialog
+`,
+  };
+}
