@@ -81,3 +81,26 @@ describe("notes", () => {
     expect(r.content).toBe("---\nid: 01.02.05.005\n---\nbody");
   });
 });
+
+describe("assignId", () => {
+  it("changes the ID of a numbered note", async () => {
+    const { assignId } = await import("../src/notes");
+    const content = "---\nid: 01.02.05.001\ntags: [Projets, SAS, F35, review]\ncreated: 2026-10-01T09:00\n---\n# Status\n";
+    const r = assignId({ taxonomy: tax, path: "01 Projets/01.02.05.001 Status.md", content, para: "02", category: "00", sub: "00", existingIds: ["01.02.05.001", "02.00.00.001"], moveToParaFolder: true });
+    expect(r.id).toBe("02.00.00.002");
+    expect(r.path).toBe("02 Areas/02.00.00.002 Status.md");
+    expect(r.content).toBe("---\nid: 02.00.00.002\ntags: [Areas, General, Team_meetings, review]\ncreated: 2026-10-01T09:00\n---\n# Status\n");
+  });
+  it("assigns a first ID to an Obsidian note", async () => {
+    const { assignId } = await import("../src/notes");
+    const r = assignId({ taxonomy: tax, path: "Notes/Garden ideas.md", content: "# Garden ideas\n#idea\n", para: "03", category: "99", sub: "00", existingIds: [], moveToParaFolder: false });
+    expect(r.path).toBe("Notes/03.99.00.001 Garden ideas.md");
+    expect(r.content).toMatch(/^---\nid: 03\.99\.00\.001\ntags: \[References, Personal, Notes\]\ncreated: \d{4}-\d\d-\d\dT\d\d:\d\d\n---\n# Garden ideas\n#idea\n$/);
+  });
+  it("does not count the note's own number as taken", async () => {
+    const { assignId } = await import("../src/notes");
+    // Same series: its own number is not counted as taken, so it gets the next free one after the others.
+    const r = assignId({ taxonomy: tax, path: "01 Projets/01.02.05.003 X.md", content: "---\nid: 01.02.05.003\n---\n", para: "01", category: "02", sub: "05", existingIds: ["01.02.05.001", "01.02.05.003"], moveToParaFolder: true });
+    expect(r.id).toBe("01.02.05.002");
+  });
+});

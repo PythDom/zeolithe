@@ -11,6 +11,7 @@
     insertTemplate,
     createFromTemplate,
     templateName,
+    isTemplatePath,
     findCategory,
     findPara,
     findSubPara,
@@ -32,6 +33,7 @@
   import ExportDialog from "./components/ExportDialog.svelte";
   import RenameDialog from "./components/RenameDialog.svelte";
   import DeleteDialog from "./components/DeleteDialog.svelte";
+  import ChangeIdDialog from "./components/ChangeIdDialog.svelte";
   import Preview from "./components/Preview.svelte";
   import Sidebar from "./components/Sidebar.svelte";
   import Toolbar from "./components/Toolbar.svelte";
@@ -60,6 +62,7 @@
   let showExport = $state(false);
   let showRename = $state(false);
   let showDelete = $state(false);
+  let showChangeId = $state(false);
   let lastVault = $state<FileSystemDirectoryHandle | undefined>();
   if (fsAccessSupported()) loadLastVault().then((h) => (lastVault = h));
   let drawer = $state(false);
@@ -391,7 +394,11 @@
     <header class="notebar">
       <button class="menu" aria-label="Menu" onclick={() => (drawer = !drawer)}>☰</button>
       <div class="crumbs">
-        {#if record?.id}<span class="id">{record.id}</span>{/if}
+        {#if record?.id}
+          <button class="id" onclick={async () => { await flush(); showChangeId = true; }} title="Change this note's ID">{record.id}</button>
+        {:else if current && !isTemplatePath(current, vault.settings.templatesFolder) && !current.startsWith("_system/")}
+          <button class="id add" onclick={async () => { await flush(); showChangeId = true; }} title="Give this note an ID">＋ Assign ID</button>
+        {/if}
         {#if current}
           <button class="path" onclick={async () => { await flush(); showRename = true; }} title="Rename or move this note (F2)">{current}</button>
         {:else}
@@ -443,6 +450,21 @@
     {#if status}<button class="status" onclick={() => (status = "")}>{status}</button>{/if}
   </main>
 </div>
+
+{#if showChangeId && current}
+  <ChangeIdDialog
+    {vault}
+    path={current}
+    {content}
+    onApply={async (note) => {
+      await moveCurrent(note.path, note.content);
+      showChangeId = false;
+      status = `ID is now ${note.id}`;
+    }}
+    onSetupTaxonomy={() => ((showChangeId = false), (showTaxonomy = true))}
+    onClose={() => (showChangeId = false)}
+  />
+{/if}
 
 {#if showDelete && current}
   <DeleteDialog
@@ -629,6 +651,19 @@
     font-size: 12.5px;
     font-weight: 700;
     white-space: nowrap;
+  }
+  .crumbs button.id {
+    border: 1px solid transparent;
+    cursor: pointer;
+  }
+  .crumbs button.id:hover {
+    border-color: var(--accent);
+  }
+  .crumbs button.id.add {
+    background: none;
+    border: 1px dashed var(--accent);
+    font-family: inherit;
+    font-weight: 600;
   }
   .crumbs .path {
     min-width: 0;

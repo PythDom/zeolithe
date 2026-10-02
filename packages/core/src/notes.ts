@@ -115,3 +115,56 @@ export function renumberNote(path: string, content: string, newId: string): NewN
     content: withFrontmatter(content, { ...data, id: newId }),
   };
 }
+
+export interface AssignIdRequest {
+  taxonomy: Taxonomy;
+  path: string;
+  content: string;
+  para: string;
+  category: string;
+  sub: string;
+  existingIds: Iterable<string>;
+  /** Move the note into the new PARA's folder. */
+  moveToParaFolder: boolean;
+}
+
+/**
+ * Give a note a new ID (or its first one): next number for the chosen
+ * PARA/Category/Sub-PARA, file name prefix, frontmatter `id`, and the
+ * taxonomy tags of the old ID replaced by the new ones (other tags kept).
+ */
+export function assignId(req: AssignIdRequest): NewNote & { id: string } {
+  const { taxonomy: tax } = req;
+  const p = findPara(tax, req.para);
+  if (!p) throw new Error(`Unknown PARA ${req.para}.`);
+  if (!findCategory(tax, req.category)) throw new Error(`Unknown category ${req.category}.`);
+  if (!findSubPara(tax, req.para, req.sub)) throw new Error(`Unknown Sub-PARA ${req.sub} for PARA ${req.para}.`);
+
+  const { data } = splitFrontmatter(req.content);
+  const parts = req.path.split("/");
+  const name = parts.pop()!;
+  const oldId = (typeof data.id === "string" && parseId(data.id) ? data.id : undefined) ?? idFromFileName(name) ?? undefined;
+  const id = nextId(req.para, req.category, req.sub, [...req.existingIds].filter((x) => x !== oldId));
+
+  const base = name.replace(/\.md$/i, "");
+  const title = oldId && base.startsWith(oldId) ? base.slice(oldId.length).trim() : base;
+  const fileName = noteFileName(id, title);
+  const folder = req.moveToParaFolder ? p.folder! : parts.join("/");
+
+  const oldTags = oldId ? tagsForId(tax, parseId(oldId)!) : [];
+  const current = Array.isArray(data.tags) ? data.tags.map((t) => String(t).replace(/^#/, "")) : typeof data.tags === "string" ? [data.tags] : [];
+  const kept = current.filter((t) => !oldTags.includes(t));
+  const newTags = tagsForId(tax, parseId(id)!);
+  const tags = [...newTags, ...kept.filter((t) => !newTags.includes(t))];
+
+  const created = data.created ?? toIsoMinute(new Date());
+  const { id: _old, tags: _t, created: _c, ...rest } = data;
+  void _old;
+  void _t;
+  void _c;
+  return {
+    id,
+    path: folder ? `${folder}/${fileName}` : fileName,
+    content: withFrontmatter(req.content, { id, tags, created, ...rest }),
+  };
+}
