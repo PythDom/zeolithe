@@ -42,6 +42,7 @@
   import NewFolderDialog from "./components/NewFolderDialog.svelte";
   import LinkDialog from "./components/LinkDialog.svelte";
   import SyncDialog from "./components/SyncDialog.svelte";
+  import { MULTI_USER_CHECKS } from "./lib/features";
   import { describeReport, loadSyncSettings, runSync, saveSyncSettings, type SyncSettings } from "./lib/sync";
   import { WebDavClient } from "./lib/webdav";
   import { demoVault, starterVault } from "./lib/demo-vault";
@@ -268,7 +269,7 @@
   // Every 3 s; less often when checking the folder is slow (big vault, network or OneDrive folder).
   let checkEvery = 3000;
   $effect(() => {
-    if (vault === demo || readOnlyCopy) return;
+    if (!MULTI_USER_CHECKS || vault === demo || readOnlyCopy) return;
     let last = 0;
     const id = setInterval(() => {
       if (document.visibilityState !== "visible" || Date.now() - last < checkEvery) return;

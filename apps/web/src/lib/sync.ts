@@ -75,6 +75,17 @@ async function readState(storage: VaultStorage, url: string): Promise<Record<str
 
 const bytes = async (b: Blob) => new Uint8Array(await b.arrayBuffer());
 
+/** Modification time and size of a local file, when the storage can tell. */
+async function stampOf(storage: VaultStorage, path: string): Promise<string | undefined> {
+  if (!storage.stat) return undefined;
+  try {
+    const s = await storage.stat(path);
+    return `${s.mtime}:${s.size}`;
+  } catch {
+    return undefined;
+  }
+}
+
 /** Many deletions at once usually mean a wrong folder: ask first. */
 const tooMany = (n: number, known: number) => n > 5 && n > known * 0.3;
 
@@ -82,9 +93,25 @@ export async function runSync(storage: VaultStorage, client: WebDavClient, opts:
   const report: SyncReport = { uploaded: [], downloaded: [], deletedLocal: [], deletedRemote: [], conflicts: [], errors: [], localChanged: false };
   const base = await readState(storage, client.url);
 
+  // Local files and their stamps (modification time + size): files unchanged since the
+  // last sync are not read again, only new or modified ones are hashed.
+  const stamps = new Map<string, string | undefined>();
+  if (storage.scan) {
+    for (const e of await storage.scan()) if (isSyncedPath(e.path)) stamps.set(e.path, `${e.mtime}:${e.size}`);
+  } else {
+    for (const path of await storage.list()) {
+      if (isSyncedPath(path)) stamps.set(path, await stampOf(storage, path));
+    }
+  }
   const local = new Map<string, string>();
-  for (const path of await storage.list()) {
-    if (isSyncedPath(path)) local.set(path, hashBytes(await bytes(await storage.readBinary(path))));
+  const rehashed = new Set<string>();
+  for (const [path, stamp] of stamps) {
+    const b = base[path];
+    if (stamp && b?.stamp === stamp) local.set(path, b.hash);
+    else {
+      local.set(path, hashBytes(await bytes(await storage.readBinary(path))));
+      rehashed.add(path);
+    }
   }
   const remote = await client.list();
   let plan = planSync(local, remote, base);
@@ -100,6 +127,11 @@ export async function runSync(storage: VaultStorage, client: WebDavClient, opts:
   }
 
   const files = { ...base };
+  // Touched but identical files: remember the new stamp so they are not re-read next time.
+  for (const path of rehashed) {
+    const b = base[path];
+    if (b && b.hash === local.get(path)) files[path] = { ...b, stamp: stamps.get(path) };
+  }
   const now = opts.now ?? new Date();
   const trashDir = `.trash/deleted by sync ${now.toISOString().slice(0, 19).replace("T", " ").replace(/:/g, "-")}`;
   let done = 0;
@@ -108,12 +140,12 @@ export async function runSync(storage: VaultStorage, client: WebDavClient, opts:
   const upload = async (path: string) => {
     const data = await storage.readBinary(path);
     const etag = await client.put(path, data);
-    files[path] = { hash: hashBytes(await bytes(data)), etag };
+    files[path] = { hash: hashBytes(await bytes(data)), etag, stamp: (await stampOf(storage, path)) ?? stamps.get(path) };
   };
   const download = async (path: string) => {
     const data = await client.get(path);
     await storage.writeBinary(path, data);
-    files[path] = { hash: hashBytes(await bytes(data)), etag: remote.get(path) ?? "" };
+    files[path] = { hash: hashBytes(await bytes(data)), etag: remote.get(path) ?? "", stamp: await stampOf(storage, path) };
     report.localChanged = true;
   };
 
@@ -146,13 +178,13 @@ export async function runSync(storage: VaultStorage, client: WebDavClient, opts:
           const theirHash = hashBytes(await bytes(theirs));
           const ours = local.get(a.path)!;
           if (theirHash === ours) {
-            files[a.path] = { hash: ours, etag: remote.get(a.path) ?? "" };
+            files[a.path] = { hash: ours, etag: remote.get(a.path) ?? "", stamp: stamps.get(a.path) };
             break;
           }
           // Both changed: keep ours as the note, theirs as a conflict copy on both sides.
           const copy = conflictPath(a.path, now);
           await storage.writeBinary(copy, theirs);
-          files[copy] = { hash: theirHash, etag: await client.put(copy, theirs) };
+          files[copy] = { hash: theirHash, etag: await client.put(copy, theirs), stamp: await stampOf(storage, copy) };
           await upload(a.path);
           report.conflicts.push(copy);
           report.localChanged = true;

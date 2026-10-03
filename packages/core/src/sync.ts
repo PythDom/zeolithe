@@ -15,6 +15,8 @@ export interface SyncBase {
   hash: string;
   /** Server version (ETag, or modification date and size). */
   etag: string;
+  /** Local modification time and size then: an unchanged file is not re-read to hash it. */
+  stamp?: string;
 }
 
 export type SyncAction =

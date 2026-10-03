@@ -22,6 +22,7 @@ import {
   type QueryResult,
   type Taxonomy,
 } from "@zeolite/core";
+import { MULTI_USER_CHECKS } from "./features";
 import { IGNORED_DIRS, type FileStamp, type VaultStorage } from "./storage";
 
 /** Paths inside ignored folders (.obsidian, .trash, .git…) are not shown. */
@@ -64,7 +65,7 @@ export class Vault {
     return run;
   }
   private async stamp(path: string) {
-    if (!this.storage.stat) return;
+    if (!MULTI_USER_CHECKS || !this.storage.stat) return;
     try {
       const s: FileStamp = await this.storage.stat(path);
       this.stamps.set(path, `${s.mtime}:${s.size}`);
@@ -132,7 +133,7 @@ export class Vault {
   conflictOf(path: string): string | null {
     const sync = /^(.*)\.sync-conflict-[^/]*\.md$/i.exec(path);
     if (sync) return `${sync[1]}.md`;
-    return oneDriveConflictOf(path, (p) => this.records.has(p));
+    return MULTI_USER_CHECKS ? oneDriveConflictOf(path, (p) => this.records.has(p)) : null;
   }
 
   /** Notes that count as real notes (conflict copies and templates excluded). */
@@ -175,7 +176,7 @@ export class Vault {
       if (this.contents.get(path) === content) return;
       const known = this.contents.get(path);
       // Changed on disk by another app since we read it? Keep that version instead of overwriting it.
-      if (known !== undefined && this.files.includes(path) && (await this.changedOnDisk(path))) {
+      if (MULTI_USER_CHECKS && known !== undefined && this.files.includes(path) && (await this.changedOnDisk(path))) {
         const disk = await this.storage.readText(path).catch(() => undefined);
         if (disk !== undefined && disk !== known && disk !== content) {
           const copy = conflictPath(path, new Date(), "OTHER");

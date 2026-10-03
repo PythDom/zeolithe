@@ -113,13 +113,16 @@ Done:
   notes keep their ID; links across the vault are updated.
 - Web links open in the default browser (in the Windows and Android apps
   too); in the editor, Ctrl/Cmd+click a web address to open it.
-- Shared folders (OneDrive/SharePoint, Syncthing, network drives): files
+- Shared folders (OneDrive/SharePoint, Syncthing, network drives) —
+  temporarily switched off (`MULTI_USER_CHECKS` in
+  `apps/web/src/lib/features.ts`): files
   changed by other apps or colleagues are picked up within seconds (the
   open note too, when it has no edits of ours); a save never overwrites
   a version changed meanwhile (it is kept as a conflict copy); OneDrive
   conflict copies (`Note-PCNAME.md`) are listed with the other conflicts.
 - Sync with a WebDAV server, e.g. a container on your Docker server
-  (⇅ in the sidebar): two-way, only changed files, conflicts kept as
+  (⇅ in the sidebar): two-way, only changed files (unchanged local files
+  are not even re-read), conflicts kept as
   Syncthing-style copies, deletions to `.trash`. See [docs/sync.md](docs/sync.md).
 - User guide: ❓ in the sidebar (or F1) writes `_system/Zeolite User Guide.md`
   into the vault (refreshed to the current version each time) and opens it.

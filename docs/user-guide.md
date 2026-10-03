@@ -276,8 +276,14 @@ another app, for example a SharePoint library synced with OneDrive:
    company's name in File Explorer).
 3. Each colleague does the same on their PC.
 
-Zeolite notices files changed by others within a few seconds, while its
-window is active:
+> [!warning] Temporarily switched off
+> The checks below are disabled in this version: Zeolite reads the folder
+> when it opens the vault, but does not notice changes made elsewhere
+> afterwards. Close and reopen the vault (📂) to see colleagues' changes,
+> and avoid working on the same notes at the same time.
+
+When switched on, Zeolite notices files changed by others within a few
+seconds, while its window is active:
 
 - new, changed and deleted notes appear in the Files list;
 - the open note is updated on screen if you have not changed it;
