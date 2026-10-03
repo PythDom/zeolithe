@@ -10,6 +10,12 @@
 
 ## The basics
 
+- **Windows app:** `Zeolite.exe` keeps its settings (last vault, chosen
+  folders, sync settings including the password) in a `Zeolite-data`
+  folder next to it, and nothing elsewhere: copy both to a USB key to take
+  Zeolite with you, delete both to remove it. (If the exe's folder is
+  read-only, the settings go to the usual Windows profile folder instead.)
+
 - Your **vault** is a plain folder of Markdown (`.md`) files. It works with
   Obsidian and syncs with Syncthing like any other folder.
 - 📂 opens a vault folder. Zeolite reopens it by itself next time.

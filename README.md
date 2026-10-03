@@ -28,7 +28,7 @@ download the files from its **Artifacts** section:
 
 | Artifact | What it is |
 | -------- | ---------- |
-| `Zeolite-windows-portable-exe` | `Zeolite.exe`: runs without installing (uses the WebView2 runtime built into Windows 10/11). |
+| `Zeolite-windows-portable-exe` | `Zeolite.exe`: runs without installing (uses the WebView2 runtime built into Windows 10/11). Truly portable: its settings (last vault, chosen folders, sync settings) live in a `Zeolite-data` folder next to the exe, nothing in the user profile. |
 | `Zeolite-windows-installer` | Installer for the current user (no admin rights). |
 | `Zeolite-android-apk` | `Zeolite-android.apk`: install on the phone (allow "install unknown apps" once). |
 | `Zeolite-portable-html` | The single-file browser version. |

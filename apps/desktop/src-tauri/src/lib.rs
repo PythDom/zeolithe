@@ -1,19 +1,61 @@
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
-use tauri::{ipc::CapabilityBuilder, AppHandle, Manager};
+use std::path::PathBuf;
+
+use tauri::{ipc::CapabilityBuilder, AppHandle, Manager, State, WebviewWindowBuilder};
 use tauri_plugin_fs::FsExt;
+
+/// Where Zeolite keeps its own data (web storage: last vault, sync settings;
+/// the list of vault folders chosen): a `Zeolite-data` folder next to the
+/// exe, so the app is truly portable and leaves nothing in the user profile.
+/// Falls back to the usual per-user folder when the exe's folder is read-only.
+struct DataDir(PathBuf);
+
+fn portable_data_dir() -> Option<PathBuf> {
+    let dir = std::env::current_exe().ok()?.parent()?.join("Zeolite-data");
+    std::fs::create_dir_all(&dir).ok()?;
+    let probe = dir.join(".write-test");
+    std::fs::write(&probe, b"").ok()?;
+    let _ = std::fs::remove_file(&probe);
+    Some(dir)
+}
+
+/// Vault folders the user chose in the folder dialog, so they can be reopened
+/// after a restart (kept in `Zeolite-data/vaults.json`).
+fn chosen_vaults(data: &DataDir) -> Vec<String> {
+    std::fs::read_to_string(data.0.join("vaults.json"))
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default()
+}
+
+fn remember_vault(data: &DataDir, root: &str) {
+    let mut list = chosen_vaults(data);
+    if !list.iter().any(|p| p == root) {
+        list.push(root.to_string());
+        if let Ok(json) = serde_json::to_string_pretty(&list) {
+            let _ = std::fs::write(data.0.join("vaults.json"), json);
+        }
+    }
+}
+
+fn vault_allowed(app: &AppHandle, data: &DataDir, path: &str) -> bool {
+    let root = path.trim_end_matches(['/', '\\']);
+    app.fs_scope().is_allowed(path) || chosen_vaults(data).iter().any(|p| p == root)
+}
 
 /// Grant read/write access to the whole vault, hidden folders included
 /// (`.obsidian` settings, `.trash` for deleted notes). Only folders the user
-/// chose in the folder dialog (kept across restarts by the persisted scope)
+/// chose in the folder dialog (remembered in `Zeolite-data/vaults.json`)
 /// can be granted, so the web side cannot reach arbitrary paths.
 #[tauri::command]
-fn allow_vault(app: AppHandle, path: String) -> Result<(), String> {
-    if !app.fs_scope().is_allowed(&path) {
+fn allow_vault(app: AppHandle, data: State<DataDir>, path: String) -> Result<(), String> {
+    if !vault_allowed(&app, &data, &path) {
         return Err("This folder was not chosen in the folder dialog.".into());
     }
     let root = path.trim_end_matches(['/', '\\']).to_string();
+    remember_vault(&data, &root);
     let mut hasher = DefaultHasher::new();
     root.hash(&mut hasher);
     let capability = CapabilityBuilder::new(format!("vault-{:x}", hasher.finish()))
@@ -46,8 +88,8 @@ struct ScanEntry {
 /// app checks the folder every few seconds for changes made by other apps.
 /// Folders named in `ignore` (.obsidian, .trash…) are skipped.
 #[tauri::command]
-fn scan_vault(app: AppHandle, path: String, ignore: Vec<String>) -> Result<Vec<ScanEntry>, String> {
-    if !app.fs_scope().is_allowed(&path) {
+fn scan_vault(app: AppHandle, data: State<DataDir>, path: String, ignore: Vec<String>) -> Result<Vec<ScanEntry>, String> {
+    if !vault_allowed(&app, &data, &path) {
         return Err("This folder was not chosen in the folder dialog.".into());
     }
     let root = std::path::PathBuf::from(path.trim_end_matches(['/', '\\']));
@@ -82,14 +124,33 @@ fn scan_vault(app: AppHandle, path: String, ignore: Vec<String>) -> Result<Vec<S
 }
 
 /// Zeolite desktop shell: the shared web UI in a native window, with access
-/// to the vault folder the user picks. The folder stays allowed across
-/// restarts (persisted scope), so the last vault reopens directly.
+/// to the vault folder the user picks. Chosen folders are remembered in
+/// `Zeolite-data`, so the last vault reopens directly.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .setup(|app| {
+            let data = portable_data_dir()
+                .or_else(|| app.path().app_data_dir().ok())
+                .ok_or("No folder to keep Zeolite's settings in.")?;
+            std::fs::create_dir_all(&data)?;
+            // The window is created here (not from the config) so that its web storage
+            // goes into the data folder instead of the user profile.
+            let config = app
+                .config()
+                .app
+                .windows
+                .iter()
+                .find(|w| w.label == "main")
+                .cloned()
+                .ok_or("No main window in the configuration.")?;
+            app.manage(DataDir(data.clone()));
+            WebviewWindowBuilder::from_config(app.handle(), &config)?
+                .data_directory(data.join("webview"))
+                .build()?;
+            Ok(())
+        })
         .plugin(tauri_plugin_fs::init())
-        // Must come after the fs plugin: it saves and restores the folders allowed by the dialog.
-        .plugin(tauri_plugin_persisted_scope::init())
         .plugin(tauri_plugin_dialog::init())
         // Web links open in the default browser.
         .plugin(tauri_plugin_opener::init())
