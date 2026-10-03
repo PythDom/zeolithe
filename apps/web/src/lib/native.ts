@@ -90,6 +90,12 @@ export class TauriStorage implements VaultStorage {
     return readTextFile(this.abs(path));
   }
 
+  async stat(path: string) {
+    const { stat } = await import("@tauri-apps/plugin-fs");
+    const s = await stat(this.abs(path));
+    return { mtime: s.mtime ? new Date(s.mtime).getTime() : 0, size: s.size };
+  }
+
   async readBinary(path: string) {
     const { readFile } = await import("@tauri-apps/plugin-fs");
     return new Blob([await readFile(this.abs(path))]);
@@ -282,6 +288,12 @@ export class CapacitorStorage implements VaultStorage {
   async makeDir(path: string) {
     const { Filesystem } = await import("@capacitor/filesystem");
     await Filesystem.mkdir({ path: this.abs(path), recursive: true });
+  }
+
+  async stat(path: string) {
+    const { Filesystem } = await import("@capacitor/filesystem");
+    const s = await Filesystem.stat({ path: this.abs(path) });
+    return { mtime: Number(s.mtime) || 0, size: s.size };
   }
 
   async readText(path: string) {

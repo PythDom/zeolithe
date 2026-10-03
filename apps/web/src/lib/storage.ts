@@ -22,6 +22,13 @@ export interface VaultStorage {
   listDirs?(): Promise<string[]>;
   /** Create a folder and its parents (optional; without it a folder exists once a note is saved in it). */
   makeDir?(path: string): Promise<void>;
+  /** Modification time and size, to notice files changed by other apps cheaply (optional). */
+  stat?(path: string): Promise<FileStamp>;
+}
+
+export interface FileStamp {
+  mtime: number;
+  size: number;
 }
 
 /** Folders never read or written by the app. */
@@ -201,6 +208,10 @@ export class FsAccessStorage implements VaultStorage {
 
   async readText(path: string) {
     return (await this.file(path)).text();
+  }
+  async stat(path: string) {
+    const f = await this.file(path);
+    return { mtime: f.lastModified, size: f.size };
   }
   async readBinary(path: string) {
     return this.file(path);

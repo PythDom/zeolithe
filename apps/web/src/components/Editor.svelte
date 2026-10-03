@@ -5,7 +5,7 @@
   import { languages } from "@codemirror/language-data";
   import { yamlFrontmatter } from "@codemirror/lang-yaml";
   import { highlightSelectionMatches, searchKeymap } from "@codemirror/search";
-  import { EditorState } from "@codemirror/state";
+  import { EditorState, Transaction } from "@codemirror/state";
   import { drawSelection, EditorView, keymap, placeholder } from "@codemirror/view";
   import { syntaxHighlighting, HighlightStyle } from "@codemirror/language";
   import { tags as t } from "@lezer/highlight";
@@ -45,6 +45,21 @@
     if (!view) return;
     view.dispatch(view.state.replaceSelection(text), { scrollIntoView: true });
     view.focus();
+  }
+
+  /**
+   * Take in a new version of the same note (changed by another app), as a
+   * minimal edit: the cursor and scroll position stay, and undo skips it.
+   */
+  export function replaceDoc(text: string) {
+    if (!view) return;
+    const cur = view.state.doc.toString();
+    if (cur === text) return;
+    let a = 0;
+    while (a < cur.length && a < text.length && cur[a] === text[a]) a++;
+    let b = 0;
+    while (b < cur.length - a && b < text.length - a && cur[cur.length - 1 - b] === text[text.length - 1 - b]) b++;
+    view.dispatch({ changes: { from: a, to: cur.length - b, insert: text.slice(a, text.length - b) }, annotations: Transaction.addToHistory.of(false) });
   }
 
   /** Replace the document (when another note is opened or the file changed). */

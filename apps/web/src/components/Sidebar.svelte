@@ -114,7 +114,13 @@
         </div>
       {/each}
       {#each vault.conflicts as c}
-        <div class="alert">⇄ Sync conflict: <button class="link" onclick={() => onOpen(c.path)}>{label(c.path)}</button></div>
+        {@const original = vault.conflictOf(c.path)}
+        <div class="alert">
+          ⇄ {original ? "Conflict copy of" : "Conflict copy"}
+          {#if original}<button class="link" onclick={() => onOpen(original)}>{label(original)}</button>{/if}:
+          <button class="link" onclick={() => onOpen(c.path)}>{label(c.path)}</button>
+          <span class="hint">Merge what you need into the note, then delete the copy.</span>
+        </div>
       {/each}
       {#if !vault.exists(TAXONOMY_PATH)}
         <div class="alert">No taxonomy in this vault yet, so notes are not numbered. <button class="link" onclick={onTaxonomy}>Set it up</button></div>
@@ -449,6 +455,11 @@
     padding: 4px 8px;
     color: var(--muted);
     font-size: 13px;
+  }
+  .alert .hint {
+    display: block;
+    color: var(--muted);
+    font-size: 11.5px;
   }
   .alerts {
     display: flex;

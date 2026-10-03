@@ -62,3 +62,19 @@ describe("sync helpers", () => {
     expect(normaliseEtag('"x1"')).toBe("x1");
   });
 });
+
+describe("OneDrive conflict copies", async () => {
+  const { oneDriveConflictOf } = await import("../src/note-record");
+  const have = (...paths: string[]) => (p: string) => paths.includes(p);
+  it("recognises a copy named after a computer, next to the original", () => {
+    expect(oneDriveConflictOf("Notes/Plan-DESKTOP-AB12CD.md", have("Notes/Plan.md"))).toBe("Notes/Plan.md");
+    expect(oneDriveConflictOf("Plan-LAPTOP7-2.md", have("Plan.md"))).toBe("Plan.md");
+    expect(oneDriveConflictOf("01.02.05.001 Status review-PCJEAN.md", have("01.02.05.001 Status review.md"))).toBe("01.02.05.001 Status review.md");
+  });
+  it("ignores ordinary names", () => {
+    expect(oneDriveConflictOf("Plan-v2.md", have("Plan.md"))).toBeNull();
+    expect(oneDriveConflictOf("Meeting-notes.md", have("Meeting.md"))).toBeNull();
+    expect(oneDriveConflictOf("Plan-DESKTOP-AB12CD.md", have())).toBeNull();
+    expect(oneDriveConflictOf("Report-2026.md", have("Report.md"))).toBeNull();
+  });
+});

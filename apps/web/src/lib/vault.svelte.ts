@@ -1,5 +1,7 @@
 import {
   buildNoteRecord,
+  conflictPath,
+  oneDriveConflictOf,
   findCollisions,
   isTemplatePath,
   attachmentFolder,
@@ -20,7 +22,7 @@ import {
   type QueryResult,
   type Taxonomy,
 } from "@zeolite/core";
-import { IGNORED_DIRS, type VaultStorage } from "./storage";
+import { IGNORED_DIRS, type FileStamp, type VaultStorage } from "./storage";
 
 /** Paths inside ignored folders (.obsidian, .trash, .git…) are not shown. */
 const visible = (path: string) => !path.split("/").slice(0, -1).some((d) => IGNORED_DIRS.has(d));
@@ -52,6 +54,31 @@ export class Vault {
     this.storage = storage;
   }
 
+  /** Last known modification time and size of each note (when the storage can tell). */
+  private stamps = new Map<string, string>();
+  /** Saves and disk checks run one at a time. */
+  private queue: Promise<unknown> = Promise.resolve();
+  private exclusive<T>(fn: () => Promise<T>): Promise<T> {
+    const run = this.queue.then(fn, fn);
+    this.queue = run.catch(() => {});
+    return run;
+  }
+  private async stamp(path: string) {
+    if (!this.storage.stat) return;
+    try {
+      const s: FileStamp = await this.storage.stat(path);
+      this.stamps.set(path, `${s.mtime}:${s.size}`);
+    } catch {
+      this.stamps.delete(path);
+    }
+  }
+  /**
+   * Called when a note was changed by another app (OneDrive, Syncthing, a
+   * colleague…) while Zeolite was saving it: the other version is kept as
+   * `copy`, Zeolite's version stays the note.
+   */
+  onConflict: ((path: string, copy: string) => void) | null = null;
+
   get name() {
     return this.storage.name;
   }
@@ -75,11 +102,13 @@ export class Vault {
     });
     const files = (await this.storage.list()).filter(visible).sort((a, b) => a.localeCompare(b));
     const records = new Map<string, NoteRecord>();
+    this.stamps.clear();
     for (const path of files) {
       if (!path.toLowerCase().endsWith(".md")) continue;
       const text = await this.storage.readText(path);
       this.contents.set(path, text);
       records.set(path, buildNoteRecord(path, text));
+      await this.stamp(path);
     }
     for (const u of this.assetUrls.values()) URL.revokeObjectURL(u);
     this.assetUrls.clear();
@@ -97,9 +126,16 @@ export class Vault {
     this.taxonomy = text ? parseTaxonomy(text) : { paras: [], categories: [], subParas: {}, warnings: ["No _system/Taxonomy.md in this vault."] };
   }
 
+  /** Original note of a conflict copy (Syncthing, OneDrive, Zeolite), or null. */
+  conflictOf(path: string): string | null {
+    const sync = /^(.*)\.sync-conflict-[^/]*\.md$/i.exec(path);
+    if (sync) return `${sync[1]}.md`;
+    return oneDriveConflictOf(path, (p) => this.records.has(p));
+  }
+
   /** Notes that count as real notes (conflict copies and templates excluded). */
   get notes(): NoteRecord[] {
-    return [...this.records.values()].filter((r) => !r.conflict && !isTemplatePath(r.path, this.settings.templatesFolder));
+    return [...this.records.values()].filter((r) => !r.conflict && !this.conflictOf(r.path) && !isTemplatePath(r.path, this.settings.templatesFolder));
   }
 
   /** Template note paths (in _system/Templates/). */
@@ -117,7 +153,7 @@ export class Vault {
   }
 
   get conflicts(): NoteRecord[] {
-    return [...this.records.values()].filter((r) => r.conflict);
+    return [...this.records.values()].filter((r) => r.conflict || this.conflictOf(r.path));
   }
 
   get existingIds(): string[] {
@@ -132,15 +168,107 @@ export class Vault {
     return this.contents.get(path) ?? "";
   }
 
-  async save(path: string, content: string) {
-    if (this.contents.get(path) === content) return;
+  save(path: string, content: string): Promise<void> {
+    return this.exclusive(async () => {
+      if (this.contents.get(path) === content) return;
+      const known = this.contents.get(path);
+      // Changed on disk by another app since we read it? Keep that version instead of overwriting it.
+      if (known !== undefined && this.files.includes(path)) {
+        const disk = await this.storage.readText(path).catch(() => undefined);
+        if (disk !== undefined && disk !== known && disk !== content) {
+          const copy = conflictPath(path, new Date(), "OTHER");
+          await this.storage.writeText(copy, disk);
+          this.remember(copy, disk);
+          await this.stamp(copy);
+          this.onConflict?.(path, copy);
+        }
+      }
+      await this.storage.writeText(path, content);
+      this.remember(path, content);
+      await this.stamp(path);
+    });
+  }
+
+  /** Update the in-memory view of a note. */
+  private remember(path: string, content: string) {
     this.contents.set(path, content);
-    await this.storage.writeText(path, content);
     const next = new Map(this.records);
     next.set(path, buildNoteRecord(path, content));
     this.records = next;
     if (!this.files.includes(path)) this.files = [...this.files, path].sort((a, b) => a.localeCompare(b));
     if (path === TAXONOMY_PATH) this.refreshTaxonomy();
+  }
+
+  /**
+   * Pick up changes made by other apps (OneDrive, Syncthing, a colleague, a
+   * text editor): new, changed and deleted files. Cheap when the storage
+   * gives modification times; otherwise notes are re-read.
+   */
+  checkDisk(): Promise<{ changed: string[]; added: string[]; removed: string[] }> {
+    return this.exclusive(async () => {
+      // Moves, deletions… may run meanwhile: then this round is dropped (the next one sees the result).
+      const filesAtStart = this.files;
+      const recordsAtStart = this.records;
+      const list = (await this.storage.list()).filter(visible);
+      const now = new Set(list);
+      const before = new Set(this.files);
+      const added = list.filter((f) => !before.has(f));
+      const removed = this.files.filter((f) => !now.has(f));
+      const changed: string[] = [];
+      const texts = new Map<string, string>();
+      const stamps = new Map<string, string>();
+      for (const path of list) {
+        if (!path.toLowerCase().endsWith(".md") || !before.has(path)) continue;
+        if (this.storage.stat) {
+          let s: FileStamp;
+          try {
+            s = await this.storage.stat(path);
+          } catch {
+            continue;
+          }
+          const key = `${s.mtime}:${s.size}`;
+          if (this.stamps.get(path) === key) continue;
+          stamps.set(path, key);
+        }
+        const text = await this.storage.readText(path).catch(() => undefined);
+        if (text === undefined) continue;
+        if (text !== this.contents.get(path)) {
+          changed.push(path);
+          texts.set(path, text);
+        }
+      }
+      for (const path of added) {
+        if (path.toLowerCase().endsWith(".md")) texts.set(path, await this.storage.readText(path).catch(() => ""));
+      }
+      const none = { changed: [], added: [], removed: [] };
+      if (this.files !== filesAtStart || this.records !== recordsAtStart) return none;
+      for (const [p, k] of stamps) this.stamps.set(p, k);
+      if (!added.length && !removed.length && !changed.length) return none;
+      const next = new Map(this.records);
+      for (const path of removed) {
+        next.delete(path);
+        this.contents.delete(path);
+        this.stamps.delete(path);
+        const url = this.assetUrls.get(path);
+        if (url) URL.revokeObjectURL(url);
+        this.assetUrls.delete(path);
+      }
+      for (const [path, text] of texts) this.contents.set(path, text);
+      for (const path of added) {
+        if (path.toLowerCase().endsWith(".md")) await this.stamp(path);
+        else if (IMAGE_EXT.test(path)) {
+          const blob = await this.storage.readBinary(path).catch(() => null);
+          if (blob) this.assetUrls.set(path, URL.createObjectURL(blob));
+        }
+      }
+      for (const path of [...changed, ...added]) {
+        if (path.toLowerCase().endsWith(".md")) next.set(path, buildNoteRecord(path, this.contents.get(path) ?? ""));
+      }
+      this.files = list.sort((a, b) => a.localeCompare(b));
+      this.records = next;
+      if ([...changed, ...added, ...removed].includes(TAXONOMY_PATH)) this.refreshTaxonomy();
+      return { changed, added, removed };
+    });
   }
 
   exists(path: string) {

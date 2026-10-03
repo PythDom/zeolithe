@@ -219,7 +219,67 @@
     };
   });
 
+  // --- Files changed by other apps (OneDrive, Syncthing, colleagues) --------
+  let checking = false;
+  const noteName = (p: string) => p.split("/").pop()!.replace(/\.md$/i, "");
+
+  async function diskCheck() {
+    if (checking || syncing || vault === demo || readOnlyCopy) return;
+    checking = true;
+    try {
+      const path = current;
+      const base = path ? vault.read(path) : "";
+      const r = await vault.checkDisk();
+      if (!path || path !== current) return;
+      if (r.changed.includes(path)) {
+        if (content === base) {
+          // No edits of ours: show the new version.
+          content = vault.read(path);
+          editor?.replaceDoc(content);
+          status = `“${noteName(path)}” was updated by another app or person`;
+        } else {
+          // Edited on both sides: keep theirs as a conflict copy, ours stays the note.
+          clearTimeout(saveTimer);
+          const copy = conflictPath(path, new Date(), "OTHER");
+          await vault.save(copy, vault.read(path));
+          await vault.save(path, content);
+          status = `“${noteName(path)}” was also changed elsewhere: the other version is kept as a conflict copy`;
+        }
+      } else if (r.removed.includes(path)) {
+        if (content === base) {
+          clearTimeout(saveTimer);
+          current = null;
+          content = "";
+          status = `“${noteName(path)}” was deleted or moved outside Zeolite`;
+        } else {
+          await vault.save(path, content);
+          status = `“${noteName(path)}” was deleted elsewhere while you were editing it: your version is kept`;
+        }
+      }
+    } catch {
+      // Folder temporarily unavailable (network drive, OneDrive busy): try again at the next check.
+    } finally {
+      checking = false;
+    }
+  }
+
+  $effect(() => {
+    if (vault === demo || readOnlyCopy) return;
+    const id = setInterval(() => document.visibilityState === "visible" && void diskCheck(), 3000);
+    const onVisible = () => document.visibilityState === "visible" && void diskCheck();
+    window.addEventListener("focus", onVisible);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener("focus", onVisible);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  });
+
   async function loadVault(v: Vault) {
+    v.onConflict = (path, copy) => {
+      status = `“${noteName(path)}” was changed elsewhere at the same time: the other version is kept as “${noteName(copy)}”`;
+    };
     await v.load();
     vault = v;
     // Never for the demo vault: its notes must not end up in a real vault's server folder.

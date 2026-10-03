@@ -25,6 +25,27 @@ export interface NoteRecord {
   conflict: boolean;
 }
 
+/**
+ * OneDrive / SharePoint conflict copy: `Note-DESKTOP-AB12CD.md` (or
+ * `Note-PCNAME-2.md`) next to `Note.md`, the suffix being a Windows computer
+ * name (upper-case letters, digits, hyphens; at most 15 characters).
+ * Returns the original note's path, or null.
+ */
+export function oneDriveConflictOf(path: string, exists: (path: string) => boolean): string | null {
+  const m = /^(.*)\.md$/i.exec(path);
+  if (!m) return null;
+  const stem = m[1]!;
+  const slash = stem.lastIndexOf("/");
+  // Try each hyphen of the file name as the start of the computer name (names can contain hyphens).
+  for (let i = stem.indexOf("-", slash + 1); i > slash + 1; i = stem.indexOf("-", i + 1)) {
+    const suffix = stem.slice(i + 1).replace(/-\d{1,3}$/, "");
+    if (suffix.length < 2 || suffix.length > 15 || !/^[A-Z0-9-]+$/.test(suffix) || !/[A-Z]/.test(suffix)) continue;
+    const original = `${stem.slice(0, i)}.md`;
+    if (exists(original)) return original;
+  }
+  return null;
+}
+
 export function isSyncConflict(path: string): boolean {
   return /\.sync-conflict-[^/]*\.md$/i.test(path);
 }

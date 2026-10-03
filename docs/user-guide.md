@@ -264,6 +264,35 @@ Syncthing on that PC instead.
 | "does not allow this" | In `config.yml`, `permissions: CRUD`. |
 | Notes missing on a new device | Check that it uses exactly the same address, then press ⇅ Sync. |
 
+## Sharing a vault with colleagues (SharePoint, OneDrive, Syncthing)
+
+Several people can work in the same vault when its folder is synced by
+another app, for example a SharePoint library synced with OneDrive:
+
+1. In SharePoint (or the Files tab of a Teams channel), open the library
+   and press **Sync** (or **Add shortcut to My files**).
+2. In Zeolite, press 📂 and choose that folder (it appears under your
+   company's name in File Explorer).
+3. Each colleague does the same on their PC.
+
+Zeolite notices files changed by others within a few seconds, while its
+window is active:
+
+- new, changed and deleted notes appear in the Files list;
+- the open note is updated on screen if you have not changed it;
+- if you were editing the same note at the same time, nothing is lost:
+  your version stays the note and the other one is kept next to it as a
+  conflict copy (`….sync-conflict-…-OTHER.md`).
+
+OneDrive's own conflict copies (`Note-COMPUTERNAME.md`) are recognised
+too. All conflict copies are listed at the top of the Files panel: open
+the copy, merge what you need into the note, then delete the copy.
+
+Tips: avoid editing the same note at the same moment; let one person
+maintain `_system/Taxonomy.md`; if two people create a note in the same
+series at once, Zeolite warns about the duplicate number and offers to
+renumber the newer note.
+
 ## Keyboard shortcuts
 
 | Keys | Action |

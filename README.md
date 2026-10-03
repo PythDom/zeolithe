@@ -111,6 +111,11 @@ Done:
 - New-note dialog: PARA ID generation, Journal, Inbox and Free notes.
 - Rename or move a note: click its path at the top, or press F2. PARA
   notes keep their ID; links across the vault are updated.
+- Shared folders (OneDrive/SharePoint, Syncthing, network drives): files
+  changed by other apps or colleagues are picked up within seconds (the
+  open note too, when it has no edits of ours); a save never overwrites
+  a version changed meanwhile (it is kept as a conflict copy); OneDrive
+  conflict copies (`Note-PCNAME.md`) are listed with the other conflicts.
 - Sync with a WebDAV server, e.g. a container on your Docker server
   (⇅ in the sidebar): two-way, only changed files, conflicts kept as
   Syncthing-style copies, deletions to `.trash`. See [docs/sync.md](docs/sync.md).
