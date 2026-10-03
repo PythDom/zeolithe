@@ -7,14 +7,14 @@ const today = new Date(2026, 9, 2); // Friday
 
 const notes = [
   buildNoteRecord(
-    "01 Projets/01.02.05.001 F35 status.md",
+    "01 Projets/01.02.05.001 Typhoon status.md",
     `---
 id: 01.02.05.001
-tags: [Projets, SAS, F35]
+tags: [Projets, SAS, Typhoon]
 created: 2026-10-01T09:00
 ---
-# F35 status
-- [ ] Draft report @alice #F35 [due:: 2026-10-07]
+# Typhoon status
+- [ ] Draft report @alice #Typhoon [due:: 2026-10-07]
 - [ ] Review schedule [due:: 2026-10-01]
 - [x] Send minutes [done:: 2026-10-02]
 - [-] Old idea
@@ -32,7 +32,7 @@ created: 2026-09-20T10:00
 - [ ] Plan training [due:: 2026-10-02]
 - [>] Later thing
 Attn:: Room booking [resolved:: 2026-10-01]
-See [[01.02.05.001 F35 status]]
+See [[01.02.05.001 Typhoon status]]
 `,
   ),
   buildNoteRecord("04 Archives/01.02.05.002 Old.md", "---\nid: 01.02.05.002\ntags: [Projets, Archives]\n---\n- [ ] archived task\n"),
@@ -47,12 +47,12 @@ describe("runQuery", () => {
       "archived task",
       "Review schedule",
       "Plan training",
-      "Draft report @alice #F35",
+      "Draft report @alice #Typhoon",
     ]);
   });
   it("filters by tag source, excluding a folder", () => {
     expect(texts('TASK FROM #Projets AND -"04 Archives" WHERE !completed')).toEqual([
-      "Draft report @alice #F35",
+      "Draft report @alice #Typhoon",
       "Review schedule",
       "Old idea",
     ]);
@@ -61,17 +61,17 @@ describe("runQuery", () => {
     expect(texts("TASK WHERE due AND due < date(today)")).toEqual(["Review schedule"]);
     expect(texts("TASK WHERE due = date(today)")).toEqual(["Plan training"]);
     expect(texts("TASK WHERE due >= date(today) AND due <= date(today) + dur(7 days)")).toEqual([
-      "Draft report @alice #F35",
+      "Draft report @alice #Typhoon",
       "Plan training",
     ]);
   });
   it("matches assignees and text", () => {
-    expect(texts('TASK WHERE contains(text, "@alice")')).toEqual(["Draft report @alice #F35"]);
+    expect(texts('TASK WHERE contains(text, "@alice")')).toEqual(["Draft report @alice #Typhoon"]);
     expect(texts('TASK WHERE icontains(text, "TRAINING")')).toEqual(["Plan training"]);
   });
   it("groups tasks by file", () => {
     const r = runQuery('TASK WHERE status = " " GROUP BY file.link', notes, today);
-    expect(r.groups.map((g) => displayValue(g.key!))).toEqual(["01.02.05.001 F35 status", "01.02.05.002 Old", "02.00.00.001 Team meeting"]);
+    expect(r.groups.map((g) => displayValue(g.key!))).toEqual(["01.02.05.001 Typhoon status", "01.02.05.002 Old", "02.00.00.001 Team meeting"]);
     expect(r.count).toBe(4);
   });
   it("lists individual Attn points", () => {
@@ -80,12 +80,12 @@ describe("runQuery", () => {
     expect(runQuery("LIST Attn", notes, today).kind).toBe("attn");
   });
   it("lists and tables notes", () => {
-    expect(texts('LIST WHERE startswith(id, "01.02")')).toEqual(["01.02.05.001 F35 status", "01.02.05.002 Old"]);
+    expect(texts('LIST WHERE startswith(id, "01.02")')).toEqual(["01.02.05.001 Typhoon status", "01.02.05.002 Old"]);
     const t = runQuery('TABLE id, file.tags AS "Tags" FROM #SAS', notes, today);
     expect(t.headers).toEqual(["File", "id", "Tags"]);
-    expect(t.groups[0]!.rows[0]!.values.map(displayValue)).toEqual(["01.02.05.001", "#Projets, #SAS, #F35"]);
-    expect(texts("LIST FROM [[01.02.05.001 F35 status]]")).toEqual(["02.00.00.001 Team meeting"]);
-    expect(texts("LIST SORT file.ctime DESC LIMIT 1")).toEqual(["01.02.05.001 F35 status"]);
+    expect(t.groups[0]!.rows[0]!.values.map(displayValue)).toEqual(["01.02.05.001", "#Projets, #SAS, #Typhoon"]);
+    expect(texts("LIST FROM [[01.02.05.001 Typhoon status]]")).toEqual(["02.00.00.001 Team meeting"]);
+    expect(texts("LIST SORT file.ctime DESC LIMIT 1")).toEqual(["01.02.05.001 Typhoon status"]);
   });
   it("supports this.file fields", () => {
     const r = runQuery('TASK WHERE status = " " AND file.name = this.file.name', notes, today, "02 Areas/02.00.00.001 Team meeting.md");
@@ -100,11 +100,11 @@ describe("runQuery", () => {
 
 describe("buildQuery", () => {
   it("builds a task query", () => {
-    const q = buildQuery({ ...DEFAULT_QUERY, tags: ["F35", "SAS"], excludeFolder: "04 Archives", due: "next", dueDays: 14, person: "alice" });
+    const q = buildQuery({ ...DEFAULT_QUERY, tags: ["Typhoon", "SAS"], excludeFolder: "04 Archives", due: "next", dueDays: 14, person: "alice" });
     expect(q).toBe(
       [
         "TASK",
-        'FROM (#F35 OR #SAS) AND -"04 Archives"',
+        'FROM (#Typhoon OR #SAS) AND -"04 Archives"',
         'WHERE status = " " AND due AND due >= date(today) AND due <= date(today) + dur(14 days) AND contains(text, "@alice")',
         "SORT due ASC",
         "GROUP BY file.link",
@@ -119,7 +119,7 @@ describe("buildQuery", () => {
 
     const list = buildQuery({ ...DEFAULT_QUERY, target: "notes", idPrefix: "01.02", sort: "id", group: "none", excludeFolder: "04 Archives" });
     expect(list).toBe('LIST\nFROM "" AND -"04 Archives"\nWHERE startswith(id, "01.02")\nSORT id ASC');
-    expect(texts(list)).toEqual(["01.02.05.001 F35 status"]);
+    expect(texts(list)).toEqual(["01.02.05.001 Typhoon status"]);
 
     const table = buildQuery({ ...DEFAULT_QUERY, target: "table", tags: ["Projets"], sort: "created-desc", group: "folder", limit: 10 });
     expect(table).toBe("TABLE id, file.tags, created\nFROM #Projets\nSORT file.ctime DESC\nGROUP BY file.folder\nLIMIT 10");

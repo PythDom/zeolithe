@@ -219,7 +219,7 @@
 
     <footer>
       <button type="button" onclick={copy}>{copied ? "Copied" : "Copy"}</button>
-      <input class="title" placeholder="Search name, e.g. F35 open tasks" bind:value={title} />
+      <input class="title" placeholder="Search name, e.g. Typhoon open tasks" bind:value={title} />
       <button type="button" disabled={!title.trim()} onclick={() => onSave(title, queryBlock(query))} title="Creates a note in Searches/">Save as search</button>
       <button type="button" class="primary" disabled={!onInsert} onclick={() => onInsert?.(queryBlock(query))} title={onInsert ? "Insert at the cursor" : "Open a note in Edit or Split mode to insert"}>Insert in note</button>
     </footer>

@@ -26,7 +26,7 @@ vault (Chromium/Edge desktop for now; native Windows and Android apps next).
 ## Writing
 
 Markdown basics: *italic*, **bold**, ~~strike~~, ==highlight==, \`code\`,
-[[01.02.05.001 F35 status review|wiki links]], #tags and @people.
+[[01.02.05.001 Typhoon status review|wiki links]], #tags and @people.
 
 > [!tip] Callouts
 > Obsidian callouts render too.
@@ -65,16 +65,16 @@ GROUP BY file.link
 **New note → PARA note** picks PARA, Sub-PARA and Category from
 \`_system/Taxonomy.md\` and assigns the next \`XX.YY.ZZ.NNN\` ID.
 `,
-    "01 Projets/01.02.05.001 F35 status review.md": `---
+    "01 Projets/01.02.05.001 Typhoon status review.md": `---
 id: 01.02.05.001
-tags: [Projets, SAS, F35]
+tags: [Projets, SAS, Typhoon]
 created: ${created}
 ---
-# F35 status review
+# Typhoon status review
 
 ## Actions
 
-- [ ] Draft report for the program office @alice #F35 [due:: ${plus(5)}]
+- [ ] Draft report for the program office @alice #Typhoon [due:: ${plus(5)}]
 - [ ] Review supplier schedule [due:: ${plus(-1)}]
 - [x] Send meeting minutes [done:: ${day}]
 

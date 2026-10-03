@@ -15,7 +15,7 @@ XX . YY . ZZ . NNN
 └───────────────── PARA
 ```
 
-Example: `01.02.05.001` → #Projets / #SAS / #F35 / first note.
+Example: `01.02.05.001` → #Projets / #SAS / #Typhoon / first note.
 
 Parsing rules:
 
@@ -68,7 +68,7 @@ Parsing rules:
 | 02   | #SOFAIR      |
 | 03   | #PC-XX       |
 | 04   | #Wisk        |
-| 05   | #F35         |
+| 05   | #Typhoon     |
 | 06   | #Planview    |
 | 07   | #T601        |
 | 50   | #Liquidation |

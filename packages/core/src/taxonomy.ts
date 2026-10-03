@@ -3,7 +3,7 @@ import { scanLines } from "./lines";
 export interface TaxonomyEntry {
   /** Two-digit code, e.g. "05". */
   code: string;
-  /** Tag without '#', e.g. "F35". */
+  /** Tag without '#', e.g. "Typhoon". */
   tag: string;
   /** Vault folder (PARA only), e.g. "01 Projets". */
   folder?: string;

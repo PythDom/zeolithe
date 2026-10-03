@@ -28,14 +28,14 @@ describe("renderTemplate", () => {
 });
 
 describe("createFromTemplate", () => {
-  const tax = parseTaxonomy("## PARA (XX)\n| 01 | #Projets |\n## Categories (YY)\n| 02 | #SAS |\n## Sub-PARA (ZZ)\n### 01 Projets\n| 05 | #F35 |");
+  const tax = parseTaxonomy("## PARA (XX)\n| 01 | #Projets |\n## Categories (YY)\n| 02 | #SAS |\n## Sub-PARA (ZZ)\n### 01 Projets\n| 05 | #Typhoon |");
   const note = createParaNote({ taxonomy: tax, para: "01", category: "02", sub: "05", title: "Kick-off", existingIds: [], now: d });
 
   it("merges properties and uses the template body", () => {
     const tpl = "---\ntags: [Meeting]\ntype: meeting\nid: nope\n---\n# {{title}} ({{id}})\n\n## Attendees\n- {{cursor}}\n";
     const out = createFromTemplate(note, tpl, { title: "Kick-off", id: note.id, date: d });
     const { data, body } = splitFrontmatter(out.content);
-    expect(data).toEqual({ id: "01.02.05.001", tags: ["Projets", "SAS", "F35", "Meeting"], created: "2026-10-02T14:05", type: "meeting" });
+    expect(data).toEqual({ id: "01.02.05.001", tags: ["Projets", "SAS", "Typhoon", "Meeting"], created: "2026-10-02T14:05", type: "meeting" });
     expect(body).toBe("\n# Kick-off (01.02.05.001)\n\n## Attendees\n- \n");
     expect(out.content.slice(out.cursor!)).toBe("\n");
     expect(out.content.slice(0, out.cursor!).endsWith("## Attendees\n- ")).toBe(true);

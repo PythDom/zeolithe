@@ -131,7 +131,7 @@ not split into Sub-PARA subfolders, because the ID prefix already sorts them.
    ```yaml
    ---
    id: 01.02.05.001
-   tags: [Projets, SAS, F35]
+   tags: [Projets, SAS, Typhoon]
    created: 2026-10-02T14:31
    ---
    ```
@@ -187,7 +187,7 @@ Fields on a task line:
 Example:
 
 ```markdown
-- [ ] Draft F35 report @alice #F35 [due:: 2026-10-15]
+- [ ] Draft Typhoon report @alice #Typhoon [due:: 2026-10-15]
 - [x] Send invoice [done:: 2026-10-02]
 ```
 
@@ -259,7 +259,7 @@ query blocks keep rendering in both apps.
 ````markdown
 ```dataview
 TASK
-FROM #F35
+FROM #Typhoon
 WHERE !completed AND due <= date(today) + dur(7 days)
 SORT due ASC
 GROUP BY file.link

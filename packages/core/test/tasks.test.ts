@@ -19,7 +19,7 @@ describe("parseTasks", () => {
     "---",
     "tags: [x]",
     "---",
-    "- [ ] Draft F35 report @alice #F35 [due:: 2026-10-15]",
+    "- [ ] Draft Typhoon report @alice #Typhoon [due:: 2026-10-15]",
     "- [x] Send invoice [done:: 2026-10-02]",
     "  1. [-] Old idea",
     "* [>] Book venue",
@@ -36,10 +36,10 @@ describe("parseTasks", () => {
   it("extracts fields, assignees and tags", () => {
     expect(tasks[0]).toMatchObject({
       line: 3,
-      text: "Draft F35 report @alice #F35",
+      text: "Draft Typhoon report @alice #Typhoon",
       due: "2026-10-15",
       assignees: ["alice"],
-      tags: ["F35"],
+      tags: ["Typhoon"],
     });
     expect(tasks[1]!.done).toBe("2026-10-02");
   });

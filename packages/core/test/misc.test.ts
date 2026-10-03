@@ -17,8 +17,8 @@ describe("inline fields", () => {
 
 describe("tags", () => {
   it("extracts inline tags outside code, links and headings", () => {
-    const md = "# Title\nSee #F35 and #Projets/F35, not `#code` or #123 or [[a#b]] or http://x.com/#frag\n```\n#nope\n```";
-    expect(extractInlineTags(md)).toEqual(["F35", "Projets/F35"]);
+    const md = "# Title\nSee #Typhoon and #Projets/Typhoon, not `#code` or #123 or [[a#b]] or http://x.com/#frag\n```\n#nope\n```";
+    expect(extractInlineTags(md)).toEqual(["Typhoon", "Projets/Typhoon"]);
   });
   it("merges frontmatter and inline tags", () => {
     expect(collectTags(["Projets", "#SAS"], "text #SAS #New")).toEqual(["Projets", "SAS", "New"]);
@@ -59,10 +59,10 @@ describe("note records", () => {
   it("builds a record", () => {
     const r = buildNoteRecord(
       "01 Projets/01.02.05.001 Status.md",
-      "---\nid: 01.02.05.001\ntags: [Projets]\ncreated: 2026-10-02T14:31\n---\n# Status\n- [ ] Do #F35\nAttn:: Look",
+      "---\nid: 01.02.05.001\ntags: [Projets]\ncreated: 2026-10-02T14:31\n---\n# Status\n- [ ] Do #Typhoon\nAttn:: Look",
     );
     expect(r).toMatchObject({ id: "01.02.05.001", title: "Status", folder: "01 Projets", created: "2026-10-02T14:31" });
-    expect(r.tags).toEqual(["Projets", "F35"]);
+    expect(r.tags).toEqual(["Projets", "Typhoon"]);
     expect(r.tasks).toHaveLength(1);
     expect(r.attn).toHaveLength(1);
     expect(isSyncConflict("a/b.sync-conflict-20261002-123456-ABCDEF.md")).toBe(true);

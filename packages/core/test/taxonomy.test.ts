@@ -19,7 +19,7 @@ describe("parseTaxonomy (docs/taxonomy.md)", () => {
   it("reads categories and Sub-PARAs", () => {
     expect(tax.categories).toHaveLength(20);
     expect(tax.categories.find((c) => c.code === "06")?.tag).toBe("Programs");
-    expect(tax.subParas["01"]?.find((s) => s.code === "05")?.tag).toBe("F35");
+    expect(tax.subParas["01"]?.find((s) => s.code === "05")?.tag).toBe("Typhoon");
     expect(tax.subParas["02"]?.find((s) => s.code === "01")?.tag).toBe("One-on-One_Meetings");
     expect(tax.subParas["04"] ?? []).toHaveLength(0);
     expect(numberablePara(tax).map((p) => p.code)).toEqual(["01", "02", "03"]);
@@ -36,9 +36,9 @@ describe("IDs", () => {
     expect(() => nextId("01", "00", "00", ["01.00.00.999"])).toThrow();
   });
   it("maps IDs to tags and file names", () => {
-    expect(tagsForId(tax, parseId("01.02.05.001")!)).toEqual(["Projets", "SAS", "F35"]);
-    expect(noteFileName("01.02.05.001", 'F35: "status"?')).toBe("01.02.05.001 F35 status.md");
-    expect(idFromFileName("01 Projets/01.02.05.001 F35 status.md")).toBe("01.02.05.001");
+    expect(tagsForId(tax, parseId("01.02.05.001")!)).toEqual(["Projets", "SAS", "Typhoon"]);
+    expect(noteFileName("01.02.05.001", 'Typhoon: "status"?')).toBe("01.02.05.001 Typhoon status.md");
+    expect(idFromFileName("01 Projets/01.02.05.001 Typhoon status.md")).toBe("01.02.05.001");
     expect(idFromFileName("Journal/2026-10-02.md")).toBeNull();
   });
   it("flags the later-created note in a collision", () => {
@@ -59,7 +59,7 @@ describe("notes", () => {
     const n = createParaNote({ taxonomy: tax, para: "01", category: "02", sub: "05", title: "Status review", existingIds: ["01.02.05.003"], now });
     expect(n.path).toBe("01 Projets/01.02.05.004 Status review.md");
     expect(n.content).toBe(
-      "---\nid: 01.02.05.004\ntags: [Projets, SAS, F35]\ncreated: 2026-10-02T14:31\n---\n\n# Status review\n\n",
+      "---\nid: 01.02.05.004\ntags: [Projets, SAS, Typhoon]\ncreated: 2026-10-02T14:31\n---\n\n# Status review\n\n",
     );
   });
   it("rejects unknown codes", () => {
@@ -73,7 +73,7 @@ describe("notes", () => {
     const a = archiveNote(tax, n.path, n.content);
     expect(a.path).toBe("04 Archives/01.02.05.001 Done.md");
     expect(a.id).toBe("01.02.05.001");
-    expect(splitFrontmatter(a.content).data.tags).toEqual(["Projets", "SAS", "F35", "Archives"]);
+    expect(splitFrontmatter(a.content).data.tags).toEqual(["Projets", "SAS", "Typhoon", "Archives"]);
   });
   it("renumbers a note", () => {
     const r = renumberNote("01 Projets/01.02.05.004 X.md", "---\nid: 01.02.05.004\n---\nbody", "01.02.05.005");
@@ -85,7 +85,7 @@ describe("notes", () => {
 describe("assignId", () => {
   it("changes the ID of a numbered note", async () => {
     const { assignId } = await import("../src/notes");
-    const content = "---\nid: 01.02.05.001\ntags: [Projets, SAS, F35, review]\ncreated: 2026-10-01T09:00\n---\n# Status\n";
+    const content = "---\nid: 01.02.05.001\ntags: [Projets, SAS, Typhoon, review]\ncreated: 2026-10-01T09:00\n---\n# Status\n";
     const r = assignId({ taxonomy: tax, path: "01 Projets/01.02.05.001 Status.md", content, para: "02", category: "00", sub: "00", existingIds: ["01.02.05.001", "02.00.00.001"], moveToParaFolder: true });
     expect(r.id).toBe("02.00.00.002");
     expect(r.path).toBe("02 Areas/02.00.00.002 Status.md");
