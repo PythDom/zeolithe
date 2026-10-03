@@ -105,6 +105,9 @@ Done:
 - New-note dialog: PARA ID generation, Journal, Inbox and Free notes.
 - Rename or move a note: click its path at the top, or press F2. PARA
   notes keep their ID; links across the vault are updated.
+- User guide: ❓ in the sidebar (or F1) writes `_system/Zeolite User Guide.md`
+  into the vault (refreshed to the current version each time) and opens it.
+  Source: [docs/user-guide.md](docs/user-guide.md).
 - Back and forward (← → in the top bar, Alt+← / Alt+→, or the mouse's side
   buttons): after following a link, return to the note you came from, at
   the same scroll position and cursor, like in a web browser.

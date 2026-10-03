@@ -40,6 +40,7 @@
   import NewFolderDialog from "./components/NewFolderDialog.svelte";
   import LinkDialog from "./components/LinkDialog.svelte";
   import { demoVault, starterVault } from "./lib/demo-vault";
+  import userGuide from "../../../docs/user-guide.md?raw";
   import { insertBlock } from "./lib/editor-commands";
   import { chordDiagram, createRenderer } from "./lib/render";
   import { folderAccessProblem, FsAccessStorage, fsAccessSupported, memoryCopyFromFiles, MemoryStorage } from "./lib/storage";
@@ -396,6 +397,20 @@
     mode = mode === "edit" ? "split" : mode;
   }
 
+  /** The user guide, written into the vault (refreshed each time, so it matches this version) and opened. */
+  const GUIDE_PATH = "_system/Zeolite User Guide.md";
+  async function help() {
+    try {
+      await flush();
+      await vault.save(GUIDE_PATH, userGuide);
+      mode = "view";
+      await open(GUIDE_PATH);
+      drawer = false;
+    } catch (e) {
+      fail(e);
+    }
+  }
+
   async function journal() {
     const settings = vault.settings.journal;
     const note = createJournalNote(new Date(), settings);
@@ -588,6 +603,7 @@
     linkFrom = v ? v.state.sliceDoc(v.state.selection.main.from, v.state.selection.main.to) : "";
   }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "n") { e.preventDefault(); showNew = true; }
+  if (e.key === "F1") { e.preventDefault(); help(); }
   if (e.key === "F2" && current) { e.preventDefault(); flush().then(() => (showRename = true)); }
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "p" && current) { e.preventDefault(); flush().then(() => (showExport = true)); }
   if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "q") { e.preventDefault(); showQuery = true; }
@@ -608,6 +624,7 @@
       <button onclick={journal} title="Today's journal">📓</button>
       <button onclick={() => (showTemplates = true)} title="Templates">📄</button>
       <button onclick={openFolder} title="Open a vault folder">📂</button>
+      <button onclick={help} title="User guide (F1): adds it to this vault and opens it" aria-label="Help">❓</button>
     </div>
     {#if lastVault && vault.name !== lastVault.name}
       <button class="reopen" onclick={reopenVault} title="Reopen your last vault folder">📂 Reopen “{lastVault.name}”</button>
@@ -950,8 +967,12 @@
     opacity: 0.45;
     cursor: not-allowed;
   }
+  .actions button:not(.primary) {
+    padding: 6px 8px;
+  }
   .actions .primary {
     flex: 1;
+    white-space: nowrap;
     border-color: var(--accent);
     background: var(--accent);
     color: var(--on-accent);
