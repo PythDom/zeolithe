@@ -8,6 +8,41 @@
 ```toc
 ```
 
+## Why “Zeolite”?
+
+A zeolite is a mineral. Its name, given in 1756 by the Swedish chemist
+Axel Cronstedt, comes from the Greek *zeō* (to boil) and *lithos* (stone):
+when he heated the crystal, it released steam, as if the stone were boiling.
+
+Zeolites are made of a regular framework of tiny cavities, which catch and
+sort molecules by size; they are used as filters and “molecular sieves”.
+That is the idea behind the app: a solid, orderly structure where every note
+finds its place, and where you can sort and filter what you collect. The
+logo is a rough crystal, like a stone just picked up. (The project's first
+name, *zeolithe*, is the French spelling.)
+
+## The PARA method
+
+PARA, proposed by Tiago Forte, sorts information by **how actionable it is**,
+not by subject. Everything fits in four places:
+
+| | What goes there | Example |
+| --- | --- | --- |
+| **Projects** | Short efforts with a goal and an end date | Prepare the F35 review |
+| **Areas** | Ongoing responsibilities, with a standard to keep, no end date | Team management, health, finances |
+| **Resources** | Topics and references you may need later | Aviation, chords, recipes |
+| **Archives** | Anything no longer active, from the three others | Finished projects |
+
+Notes move as their status changes: a finished project goes to the
+Archives, a resource becomes part of a project when you start using it.
+The question to ask is never “what is this about?” but “where will I need
+it?”.
+
+In Zeolite, the four PARA are the first number of a note's ID and its
+folder: `01 Projets`, `02 Areas`, `03 References` (Resources) and
+`04 Archives`. The Category and Sub-PARA numbers then refine where the note
+belongs, and **Archive** moves a note to `04 Archives` in one click.
+
 ## The basics
 
 - **Windows app:** `Zeolite.exe` keeps its settings (last vault, chosen
