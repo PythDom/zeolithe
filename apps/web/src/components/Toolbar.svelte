@@ -18,8 +18,10 @@
     templates: () => string[];
     onTemplate: (path: string) => void;
     onManageTemplates: () => void;
+    /** Open the link dialog with the selected text. */
+    onLink: (selected: string) => void;
   }
-  let { view, onStaticToc, onQuery, templates, onTemplate, onManageTemplates }: Props = $props();
+  let { view, onStaticToc, onQuery, templates, onTemplate, onManageTemplates, onLink }: Props = $props();
   let tplOpen = $state(false);
 
   let dueOpen = $state(false);
@@ -65,7 +67,7 @@
     <button title="Numbered list" onclick={run((v) => toggleLinePrefix(v, "1. "))}>1≡</button>
     <button title="Quote" onclick={run((v) => toggleLinePrefix(v, "> "))}>❝</button>
     <button title="Code block" onclick={run((v) => insertBlock(v, "```\n\n```"))}>{"{ }"}</button>
-    <button title="Wiki link" onclick={run((v) => wrapSelection(v, "[[", "]]", "Note"))}>[[ ]]</button>
+    <button title="Link to a note (Ctrl+K). Tip: typing [[ in the editor also suggests notes." onclick={run((v) => onLink(v.state.sliceDoc(v.state.selection.main.from, v.state.selection.main.to)))}>[[ ]]</button>
     <button title="Table" onclick={run((v) => insertBlock(v, "| Column | Column |\n| ------ | ------ |\n|        |        |"))}>▦</button>
   </div>
   <div class="group">

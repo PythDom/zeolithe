@@ -40,6 +40,8 @@ export interface SearchHit {
 export class Vault {
   storage: VaultStorage;
   files = $state<string[]>([]);
+  /** Every folder on disk, empty ones included (when the storage can list them). */
+  dirs = $state<string[]>([]);
   records = $state<Map<string, NoteRecord>>(new Map());
   contents = new Map<string, string>();
   taxonomy = $state<Taxonomy>({ paras: [], categories: [], subParas: {}, warnings: [] });
@@ -85,6 +87,7 @@ export class Vault {
       if (IMAGE_EXT.test(path)) this.assetUrls.set(path, URL.createObjectURL(await this.storage.readBinary(path)));
     }
     this.files = files;
+    this.dirs = ((await this.storage.listDirs?.()) ?? []).filter((d) => !d.split("/").some((p) => IGNORED_DIRS.has(p)));
     this.records = records;
     this.refreshTaxonomy();
   }
@@ -211,6 +214,7 @@ export class Vault {
     for (const f of files) await this.storage.rename(f, `${target}/${f.slice(folder.length + 1)}`);
     // The emptied folder itself (may hold hidden or ignored files we do not track).
     await this.storage.removeDir?.(folder).catch(() => {});
+    this.dirs = this.dirs.filter((d) => d !== folder && !d.startsWith(`${folder}/`));
     const gone = new Set(files);
     for (const f of files) this.contents.delete(f);
     this.files = this.files.filter((f) => !gone.has(f));
@@ -255,6 +259,23 @@ export class Vault {
     return [...this.records.keys()].find((p) => linkNameOf(p) === name);
   }
 
+  /**
+   * Shortest link target that opens this file, like Obsidian: the note name
+   * (or attachment file name), or the path when another file has the same name.
+   */
+  linkText(path: string): string {
+    const isNote = /\.md$/i.test(path);
+    const name = isNote ? linkNameOf(path) : path.split("/").pop()!;
+    const same = this.files.filter((f) => (isNote ? /\.md$/i.test(f) && linkNameOf(f) === name : f.split("/").pop() === name));
+    if (same.length <= 1) return name;
+    return isNote ? path.replace(/\.md$/i, "") : path;
+  }
+
+  /** Files that are not notes (images, PDFs…), for links and embeds. */
+  attachments(): string[] {
+    return this.files.filter((f) => !/\.md$/i.test(f) && !isTemplatePath(f, this.settings.templatesFolder));
+  }
+
   /** Vault path of an attachment, matched by path or file name. */
   resolveAssetPath(target: string): string | undefined {
     if (this.files.includes(target)) return target;
@@ -286,14 +307,30 @@ export class Vault {
     return runQuery(source, this.notes, new Date(), thisPath);
   }
 
-  /** Folders that contain notes. */
+  /** Folders that contain notes, plus the folders on disk (empty ones included). */
   folders(): string[] {
-    const set = new Set<string>();
+    const set = new Set<string>(this.dirs);
     for (const r of this.notes) {
       const parts = r.folder.split("/");
       for (let i = 1; i <= parts.length; i++) if (parts[0]) set.add(parts.slice(0, i).join("/"));
     }
-    return [...set].sort();
+    return [...set].sort((a, b) => a.localeCompare(b));
+  }
+
+  /** Whether a folder exists (case-insensitive, like Windows and Android file systems). */
+  folderExists(folder: string): boolean {
+    const f = folder.toLowerCase();
+    return this.folders().some((d) => d.toLowerCase() === f) || this.files.some((p) => p.toLowerCase().startsWith(`${f}/`));
+  }
+
+  /** Create an empty folder (and its parents). */
+  async createFolder(folder: string) {
+    if (this.folderExists(folder)) throw new Error(`The folder “${folder}” already exists.`);
+    if (!this.storage.makeDir) throw new Error("This vault cannot create empty folders; create a note in the new folder instead.");
+    await this.storage.makeDir(folder);
+    const parts = folder.split("/");
+    const add = parts.map((_, i) => parts.slice(0, i + 1).join("/")).filter((d) => !this.dirs.includes(d));
+    this.dirs = [...this.dirs, ...add].sort((a, b) => a.localeCompare(b));
   }
 
   /**

@@ -20,6 +20,8 @@
 
   interface Props {
     taxonomy: Taxonomy;
+    /** Existing folders, suggested for free notes. */
+    folders?: string[];
     existingIds: string[];
     templates: string[];
     /** Daily notes folder and format (from Obsidian's settings). */
@@ -28,7 +30,7 @@
     onCreate: (note: NewNote, cursor: number | null) => void;
     onClose: () => void;
   }
-  let { taxonomy, existingIds, templates, readTemplate, journal, onCreate, onClose }: Props = $props();
+  let { taxonomy, existingIds, templates, readTemplate, journal, folders = [], onCreate, onClose }: Props = $props();
   let template = $state("");
   let templateTouched = $state(false);
 
@@ -186,7 +188,8 @@
     {/if}
 
     {#if kind === "free"}
-      <label>Folder <input bind:value={folder} placeholder="(vault root)" /></label>
+      <label>Folder <input bind:value={folder} placeholder="(vault root)" list="nn-folders" /></label>
+      <datalist id="nn-folders">{#each folders as f}<option value={f}></option>{/each}</datalist>
     {/if}
 
     {#if kind !== "journal"}

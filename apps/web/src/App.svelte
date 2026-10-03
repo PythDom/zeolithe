@@ -37,6 +37,8 @@
   import Preview from "./components/Preview.svelte";
   import Sidebar from "./components/Sidebar.svelte";
   import Toolbar from "./components/Toolbar.svelte";
+  import NewFolderDialog from "./components/NewFolderDialog.svelte";
+  import LinkDialog from "./components/LinkDialog.svelte";
   import { demoVault, starterVault } from "./lib/demo-vault";
   import { insertBlock } from "./lib/editor-commands";
   import { chordDiagram, createRenderer } from "./lib/render";
@@ -70,6 +72,10 @@
   let showDelete = $state(false);
   let showChangeId = $state(false);
   let deleteFolder = $state<string | null>(null);
+  /** Parent of the folder being created ("" = vault root), null when the dialog is closed. */
+  let newFolderIn = $state<string | null>(null);
+  /** Wiki link dialog: the selected text when it opened, null when closed. */
+  let linkFrom = $state<string | null>(null);
   let lastVault = $state<FileSystemDirectoryHandle | undefined>();
   let androidPicker = $state(false);
   const shell = platform();
@@ -356,6 +362,13 @@
     }
   }
 
+  async function createFolder(folder: string) {
+    await vault.createFolder(folder);
+    newFolderIn = null;
+    tab = "files";
+    status = `Folder “${folder}” created. Drag notes onto it to move them there.`;
+  }
+
   /** Move a folder and everything in it to .trash. */
   async function trashFolder(folder: string) {
     await flush();
@@ -459,6 +472,11 @@
     drawer = true;
   }
 
+  /** Link targets offered when typing [[ in the editor. */
+  const linkTargets = () => [
+    ...vault.notes.filter((r) => r.path !== current).map((r) => ({ link: vault.linkText(r.path), detail: r.folder, headings: r.headings.map((h) => h.text) })),
+    ...vault.attachments().map((f) => ({ link: vault.linkText(f), detail: "attachment", headings: [] })),
+  ];
   const allTags = () => [...new Set([...taxonomyTags(vault.taxonomy), ...vault.tagCounts().keys()])].sort();
 
   /** Start on the last vault in the native apps, else on the demo vault. */
@@ -480,6 +498,11 @@
 </script>
 
 <svelte:window onkeydown={(e) => {
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "k" && current && mode !== "view") {
+    e.preventDefault();
+    const v = editor?.getView();
+    linkFrom = v ? v.state.sliceDoc(v.state.selection.main.from, v.state.selection.main.to) : "";
+  }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "n") { e.preventDefault(); showNew = true; }
   if (e.key === "F2" && current) { e.preventDefault(); flush().then(() => (showRename = true)); }
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "p" && current) { e.preventDefault(); flush().then(() => (showExport = true)); }
@@ -515,6 +538,7 @@
       onTaxonomy={() => (showTaxonomy = true)}
       onMoveNote={moveNote}
       onDeleteFolder={(f) => (deleteFolder = f)}
+      onNewFolder={(parent) => (newFolderIn = parent)}
     />
   </aside>
   <button class="scrim" aria-label="Close menu" onclick={() => (drawer = false)}></button>
@@ -566,12 +590,13 @@
           templates={() => vault.templates()}
           onTemplate={applyTemplate}
           onManageTemplates={() => (showTemplates = true)}
+          onLink={(selected) => (linkFrom = selected)}
         />
       {/if}
       <div class="panes mode-{mode}">
         {#if mode !== "view"}
           <section class="pane">
-            <Editor bind:this={editor} {content} {onChange} {onFile} tags={allTags} people={() => vault.people()} />
+            <Editor bind:this={editor} {content} {onChange} {onFile} tags={allTags} people={() => vault.people()} links={linkTargets} />
           </section>
         {/if}
         {#if mode !== "edit"}
@@ -742,8 +767,29 @@
   />
 {/if}
 
+{#if newFolderIn !== null}
+  <NewFolderDialog {vault} parent={newFolderIn} onCreate={createFolder} onClose={() => (newFolderIn = null)} />
+{/if}
+
+{#if linkFrom !== null}
+  <LinkDialog
+    {vault}
+    {current}
+    selected={linkFrom}
+    onInsert={(text) => {
+      linkFrom = null;
+      editor?.insert(text);
+    }}
+    onClose={() => {
+      linkFrom = null;
+      editor?.getView()?.focus();
+    }}
+  />
+{/if}
+
 {#if showNew}
   <NewNoteDialog
+    folders={vault.folders()}
     taxonomy={vault.taxonomy}
     existingIds={vault.existingIds}
     templates={vault.templates()}

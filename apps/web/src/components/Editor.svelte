@@ -20,14 +20,28 @@
     onFile: (file: File) => Promise<string>;
     tags: () => string[];
     people: () => string[];
+    /** Notes and attachments offered after typing [[ (link text, folder, headings). */
+    links?: () => LinkTarget[];
   }
-  let { content, onChange, onFile, tags, people }: Props = $props();
+  export interface LinkTarget {
+    link: string;
+    detail: string;
+    headings: string[];
+  }
+  let { content, onChange, onFile, tags, people, links = () => [] }: Props = $props();
 
   let host: HTMLDivElement;
   let view: EditorView | undefined;
 
   export function getView() {
     return view;
+  }
+
+  /** Insert text at the cursor, replacing the selection. */
+  export function insert(text: string) {
+    if (!view) return;
+    view.dispatch(view.state.replaceSelection(text), { scrollIntoView: true });
+    view.focus();
   }
 
   /** Replace the document (when another note is opened or the file changed). */
@@ -55,7 +69,42 @@
     { tag: [t.atom, t.bool, t.number, t.squareBracket], color: "var(--muted)" },
   ]);
 
+  /** "]]" is added unless it is already there (typed or auto-closed). */
+  function closeLink(view: EditorView, text: string, from: number, to: number) {
+    const close = view.state.sliceDoc(to, to + 2) === "]]" ? "" : "]]";
+    view.dispatch({ changes: { from, to, insert: text + close }, selection: { anchor: from + text.length + close.length } });
+  }
+
   function complete(ctx: CompletionContext) {
+    // [[Note#Heading
+    const head = ctx.matchBefore(/\[\[([^[\]|#\n]+)#[^[\]|\n]*/);
+    if (head) {
+      const target = head.text.slice(2, head.text.indexOf("#"));
+      const all = links();
+      const lower = target.toLowerCase();
+      const loose = all.filter((l) => l.link.toLowerCase().includes(lower));
+      const t = all.find((l) => l.link === target || l.link.split("/").pop() === target) ?? (loose.length === 1 ? loose[0] : undefined);
+      if (!t?.headings.length) return null;
+      return {
+        from: head.from + head.text.indexOf("#") + 1,
+        options: t.headings.map((h) => ({ label: h, type: "text", apply: (v: EditorView, _c: unknown, _from: number, to: number) => closeLink(v, `${t.link}#${h}`, head.from + 2, to) })),
+        validFor: /^[^[\]|\n]*$/,
+      };
+    }
+    // [[Note
+    const link = ctx.matchBefore(/\[\[[^[\]|#\n]*/);
+    if (link) {
+      return {
+        from: link.from + 2,
+        options: links().map((l) => ({
+          label: l.link,
+          detail: l.detail,
+          type: "class",
+          apply: (v: EditorView, _c: unknown, from: number, to: number) => closeLink(v, l.link, from, to),
+        })),
+        validFor: /^[^[\]|#\n]*$/,
+      };
+    }
     const tag = ctx.matchBefore(/(?:^|[\s(])#[\p{L}\p{N}_\-/]*/u);
     if (tag) {
       const from = tag.from + tag.text.indexOf("#") + 1;

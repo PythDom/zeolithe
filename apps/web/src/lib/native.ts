@@ -65,6 +65,26 @@ export class TauriStorage implements VaultStorage {
     return out;
   }
 
+  async listDirs(): Promise<string[]> {
+    const { readDir } = await import("@tauri-apps/plugin-fs");
+    const out: string[] = [];
+    const walk = async (rel: string) => {
+      for (const e of await readDir(rel ? this.abs(rel) : this.root)) {
+        if (!e.isDirectory || IGNORED_DIRS.has(e.name)) continue;
+        const p = rel ? `${rel}/${e.name}` : e.name;
+        out.push(p);
+        await walk(p);
+      }
+    };
+    await walk("");
+    return out;
+  }
+
+  async makeDir(path: string) {
+    const { mkdir } = await import("@tauri-apps/plugin-fs");
+    await mkdir(this.abs(path), { recursive: true });
+  }
+
   async readText(path: string) {
     const { readTextFile } = await import("@tauri-apps/plugin-fs");
     return readTextFile(this.abs(path));
@@ -235,6 +255,27 @@ export class CapacitorStorage implements VaultStorage {
     };
     await walk("");
     return out;
+  }
+
+  async listDirs(): Promise<string[]> {
+    const { Filesystem } = await import("@capacitor/filesystem");
+    const out: string[] = [];
+    const walk = async (rel: string) => {
+      const { files } = await Filesystem.readdir({ path: rel ? this.abs(rel) : this.root });
+      for (const f of files) {
+        if (f.type !== "directory" || IGNORED_DIRS.has(f.name)) continue;
+        const p = rel ? `${rel}/${f.name}` : f.name;
+        out.push(p);
+        await walk(p);
+      }
+    };
+    await walk("");
+    return out;
+  }
+
+  async makeDir(path: string) {
+    const { Filesystem } = await import("@capacitor/filesystem");
+    await Filesystem.mkdir({ path: this.abs(path), recursive: true });
   }
 
   async readText(path: string) {

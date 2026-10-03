@@ -13,8 +13,10 @@
     /** A note was dropped on a folder ("" = vault root). */
     onMoveNote: (path: string, folder: string) => void;
     onDeleteFolder: (folder: string) => void;
+    /** Create a folder inside `parent` ("" = vault root). */
+    onNewFolder: (parent: string) => void;
   }
-  let { vault, current, tab = $bindable(), query = $bindable(), onOpen, onQuery, onTaxonomy, onMoveNote, onDeleteFolder }: Props = $props();
+  let { vault, current, tab = $bindable(), query = $bindable(), onOpen, onQuery, onTaxonomy, onMoveNote, onDeleteFolder, onNewFolder }: Props = $props();
 
   // Drag & drop of notes onto folders.
   const DRAG_TYPE = "application/x-zeolite-note";
@@ -51,6 +53,7 @@
   // Files grouped by folder.
   const folders = $derived.by(() => {
     const map = new Map<string, string[]>();
+    for (const d of vault.dirs) map.set(d, []);
     for (const f of vault.files) {
       if (!f.toLowerCase().endsWith(".md")) continue;
       const dir = f.includes("/") ? f.slice(0, f.lastIndexOf("/")) : "";
@@ -121,6 +124,7 @@
   {/if}
 
   {#if tab === "files"}
+    <button class="build" onclick={() => onNewFolder("")}>📁＋ New folder…</button>
     {#each folders as [dir, files]}
       {#if dir}
         <div
@@ -132,6 +136,7 @@
           ondrop={(e) => drop(e, dir)}
         >
           <button class="folder" onclick={() => (collapsed[dir] = !collapsed[dir])}>{collapsed[dir] ? "▸" : "▾"} {dir}</button>
+          <button class="folder-add" title="New folder inside “{dir}”" aria-label="New folder inside {dir}" onclick={() => onNewFolder(dir)}>＋</button>
           <button class="folder-del" title="Delete folder “{dir}” (moves it to .trash)" aria-label="Delete folder {dir}" onclick={() => onDeleteFolder(dir)}>🗑</button>
         </div>
       {/if}
@@ -150,6 +155,8 @@
           >
             {label(f)}
           </button>
+        {:else}
+          {#if dir && !vault.dirs.some((d) => d.startsWith(`${dir}/`)) && !vault.filesIn(dir).length}<p class="folder-empty">Empty. Drag notes here, or create one in this folder.</p>{/if}
         {/each}
       {/if}
     {/each}
@@ -291,6 +298,7 @@
     outline: 2px dashed var(--accent);
     background: var(--accent-soft);
   }
+  .folder-add,
   .folder-del {
     padding: 2px 6px;
     border: none;
@@ -300,19 +308,34 @@
     opacity: 0;
     cursor: pointer;
   }
+  .folder-add {
+    color: var(--accent-strong);
+    font-size: 14px;
+    font-weight: 700;
+  }
+  .folder-row:hover .folder-add,
+  .folder-add:focus-visible,
   .folder-row:hover .folder-del,
   .folder-del:focus-visible {
     opacity: 0.7;
   }
+  .folder-add:hover,
   .folder-del:hover {
     opacity: 1;
     background: var(--hover);
   }
   /* Touch screens have no hover: keep the button visible. */
   @media (hover: none) {
+    .folder-add,
     .folder-del {
       opacity: 0.6;
     }
+  }
+  .folder-empty {
+    margin: 2px 0 4px 22px;
+    color: var(--muted);
+    font-size: 12px;
+    font-style: italic;
   }
   .root-drop {
     margin: 4px 0 8px;

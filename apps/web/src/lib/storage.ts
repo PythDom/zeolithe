@@ -18,6 +18,10 @@ export interface VaultStorage {
   remove(path: string): Promise<void>;
   /** Remove a folder that has been emptied (optional; left in place otherwise). */
   removeDir?(path: string): Promise<void>;
+  /** Every folder, empty ones included, so that they can be shown (optional). */
+  listDirs?(): Promise<string[]>;
+  /** Create a folder and its parents (optional; without it a folder exists once a note is saved in it). */
+  makeDir?(path: string): Promise<void>;
 }
 
 /** Folders never read or written by the app. */
@@ -25,6 +29,7 @@ export const IGNORED_DIRS = new Set([".obsidian", ".git", ".trash", ".stfolder",
 
 export class MemoryStorage implements VaultStorage {
   private files = new Map<string, string | Blob>();
+  private dirs = new Set<string>();
   constructor(
     readonly name: string,
     seed: Record<string, string | Blob> = {},
@@ -59,6 +64,22 @@ export class MemoryStorage implements VaultStorage {
   }
   async remove(path: string) {
     this.files.delete(path);
+  }
+  async listDirs() {
+    const out = new Set(this.dirs);
+    for (const f of this.files.keys()) {
+      const parts = f.split("/").slice(0, -1);
+      for (let i = 1; i <= parts.length; i++) out.add(parts.slice(0, i).join("/"));
+    }
+    return [...out];
+  }
+  async makeDir(path: string) {
+    const parts = path.split("/");
+    for (let i = 1; i <= parts.length; i++) this.dirs.add(parts.slice(0, i).join("/"));
+  }
+  async removeDir(path: string) {
+    for (const d of [...this.dirs]) if (d === path || d.startsWith(`${path}/`)) this.dirs.delete(d);
+    for (const f of [...this.files.keys()]) if (f.startsWith(`${path}/`)) this.files.delete(f);
   }
 }
 
@@ -144,6 +165,25 @@ export class FsAccessStorage implements VaultStorage {
     };
     await walk(this.root, "");
     return out;
+  }
+
+  async listDirs() {
+    const out: string[] = [];
+    const walk = async (dir: DirHandle, prefix: string) => {
+      for await (const h of dir.values()) {
+        if (h.kind === "directory" && !IGNORED_DIRS.has(h.name)) {
+          out.push(prefix + h.name);
+          await walk(h as DirHandle, `${prefix}${h.name}/`);
+        }
+      }
+    };
+    await walk(this.root, "");
+    return out;
+  }
+
+  async makeDir(path: string) {
+    let dir = this.root;
+    for (const p of path.split("/")) dir = (await dir.getDirectoryHandle(p, { create: true })) as DirHandle;
   }
 
   private async dirOf(path: string, create: boolean): Promise<[DirHandle, string]> {

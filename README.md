@@ -108,6 +108,13 @@ Done:
 - Close the open note (✕ in the top bar).
 - Move a note to another folder by dragging it onto the folder in the Files
   list (or onto "vault root" below the list); links are updated.
+- New folder (📁＋ New folder at the top of the Files list, or ＋ next to a
+  folder for a sub-folder); `Projects/2026` creates both levels. Empty
+  folders are shown, so notes can be dragged into them.
+- Insert a link ([[ ]] button or Ctrl+K): search notes by name, title, ID or
+  folder, optionally pick a heading, set the text shown or embed it; the
+  dialog shows the result and a short syntax help. Typing `[[` in the
+  editor also suggests notes, and `[[Note#` its headings.
 - Delete a folder (🗑 next to its name): it moves to `.trash` with
   everything in it; the notes linking into it are listed first.
 - Demo vault clearly marked as not saved; opening an empty folder offers to
