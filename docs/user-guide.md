@@ -64,6 +64,10 @@ The toolbar formats the line or the selection: headings, **bold**,
 *italic*, ~~strikethrough~~, ==highlight==, `code`, lists, quotes, tables.
 
 - **Images:** paste or drop them into the editor.
+- **Attachments** (images, PDFs, documents) are listed in the Files panel
+  under their folder, after the notes. Click one to view it (images), see
+  which notes use it, link it in the open note, or open it with its usual
+  app (Windows app).
 - **Tags:** `#tag`. Typing `#` suggests existing tags.
 - **People:** `@name`. Typing `@` suggests people already mentioned.
 - **Table of contents:** **TOC** inserts one that updates itself, **TOC⇣**

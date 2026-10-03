@@ -41,6 +41,7 @@
   import Toolbar from "./components/Toolbar.svelte";
   import NewFolderDialog from "./components/NewFolderDialog.svelte";
   import LinkDialog from "./components/LinkDialog.svelte";
+  import AttachmentDialog from "./components/AttachmentDialog.svelte";
   import SyncDialog from "./components/SyncDialog.svelte";
   import { MULTI_USER_CHECKS } from "./lib/features";
   import { describeReport, loadSyncSettings, runSync, saveSyncSettings, type SyncSettings } from "./lib/sync";
@@ -83,6 +84,8 @@
   let newFolderIn = $state<string | null>(null);
   /** Wiki link dialog: the selected text when it opened, null when closed. */
   let linkFrom = $state<string | null>(null);
+  /** Attachment shown from the Files list. */
+  let attachment = $state<string | null>(null);
   let lastVault = $state<FileSystemDirectoryHandle | undefined>();
   let androidPicker = $state(false);
   const shell = platform();
@@ -857,6 +860,7 @@
       onMoveNote={moveNote}
       onDeleteFolder={(f) => (deleteFolder = f)}
       onNewFolder={(parent) => (newFolderIn = parent)}
+      onOpenAttachment={(p) => (attachment = p)}
     />
   </aside>
   <button class="scrim" aria-label="Close menu" onclick={() => (drawer = false)}></button>
@@ -1133,6 +1137,16 @@
       </div>
     </div>
   </div>
+{/if}
+
+{#if attachment}
+  <AttachmentDialog
+    {vault}
+    path={attachment}
+    onInsert={current && mode !== "view" ? (text) => ((attachment = null), editor?.insert(text)) : undefined}
+    onOpenNote={(p) => ((attachment = null), open(p))}
+    onClose={() => (attachment = null)}
+  />
 {/if}
 
 {#if newFolderIn !== null}

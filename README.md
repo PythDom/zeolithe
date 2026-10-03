@@ -99,7 +99,8 @@ Done:
 - Editor with toolbar, plus edit, split and view modes.
 - Obsidian-flavoured preview: wiki links, embeds, callouts, highlights,
   inline fields.
-- Images by paste or drop.
+- Images by paste or drop. Attachments are listed in the Files panel: view,
+  see which notes use them, link them, open them with their app (Windows).
 - Dynamic and static TOC; clicking an entry (or any `[[#Heading]]` or
   `[text](#heading)` link) scrolls the preview and the editor to the
   heading, and ← returns. In the editor (Edit mode, phones) a ```toc block

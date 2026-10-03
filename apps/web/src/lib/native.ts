@@ -50,6 +50,13 @@ export class TauriStorage implements VaultStorage {
     return `${this.root.replace(/[\\/]+$/, "")}/${path}`;
   }
 
+  async openFile(path: string) {
+    const { openPath } = await import("@tauri-apps/plugin-opener");
+    // Native separators for Windows (the vault root tells which ones).
+    const native = this.root.includes("\\") ? path.replace(/\//g, "\\") : path;
+    await openPath(`${this.root.replace(/[\\/]+$/, "")}${this.root.includes("\\") ? "\\" : "/"}${native}`);
+  }
+
   /** One native call for the whole vault (the fs plugin needs one call per folder and per file). */
   async scan(): Promise<ScanEntry[]> {
     const { invoke } = await import("@tauri-apps/api/core");

@@ -15,8 +15,10 @@
     onDeleteFolder: (folder: string) => void;
     /** Create a folder inside `parent` ("" = vault root). */
     onNewFolder: (parent: string) => void;
+    /** An attachment (image, PDF…) was clicked in the Files list. */
+    onOpenAttachment: (path: string) => void;
   }
-  let { vault, current, tab = $bindable(), query = $bindable(), onOpen, onQuery, onTaxonomy, onMoveNote, onDeleteFolder, onNewFolder }: Props = $props();
+  let { vault, current, tab = $bindable(), query = $bindable(), onOpen, onQuery, onTaxonomy, onMoveNote, onDeleteFolder, onNewFolder, onOpenAttachment }: Props = $props();
 
   // Drag & drop of notes onto folders.
   const DRAG_TYPE = "application/x-zeolite-note";
@@ -50,17 +52,21 @@
 
   const today = toIsoDate(new Date());
 
-  // Files grouped by folder.
+  // Files grouped by folder: notes first, then attachments (images, PDFs…).
   const folders = $derived.by(() => {
-    const map = new Map<string, string[]>();
-    for (const d of vault.dirs) map.set(d, []);
+    const map = new Map<string, { notes: string[]; others: string[] }>();
+    const entry = (dir: string) => map.get(dir) ?? map.set(dir, { notes: [], others: [] }).get(dir)!;
+    for (const d of vault.dirs) entry(d);
     for (const f of vault.files) {
-      if (!f.toLowerCase().endsWith(".md")) continue;
       const dir = f.includes("/") ? f.slice(0, f.lastIndexOf("/")) : "";
-      map.set(dir, [...(map.get(dir) ?? []), f]);
+      if (f.toLowerCase().endsWith(".md")) entry(dir).notes.push(f);
+      else entry(dir).others.push(f);
     }
     return [...map.entries()].sort(([a], [b]) => (a === "" ? -1 : b === "" ? 1 : a.localeCompare(b)));
   });
+  const fileName = (path: string) => path.split("/").pop()!;
+  const fileIcon = (path: string) =>
+    /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i.test(path) ? "🖼" : /\.pdf$/i.test(path) ? "📕" : /\.(docx?|odt|rtf|txt)$/i.test(path) ? "📄" : /\.(xlsx?|ods|csv)$/i.test(path) ? "📊" : /\.(pptx?|odp)$/i.test(path) ? "📽" : "📎";
   let collapsed = $state<Record<string, boolean>>({});
 
   // Tags grouped by taxonomy role.
@@ -131,7 +137,7 @@
 
   {#if tab === "files"}
     <button class="build" onclick={() => onNewFolder("")}>📁＋ New folder…</button>
-    {#each folders as [dir, files]}
+    {#each folders as [dir, { notes: files, others }]}
       {#if dir}
         <div
           class="folder-row"
@@ -162,7 +168,12 @@
             {label(f)}
           </button>
         {:else}
-          {#if dir && !vault.dirs.some((d) => d.startsWith(`${dir}/`)) && !vault.filesIn(dir).length}<p class="folder-empty">Empty. Drag notes here, or create one in this folder.</p>{/if}
+          {#if dir && !others.length && !vault.dirs.some((d) => d.startsWith(`${dir}/`)) && !vault.filesIn(dir).length}<p class="folder-empty">Empty. Drag notes here, or create one in this folder.</p>{/if}
+        {/each}
+        {#each others as f}
+          <button class="file attachment" class:indent={!!dir} onclick={() => onOpenAttachment(f)} title="{f}: click to view, link or open it">
+            <span class="ficon">{fileIcon(f)}</span>{fileName(f)}
+          </button>
         {/each}
       {/if}
     {/each}
@@ -351,6 +362,13 @@
     color: var(--muted);
     font-size: 12.5px;
     text-align: center;
+  }
+  .file.attachment {
+    color: var(--muted);
+    font-size: 12.5px;
+  }
+  .file.attachment .ficon {
+    margin-right: 5px;
   }
   .file.dragged {
     opacity: 0.5;

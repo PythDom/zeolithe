@@ -58,16 +58,24 @@ fn allow_vault(app: AppHandle, data: State<DataDir>, path: String) -> Result<(),
     remember_vault(&data, &root);
     let mut hasher = DefaultHasher::new();
     root.hash(&mut hasher);
+    // Windows checks existing files under their canonical form (`\\?\C:\…`):
+    // allow that form too, or only new files could be written after a restart.
+    let mut roots = vec![root.clone()];
+    if let Ok(canonical) = std::fs::canonicalize(&root) {
+        let c = canonical.to_string_lossy().to_string();
+        if c != root {
+            roots.push(c);
+        }
+    }
+    let entries: Vec<serde_json::Value> = roots
+        .iter()
+        .flat_map(|r| [serde_json::json!({ "path": r }), serde_json::json!({ "path": format!("{r}/**") })])
+        .collect();
     let capability = CapabilityBuilder::new(format!("vault-{:x}", hasher.finish()))
         .window("main")
-        .permission_scoped(
-            "fs:scope",
-            vec![
-                serde_json::json!({ "path": root }),
-                serde_json::json!({ "path": format!("{root}/**") }),
-            ],
-            Vec::<serde_json::Value>::new(),
-        );
+        .permission_scoped("fs:scope", entries.clone(), Vec::<serde_json::Value>::new())
+        // Attachments open in their default app.
+        .permission_scoped("opener:allow-open-path", entries, Vec::<serde_json::Value>::new());
     match app.add_capability(capability) {
         Ok(()) => Ok(()),
         // Already granted earlier in this session.
