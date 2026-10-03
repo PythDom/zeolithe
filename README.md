@@ -100,7 +100,9 @@ Done:
 - Obsidian-flavoured preview: wiki links, embeds, callouts, highlights,
   inline fields.
 - Images by paste or drop.
-- Dynamic and static TOC.
+- Dynamic and static TOC; clicking an entry (or any `[[#Heading]]` or
+  `[text](#heading)` link) scrolls the preview and the editor to the
+  heading, and ← returns.
 - Tasks: toolbar buttons, state cycling, ticking from the preview, `[due:: …]`
   with natural-language dates.
 - Attn points: insert, resolve, convert to task.

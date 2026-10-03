@@ -79,6 +79,20 @@
       onOpenLink(link.dataset.target ?? "", link.dataset.heading ?? "");
       return;
     }
+    // Markdown links to a heading of this note: [Heading](#heading).
+    const anchor = el.closest<HTMLAnchorElement>('a[href^="#"]:not(.tag)');
+    const href = anchor?.getAttribute("href") ?? "";
+    if (anchor && href.length > 1) {
+      e.preventDefault();
+      let h = href.slice(1);
+      try {
+        h = decodeURIComponent(h);
+      } catch {
+        // Keep it as written.
+      }
+      onOpenLink("", h);
+      return;
+    }
     const tag = el.closest<HTMLAnchorElement>("a.tag");
     if (tag) {
       e.preventDefault();

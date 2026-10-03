@@ -58,7 +58,8 @@ The toolbar formats the line or the selection: headings, **bold**,
 - **Tags:** `#tag`. Typing `#` suggests existing tags.
 - **People:** `@name`. Typing `@` suggests people already mentioned.
 - **Table of contents:** **TOC** inserts one that updates itself, **TOC⇣**
-  writes a fixed one.
+  writes a fixed one. Click an entry to jump to that heading; **←** brings
+  you back.
 
 ### Links between notes
 

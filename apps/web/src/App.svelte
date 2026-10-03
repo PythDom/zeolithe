@@ -1,6 +1,7 @@
 <script lang="ts">
   import {
     archiveNote,
+    type Heading,
     conflictPath,
     headingLinkText,
     isArchived,
@@ -46,7 +47,7 @@
   import { demoVault, starterVault } from "./lib/demo-vault";
   import userGuide from "../../../docs/user-guide.md?raw";
   import { insertBlock } from "./lib/editor-commands";
-  import { chordDiagram, createRenderer } from "./lib/render";
+  import { chordDiagram, createRenderer, slug } from "./lib/render";
   import { folderAccessProblem, FsAccessStorage, fsAccessSupported, memoryCopyFromFiles, MemoryStorage } from "./lib/storage";
   import { Vault } from "./lib/vault.svelte";
   import { loadLastVault, regainAccess, saveLastVault } from "./lib/last-vault";
@@ -376,7 +377,12 @@
     }
   }
 
+  /** Heading text compared loosely, so that "#my-heading" style anchors match too. */
+  const headingKey = (t: string) =>
+    headingLinkText(t).toLowerCase().replace(/^h-/, "").replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "");
+
   async function openLink(target: string, heading: string) {
+    await flush();
     let path = target ? vault.resolveNote(target) : current ?? undefined;
     if (!path) {
       // Like Obsidian: following a link to a missing note creates it.
@@ -384,8 +390,43 @@
       status = `Created ${path}`;
     }
     const rec = vault.records.get(path);
-    const h = heading ? rec?.headings.find((x) => headingLinkText(x.text) === headingLinkText(heading)) : undefined;
+    const h = heading
+      ? (rec?.headings.find((x) => headingLinkText(x.text) === headingLinkText(heading)) ??
+        rec?.headings.find((x) => headingKey(x.text) === headingKey(heading)))
+      : undefined;
+    if (path === current) {
+      // A heading of this note (table of contents, [[#Heading]]): jump, and remember where we were for ←.
+      if (!h) return;
+      const cur = here();
+      if (cur) {
+        back = [...back, cur].slice(-HISTORY_MAX);
+        forward = [];
+      }
+      jumpToHeading(h, rec!.headings, true);
+      return;
+    }
     await open(path, h?.line);
+    if (h) jumpToHeading(h, rec!.headings, false);
+  }
+
+  /** Scroll the preview (and the editor) to a heading of the open note. */
+  function jumpToHeading(h: Heading, all: Heading[], inEditor: boolean) {
+    const view = editor?.getView();
+    if (inEditor && view) {
+      const l = view.state.doc.line(Math.min(h.line + 1, view.state.doc.lines));
+      view.dispatch({ selection: { anchor: l.from }, effects: EditorView.scrollIntoView(l.from, { y: "start", yMargin: 12 }) });
+    }
+    // Same text twice: the n-th heading with that anchor.
+    const id = slug(h.text);
+    const nth = all.filter((x) => x.line < h.line && slug(x.text) === id).length;
+    let frames = 0;
+    const go = () => {
+      const pane = document.querySelector<HTMLElement>(".panes .preview");
+      const el = pane?.querySelectorAll<HTMLElement>(`[id="${CSS.escape(id)}"]`)[nth];
+      if (pane && el) pane.scrollTop += el.getBoundingClientRect().top - pane.getBoundingClientRect().top - 8;
+      else if (pane && ++frames < 30) requestAnimationFrame(go);
+    };
+    requestAnimationFrame(go);
   }
 
   async function toggleTask(line: number, path?: string) {
