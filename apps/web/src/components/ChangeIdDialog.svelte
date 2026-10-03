@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { assignId, idFromFileName, idPrefix, nextId, numberablePara, parseId, type NewNote } from "@zeolite/core";
+  import { assignId, formatId, idFromFileName, idPrefix, nextSeq, numberablePara, parseId, type NewNote } from "@zeolite/core";
   import { untrack } from "svelte";
   import type { Vault } from "../lib/vault.svelte";
 
@@ -38,16 +38,23 @@
     if (!tax.categories.some((c) => c.code === category) && tax.categories[0]) category = tax.categories[0].code;
   });
 
-  const sameSeries = $derived(!!cur && idPrefix(cur.para, cur.category, cur.sub) === idPrefix(para, category, sub));
-  const preview = $derived.by(() => {
-    if (!para || !sub || !category) return "";
-    if (sameSeries) return currentId!;
-    try {
-      return nextId(para, category, sub, vault.existingIds.filter((x) => x !== currentId));
-    } catch (e) {
-      return `⚠ ${(e as Error).message}`;
-    }
+  const prefix = $derived(idPrefix(para, category, sub));
+  const sameSeries = $derived(!!cur && idPrefix(cur.para, cur.category, cur.sub) === prefix);
+  const others = $derived(vault.existingIds.filter((x) => x !== currentId));
+  // The sequence number (last three digits): the current one in the same series, else the next free one; editable.
+  let num = $state("");
+  let numFor = "";
+  $effect(() => {
+    if (!para || !sub || !category || prefix === numFor) return;
+    numFor = prefix;
+    num = String(sameSeries ? cur!.seq : nextSeq(prefix, others)).padStart(3, "0");
   });
+  const seq = $derived(/^\d{1,3}$/.test(num.trim()) ? Number(num.trim()) : NaN);
+  const preview = $derived(para && sub && category && seq >= 1 ? formatId({ para, category, sub, seq }) : "");
+  const problem = $derived(
+    !para || !sub || !category ? "" : !(seq >= 1) ? "Type a number from 001 to 999." : others.includes(preview) ? `${preview} is already used by another note.` : "",
+  );
+  const unchanged = $derived(preview === currentId);
   const folder = $derived(paras.find((p) => p.code === para)?.folder ?? "");
 
   async function apply(e: SubmitEvent) {
@@ -55,7 +62,7 @@
     error = "";
     busy = true;
     try {
-      const note = assignId({ taxonomy: tax, path, content, para, category, sub, existingIds: vault.existingIds, moveToParaFolder: move });
+      const note = assignId({ taxonomy: tax, path, content, para, category, sub, existingIds: vault.existingIds, moveToParaFolder: move, seq });
       if (note.path !== path && vault.exists(note.path)) throw new Error(`A note already exists at ${note.path}.`);
       await onApply(note);
     } catch (err) {
@@ -80,7 +87,7 @@
       {#if currentId}
         <p class="note">Current ID <code>{currentId}</code>. IDs are meant to stay stable: links inside the vault are updated, but references elsewhere (PDFs, emails, paper) will still show the old ID.</p>
       {:else}
-        <p class="note">This note has no ID yet. It gets the next number in the series you choose.</p>
+        <p class="note">This note has no ID yet. It gets the next number in the series you choose, or the number you type.</p>
       {/if}
       <label>PARA
         <select bind:value={para}>{#each paras as p}<option value={p.code}>{p.code} · #{p.tag}</option>{/each}</select>
@@ -91,13 +98,17 @@
       <label>Sub-PARA
         <select bind:value={sub}>{#each subs as s}<option value={s.code}>{s.code} · #{s.tag}</option>{/each}</select>
       </label>
-      <div class="id">New ID <code>{preview}</code></div>
+      <label>Number (last three digits)
+        <input class="num" bind:value={num} inputmode="numeric" maxlength="3" autocomplete="off" />
+      </label>
+      <div class="id">New ID <code>{preview || "…"}</code>{#if unchanged} <span class="same">(unchanged)</span>{/if}</div>
+      {#if problem}<p class="error">⚠ {problem}</p>{/if}
       <label class="check"><input type="checkbox" bind:checked={move} /> Move the note to <b>{folder}/</b></label>
       <p class="hint">The note's PARA, Category and Sub-PARA tags are replaced by the new ones; other tags are kept.</p>
       {#if error}<p class="error">{error}</p>{/if}
       <div class="actions">
         <button type="button" onclick={onClose}>Cancel</button>
-        <button type="submit" class="primary" disabled={busy || sameSeries || preview.startsWith("⚠")}>{currentId ? "Change ID" : "Assign ID"}</button>
+        <button type="submit" class="primary" disabled={busy || unchanged || !!problem || !preview}>{currentId ? "Change ID" : "Assign ID"}</button>
       </div>
     {/if}
   </form>
@@ -150,7 +161,17 @@
     gap: 6px;
     color: var(--fg);
   }
-  select {
+  input.num {
+    width: 7em;
+    font-family: var(--mono);
+    letter-spacing: 0.08em;
+  }
+  .same {
+    color: var(--muted);
+    font-size: 12.5px;
+  }
+  select,
+  .num {
     padding: 8px;
     border: 1px solid var(--border);
     border-radius: 6px;

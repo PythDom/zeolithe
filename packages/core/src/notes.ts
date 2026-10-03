@@ -1,7 +1,7 @@
 import { toIsoDate, toIsoMinute } from "./dates";
 import { formatDate } from "./templates";
 import { addFrontmatterTags, serializeFrontmatter, splitFrontmatter, withFrontmatter } from "./frontmatter";
-import { idFromFileName, nextId, noteFileName, parseId, sanitizeTitle, tagsForId } from "./ids";
+import { formatId, idFromFileName, nextId, noteFileName, parseId, sanitizeTitle, tagsForId } from "./ids";
 import { archivePara, findCategory, findPara, findSubPara, type Taxonomy } from "./taxonomy";
 
 export const JOURNAL_FOLDER = "Journal";
@@ -126,6 +126,8 @@ export interface AssignIdRequest {
   existingIds: Iterable<string>;
   /** Move the note into the new PARA's folder. */
   moveToParaFolder: boolean;
+  /** Sequence number (1–999) chosen by hand; default: the next free one in the series. */
+  seq?: number;
 }
 
 /**
@@ -144,7 +146,14 @@ export function assignId(req: AssignIdRequest): NewNote & { id: string } {
   const parts = req.path.split("/");
   const name = parts.pop()!;
   const oldId = (typeof data.id === "string" && parseId(data.id) ? data.id : undefined) ?? idFromFileName(name) ?? undefined;
-  const id = nextId(req.para, req.category, req.sub, [...req.existingIds].filter((x) => x !== oldId));
+  const others = [...req.existingIds].filter((x) => x !== oldId);
+  let id: string;
+  if (req.seq === undefined) id = nextId(req.para, req.category, req.sub, others);
+  else {
+    if (!Number.isInteger(req.seq) || req.seq < 1 || req.seq > 999) throw new Error("The number must be between 001 and 999.");
+    id = formatId({ para: req.para, category: req.category, sub: req.sub, seq: req.seq });
+    if (others.includes(id)) throw new Error(`${id} is already used by another note.`);
+  }
 
   const base = name.replace(/\.md$/i, "");
   const title = oldId && base.startsWith(oldId) ? base.slice(oldId.length).trim() : base;

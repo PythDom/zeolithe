@@ -142,7 +142,8 @@ Done:
   for numbering only; the app offers to create it (Tags → ⚙ Manage taxonomy).
 - Change a note's ID, or give an imported note its first ID: click the ID
   badge (or ＋ Assign ID) in the top bar. Next number in the chosen series,
-  taxonomy tags swapped, optional move to the PARA folder, links updated.
+  or a number typed by hand (refused if taken), taxonomy tags swapped,
+  optional move to the PARA folder, links updated.
 - Archiving.
 - ID collision detection and renumbering, with link updates.
 - Sync-conflict listing.

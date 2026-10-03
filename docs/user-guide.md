@@ -35,9 +35,12 @@
 A **template** is suggested when one fits; 📄 in the sidebar manages
 templates.
 
-IDs never change. Click the **ID badge** in the top bar to change it on
-purpose, or **＋ Assign ID** to number a free note. **Archive** moves a
-note to `04 Archives` and tags it `#Archives`.
+IDs never change by themselves. To change one on purpose, click the **ID
+badge** in the top bar: choose PARA, Category and Sub-PARA, and the
+**Number** (the last three digits, the next free one is proposed; a number
+already used is refused). Links to the note are updated. **＋ Assign ID**
+numbers a free note the same way. **Archive** moves a note to
+`04 Archives` and tags it `#Archives`.
 
 ## Organising notes
 

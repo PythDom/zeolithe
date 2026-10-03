@@ -97,6 +97,15 @@ describe("assignId", () => {
     expect(r.path).toBe("Notes/03.99.00.001 Garden ideas.md");
     expect(r.content).toMatch(/^---\nid: 03\.99\.00\.001\ntags: \[References, Personal, Notes\]\ncreated: \d{4}-\d\d-\d\dT\d\d:\d\d\n---\n# Garden ideas\n#idea\n$/);
   });
+  it("uses a number chosen by hand, refusing one already taken", async () => {
+    const { assignId } = await import("../src/notes");
+    const req = { taxonomy: tax, path: "01 Projets/01.02.05.001 X.md", content: "---\nid: 01.02.05.001\n---\n", para: "01", category: "02", sub: "05", existingIds: ["01.02.05.001", "01.02.05.002"], moveToParaFolder: true };
+    const r = assignId({ ...req, seq: 7 });
+    expect(r.id).toBe("01.02.05.007");
+    expect(r.path).toBe("01 Projets/01.02.05.007 X.md");
+    expect(() => assignId({ ...req, seq: 2 })).toThrow(/already used/);
+    expect(() => assignId({ ...req, seq: 1000 })).toThrow(/between 001 and 999/);
+  });
   it("does not count the note's own number as taken", async () => {
     const { assignId } = await import("../src/notes");
     // Same series: its own number is not counted as taken, so it gets the next free one after the others.
