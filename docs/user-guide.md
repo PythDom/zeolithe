@@ -18,8 +18,7 @@ Zeolites are made of a regular framework of tiny cavities, which catch and
 sort molecules by size; they are used as filters and “molecular sieves”.
 That is the idea behind the app: a solid, orderly structure where every note
 finds its place, and where you can sort and filter what you collect. The
-logo is a rough crystal, like a stone just picked up. (The project's first
-name, *zeolithe*, is the French spelling.)
+logo is a rough crystal, like a stone just picked up.
 
 ## The PARA method
 
@@ -28,7 +27,7 @@ not by subject. Everything fits in four places:
 
 | | What goes there | Example |
 | --- | --- | --- |
-| **Projects** | Short efforts with a goal and an end date | Prepare the F35 review |
+| **Projects** | Short efforts with a goal and an end date | Prepare the New transistor review |
 | **Areas** | Ongoing responsibilities, with a standard to keep, no end date | Team management, health, finances |
 | **Resources** | Topics and references you may need later | Aviation, chords, recipes |
 | **Archives** | Anything no longer active, from the three others | Finished projects |
