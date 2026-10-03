@@ -111,6 +111,8 @@ Done:
 - New-note dialog: PARA ID generation, Journal, Inbox and Free notes.
 - Rename or move a note: click its path at the top, or press F2. PARA
   notes keep their ID; links across the vault are updated.
+- Web links open in the default browser (in the Windows and Android apps
+  too); in the editor, Ctrl/Cmd+click a web address to open it.
 - Shared folders (OneDrive/SharePoint, Syncthing, network drives): files
   changed by other apps or colleagues are picked up within seconds (the
   open note too, when it has no edits of ours); a save never overwrites

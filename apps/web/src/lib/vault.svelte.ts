@@ -100,15 +100,17 @@ export class Vault {
       dailyNotes: await this.readOptional(".obsidian/daily-notes.json"),
       app: await this.readOptional(".obsidian/app.json"),
     });
-    const files = (await this.storage.list()).filter(visible).sort((a, b) => a.localeCompare(b));
+    const entries = await this.scanFiles();
+    const files = entries.map((e) => e.path).sort((a, b) => a.localeCompare(b));
     const records = new Map<string, NoteRecord>();
     this.stamps.clear();
-    for (const path of files) {
+    for (const { path, stamp } of entries) {
       if (!path.toLowerCase().endsWith(".md")) continue;
       const text = await this.storage.readText(path);
       this.contents.set(path, text);
       records.set(path, buildNoteRecord(path, text));
-      await this.stamp(path);
+      if (stamp) this.stamps.set(path, stamp);
+      else await this.stamp(path);
     }
     for (const u of this.assetUrls.values()) URL.revokeObjectURL(u);
     this.assetUrls.clear();
@@ -173,7 +175,7 @@ export class Vault {
       if (this.contents.get(path) === content) return;
       const known = this.contents.get(path);
       // Changed on disk by another app since we read it? Keep that version instead of overwriting it.
-      if (known !== undefined && this.files.includes(path)) {
+      if (known !== undefined && this.files.includes(path) && (await this.changedOnDisk(path))) {
         const disk = await this.storage.readText(path).catch(() => undefined);
         if (disk !== undefined && disk !== known && disk !== content) {
           const copy = conflictPath(path, new Date(), "OTHER");
@@ -189,6 +191,18 @@ export class Vault {
     });
   }
 
+  /** Whether a note may have been changed by another app since we last read or wrote it. */
+  private async changedOnDisk(path: string): Promise<boolean> {
+    const known = this.stamps.get(path);
+    if (!this.storage.stat || known === undefined) return true;
+    try {
+      const s = await this.storage.stat(path);
+      return `${s.mtime}:${s.size}` !== known;
+    } catch {
+      return true;
+    }
+  }
+
   /** Update the in-memory view of a note. */
   private remember(path: string, content: string) {
     this.contents.set(path, content);
@@ -199,48 +213,67 @@ export class Vault {
     if (path === TAXONOMY_PATH) this.refreshTaxonomy();
   }
 
+  /** Files with their stamps, in one call when the storage can (Windows app), else list (+ stat). */
+  private async scanFiles(): Promise<{ path: string; stamp?: string }[]> {
+    if (this.storage.scan) {
+      return (await this.storage.scan()).filter((e) => visible(e.path)).map((e) => ({ path: e.path, stamp: `${e.mtime}:${e.size}` }));
+    }
+    return (await this.storage.list()).filter(visible).map((path) => ({ path }));
+  }
+
   /**
    * Pick up changes made by other apps (OneDrive, Syncthing, a colleague, a
-   * text editor): new, changed and deleted files. Cheap when the storage
-   * gives modification times; otherwise notes are re-read.
+   * text editor): new, changed and deleted files. The folder is read without
+   * holding up saves; only applying the result waits for them.
    */
-  checkDisk(): Promise<{ changed: string[]; added: string[]; removed: string[] }> {
+  async checkDisk(): Promise<{ changed: string[]; added: string[]; removed: string[] }> {
+    const none = { changed: [] as string[], added: [] as string[], removed: [] as string[] };
+    // Moves, deletions, saves… may run meanwhile: then this round is dropped (the next one sees the result).
+    const filesAtStart = this.files;
+    const recordsAtStart = this.records;
+    const entries = await this.scanFiles();
+    const now = new Set(entries.map((e) => e.path));
+    const before = new Set(filesAtStart);
+    const added = entries.map((e) => e.path).filter((f) => !before.has(f));
+    const removed = filesAtStart.filter((f) => !now.has(f));
+    const changed: string[] = [];
+    const texts = new Map<string, string>();
+    const stamps = new Map<string, string>();
+    for (const { path, stamp } of entries) {
+      if (!path.toLowerCase().endsWith(".md") || !before.has(path)) continue;
+      let key = stamp;
+      if (key === undefined && this.storage.stat) {
+        try {
+          const s: FileStamp = await this.storage.stat(path);
+          key = `${s.mtime}:${s.size}`;
+        } catch {
+          continue;
+        }
+      }
+      if (key !== undefined) {
+        if (this.stamps.get(path) === key) continue;
+        stamps.set(path, key);
+      }
+      const text = await this.storage.readText(path).catch(() => undefined);
+      if (text === undefined) continue;
+      if (text !== this.contents.get(path)) {
+        changed.push(path);
+        texts.set(path, text);
+      }
+    }
+    for (const { path, stamp } of entries) {
+      if (!added.includes(path)) continue;
+      if (path.toLowerCase().endsWith(".md")) texts.set(path, await this.storage.readText(path).catch(() => ""));
+      if (stamp) stamps.set(path, stamp);
+    }
+    const images = new Map<string, Blob>();
+    for (const path of added) {
+      if (IMAGE_EXT.test(path)) {
+        const blob = await this.storage.readBinary(path).catch(() => null);
+        if (blob) images.set(path, blob);
+      }
+    }
     return this.exclusive(async () => {
-      // Moves, deletions… may run meanwhile: then this round is dropped (the next one sees the result).
-      const filesAtStart = this.files;
-      const recordsAtStart = this.records;
-      const list = (await this.storage.list()).filter(visible);
-      const now = new Set(list);
-      const before = new Set(this.files);
-      const added = list.filter((f) => !before.has(f));
-      const removed = this.files.filter((f) => !now.has(f));
-      const changed: string[] = [];
-      const texts = new Map<string, string>();
-      const stamps = new Map<string, string>();
-      for (const path of list) {
-        if (!path.toLowerCase().endsWith(".md") || !before.has(path)) continue;
-        if (this.storage.stat) {
-          let s: FileStamp;
-          try {
-            s = await this.storage.stat(path);
-          } catch {
-            continue;
-          }
-          const key = `${s.mtime}:${s.size}`;
-          if (this.stamps.get(path) === key) continue;
-          stamps.set(path, key);
-        }
-        const text = await this.storage.readText(path).catch(() => undefined);
-        if (text === undefined) continue;
-        if (text !== this.contents.get(path)) {
-          changed.push(path);
-          texts.set(path, text);
-        }
-      }
-      for (const path of added) {
-        if (path.toLowerCase().endsWith(".md")) texts.set(path, await this.storage.readText(path).catch(() => ""));
-      }
-      const none = { changed: [], added: [], removed: [] };
       if (this.files !== filesAtStart || this.records !== recordsAtStart) return none;
       for (const [p, k] of stamps) this.stamps.set(p, k);
       if (!added.length && !removed.length && !changed.length) return none;
@@ -253,18 +286,13 @@ export class Vault {
         if (url) URL.revokeObjectURL(url);
         this.assetUrls.delete(path);
       }
-      for (const [path, text] of texts) this.contents.set(path, text);
-      for (const path of added) {
-        if (path.toLowerCase().endsWith(".md")) await this.stamp(path);
-        else if (IMAGE_EXT.test(path)) {
-          const blob = await this.storage.readBinary(path).catch(() => null);
-          if (blob) this.assetUrls.set(path, URL.createObjectURL(blob));
-        }
+      for (const [path, text] of texts) {
+        this.contents.set(path, text);
+        next.set(path, buildNoteRecord(path, text));
       }
-      for (const path of [...changed, ...added]) {
-        if (path.toLowerCase().endsWith(".md")) next.set(path, buildNoteRecord(path, this.contents.get(path) ?? ""));
-      }
-      this.files = list.sort((a, b) => a.localeCompare(b));
+      for (const path of added) if (path.toLowerCase().endsWith(".md") && !stamps.has(path)) await this.stamp(path);
+      for (const [path, blob] of images) this.assetUrls.set(path, URL.createObjectURL(blob));
+      this.files = [...now].sort((a, b) => a.localeCompare(b));
       this.records = next;
       if ([...changed, ...added, ...removed].includes(TAXONOMY_PATH)) this.refreshTaxonomy();
       return { changed, added, removed };

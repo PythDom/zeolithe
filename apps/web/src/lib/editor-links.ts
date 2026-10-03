@@ -2,7 +2,7 @@
  * Links that work inside the editor (Edit mode, phones):
  *   - a ```toc block shows a clickable contents list under it;
  *   - entries of a static TOC (between <!-- toc --> markers) are clickable;
- *   - Ctrl/Cmd+click follows any [[link]].
+ *   - Ctrl/Cmd+click follows any [[link]] or web address.
  */
 import { RangeSetBuilder, StateField, type EditorState } from "@codemirror/state";
 import { Decoration, EditorView, WidgetType, type DecorationSet } from "@codemirror/view";
@@ -93,6 +93,21 @@ function build(state: EditorState, open: OpenLink): DecorationSet {
   return b.finish();
 }
 
+/** A web address under a document position: bare, <…> or in [text](url). */
+function urlAt(state: EditorState, pos: number): string | null {
+  const line = state.doc.lineAt(pos);
+  for (const m of line.text.matchAll(/(?:https?:\/\/|mailto:)[^\s<>()\[\]"']+/gi)) {
+    const from = line.from + m.index!;
+    if (pos >= from && pos <= from + m[0].length) return m[0].replace(/[.,;:!?]+$/, "");
+  }
+  // [text](url): clicking the text follows it too.
+  for (const m of line.text.matchAll(/\[[^\]]*\]\(((?:https?:\/\/|mailto:)[^\s)]+)\)/gi)) {
+    const from = line.from + m.index!;
+    if (pos >= from && pos <= from + m[0].length) return m[1]!;
+  }
+  return null;
+}
+
 /** The [[link]] under a document position, if any. */
 function linkAt(state: EditorState, pos: number): { target: string; heading: string } | null {
   const line = state.doc.lineAt(pos);
@@ -103,7 +118,7 @@ function linkAt(state: EditorState, pos: number): { target: string; heading: str
   return null;
 }
 
-export function editorLinks(open: OpenLink) {
+export function editorLinks(open: OpenLink, openUrl: (url: string) => void) {
   const field = StateField.define<DecorationSet>({
     create: (s) => build(s, open),
     update: (deco, tr) => (tr.docChanged ? build(tr.state, open) : deco),
@@ -121,10 +136,17 @@ export function editorLinks(open: OpenLink) {
       }
       if (!(e.ctrlKey || e.metaKey)) return false;
       const pos = view.posAtCoords({ x: e.clientX, y: e.clientY });
-      const link = pos === null ? null : linkAt(view.state, pos);
-      if (!link) return false;
+      if (pos === null) return false;
+      const link = linkAt(view.state, pos);
+      if (link) {
+        e.preventDefault();
+        open(link.target, link.heading);
+        return true;
+      }
+      const url = urlAt(view.state, pos);
+      if (!url) return false;
       e.preventDefault();
-      open(link.target, link.heading);
+      openUrl(url);
       return true;
     },
   });

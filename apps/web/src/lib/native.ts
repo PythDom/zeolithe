@@ -4,7 +4,7 @@
  * a way to save a file elsewhere (PDF export). The web build never loads these
  * modules unless it runs inside one of the shells.
  */
-import { IGNORED_DIRS, type VaultStorage } from "./storage";
+import { IGNORED_DIRS, type ScanEntry, type VaultStorage } from "./storage";
 
 export type Platform = "tauri" | "android" | "web";
 
@@ -50,19 +50,14 @@ export class TauriStorage implements VaultStorage {
     return `${this.root.replace(/[\\/]+$/, "")}/${path}`;
   }
 
+  /** One native call for the whole vault (the fs plugin needs one call per folder and per file). */
+  async scan(): Promise<ScanEntry[]> {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return invoke<ScanEntry[]>("scan_vault", { path: this.root, ignore: [...IGNORED_DIRS] });
+  }
+
   async list(): Promise<string[]> {
-    const { readDir } = await import("@tauri-apps/plugin-fs");
-    const out: string[] = [];
-    const walk = async (rel: string) => {
-      for (const e of await readDir(rel ? this.abs(rel) : this.root)) {
-        const p = rel ? `${rel}/${e.name}` : e.name;
-        if (e.isDirectory) {
-          if (!IGNORED_DIRS.has(e.name)) await walk(p);
-        } else if (e.isFile) out.push(p);
-      }
-    };
-    await walk("");
-    return out;
+    return (await this.scan()).map((e) => e.path);
   }
 
   async listDirs(): Promise<string[]> {
@@ -161,6 +156,23 @@ export class TauriStorage implements VaultStorage {
   private static async allow(path: string) {
     const { invoke } = await import("@tauri-apps/api/core");
     await invoke("allow_vault", { path });
+  }
+}
+
+/**
+ * Open a web (or mailto:) link in the system's browser or mail app. Inside
+ * the Windows and Android apps a link cannot open a new window by itself.
+ */
+export async function openExternal(url: string): Promise<void> {
+  const shell = platform();
+  if (shell === "tauri") {
+    const { openUrl } = await import("@tauri-apps/plugin-opener");
+    await openUrl(url);
+  } else if (shell === "android") {
+    // Capacitor hands navigations to other sites over to the system browser.
+    window.location.href = url;
+  } else {
+    window.open(url, "_blank", "noopener,noreferrer");
   }
 }
 

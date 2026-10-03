@@ -13,6 +13,7 @@
   import { onMount } from "svelte";
   import { chordHighlight } from "../lib/chord-highlight";
   import { editorLinks } from "../lib/editor-links";
+  import { openExternal } from "../lib/native";
 
   interface Props {
     content: string;
@@ -189,7 +190,7 @@
         dueConverter,
         chordHighlight,
         fileHandlers,
-        editorLinks((t, h) => onOpenLink(t, h)),
+        editorLinks((t, h) => onOpenLink(t, h), (url) => void openExternal(url)),
         EditorView.updateListener.of((u) => {
           if (u.docChanged) onChange(u.state.doc.toString());
         }),

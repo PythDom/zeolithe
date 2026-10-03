@@ -70,7 +70,8 @@ The toolbar formats the line or the selection: headings, **bold**,
 Press **[[ ]]** in the toolbar (or Ctrl+K): search a note by name, title,
 ID or folder, choose an optional heading or display text, then **Insert
 link**. Typing `[[` in the editor also suggests notes. In the editor,
-**Ctrl+click** a link to follow it (in the preview, a simple click).
+**Ctrl+click** a link to follow it (in the preview, a simple click). Web
+addresses open in your browser the same way.
 
 | Write | Result |
 | ----- | ------ |

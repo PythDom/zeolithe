@@ -16,6 +16,7 @@
     "fs:allow-remove",
     "fs:allow-mkdir",
     "fs:allow-exists",
-    "fs:allow-stat"
+    "fs:allow-stat",
+    "opener:default"
   ]
 }

@@ -24,6 +24,12 @@ export interface VaultStorage {
   makeDir?(path: string): Promise<void>;
   /** Modification time and size, to notice files changed by other apps cheaply (optional). */
   stat?(path: string): Promise<FileStamp>;
+  /** Every file with its modification time and size, in one go (optional; faster than list + stat). */
+  scan?(): Promise<ScanEntry[]>;
+}
+
+export interface ScanEntry extends FileStamp {
+  path: string;
 }
 
 export interface FileStamp {
@@ -167,6 +173,22 @@ export class FsAccessStorage implements VaultStorage {
           if (!IGNORED_DIRS.has(h.name)) await walk(h as DirHandle, `${prefix}${h.name}/`);
         } else {
           out.push(prefix + h.name);
+        }
+      }
+    };
+    await walk(this.root, "");
+    return out;
+  }
+
+  async scan() {
+    const out: ScanEntry[] = [];
+    const walk = async (dir: DirHandle, prefix: string) => {
+      for await (const h of dir.values()) {
+        if (h.kind === "directory") {
+          if (!IGNORED_DIRS.has(h.name)) await walk(h as DirHandle, `${prefix}${h.name}/`);
+        } else {
+          const f = await (h as FileSystemFileHandle).getFile();
+          out.push({ path: prefix + h.name, mtime: f.lastModified, size: f.size });
         }
       }
     };

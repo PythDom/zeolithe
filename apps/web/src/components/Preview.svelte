@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { openExternal } from "../lib/native";
   interface Props {
     html: string;
     onOpenLink: (target: string, heading: string) => void;
@@ -99,7 +100,14 @@
       onTag(tag.dataset.tag ?? "");
       return;
     }
-    // External links keep their default behaviour (they carry target=_blank).
+    // Web and mail links: the system browser / mail app (a new window cannot open inside the apps).
+    const ext = el.closest<HTMLAnchorElement>("a[href]");
+    const url = ext?.getAttribute("href") ?? "";
+    if (ext && /^(https?:|mailto:|tel:)/i.test(url)) {
+      e.preventDefault();
+      void openExternal(url);
+      return;
+    }
   }
 </script>
 

@@ -226,10 +226,12 @@
   async function diskCheck() {
     if (checking || syncing || vault === demo || readOnlyCopy) return;
     checking = true;
+    const started = performance.now();
     try {
       const path = current;
       const base = path ? vault.read(path) : "";
       const r = await vault.checkDisk();
+      checkEvery = Math.min(30_000, Math.max(3000, (performance.now() - started) * 10));
       if (!path || path !== current) return;
       if (r.changed.includes(path)) {
         if (content === base) {
@@ -263,9 +265,16 @@
     }
   }
 
+  // Every 3 s; less often when checking the folder is slow (big vault, network or OneDrive folder).
+  let checkEvery = 3000;
   $effect(() => {
     if (vault === demo || readOnlyCopy) return;
-    const id = setInterval(() => document.visibilityState === "visible" && void diskCheck(), 3000);
+    let last = 0;
+    const id = setInterval(() => {
+      if (document.visibilityState !== "visible" || Date.now() - last < checkEvery) return;
+      last = Date.now();
+      void diskCheck();
+    }, 1000);
     const onVisible = () => document.visibilityState === "visible" && void diskCheck();
     window.addEventListener("focus", onVisible);
     document.addEventListener("visibilitychange", onVisible);
