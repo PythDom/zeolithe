@@ -858,7 +858,7 @@
       <div class="panes mode-{mode}">
         {#if mode !== "view"}
           <section class="pane">
-            <Editor bind:this={editor} {content} {onChange} {onFile} tags={allTags} people={() => vault.people()} links={linkTargets} />
+            <Editor bind:this={editor} {content} {onChange} {onFile} tags={allTags} people={() => vault.people()} links={linkTargets} onOpenLink={openLink} />
           </section>
         {/if}
         {#if mode !== "edit"}
@@ -1248,6 +1248,19 @@
     display: flex;
     gap: 8px;
     align-items: center;
+    overflow: hidden;
+  }
+  /* Phones: no room for "+ Assign ID" (still available on wider screens). */
+  @media (max-width: 560px) {
+    .crumbs button.id.add {
+      display: none;
+    }
+  }
+  .crumbs button.id {
+    flex-shrink: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .crumbs .id {
     padding: 2px 8px;

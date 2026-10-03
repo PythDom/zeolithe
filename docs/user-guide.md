@@ -58,14 +58,16 @@ The toolbar formats the line or the selection: headings, **bold**,
 - **Tags:** `#tag`. Typing `#` suggests existing tags.
 - **People:** `@name`. Typing `@` suggests people already mentioned.
 - **Table of contents:** **TOC** inserts one that updates itself, **TOC⇣**
-  writes a fixed one. Click an entry to jump to that heading; **←** brings
-  you back.
+  writes a fixed one. Click an entry to jump to that heading, in the
+  preview as well as in the editor (where the TOC shows a clickable
+  contents list); **←** brings you back.
 
 ### Links between notes
 
 Press **[[ ]]** in the toolbar (or Ctrl+K): search a note by name, title,
 ID or folder, choose an optional heading or display text, then **Insert
-link**. Typing `[[` in the editor also suggests notes.
+link**. Typing `[[` in the editor also suggests notes. In the editor,
+**Ctrl+click** a link to follow it (in the preview, a simple click).
 
 | Write | Result |
 | ----- | ------ |

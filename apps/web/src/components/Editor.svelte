@@ -12,6 +12,7 @@
   import { convertDueFields } from "@zeolite/core";
   import { onMount } from "svelte";
   import { chordHighlight } from "../lib/chord-highlight";
+  import { editorLinks } from "../lib/editor-links";
 
   interface Props {
     content: string;
@@ -22,13 +23,15 @@
     people: () => string[];
     /** Notes and attachments offered after typing [[ (link text, folder, headings). */
     links?: () => LinkTarget[];
+    /** Follow a link: table of contents entries, Ctrl/Cmd+click on [[links]]. */
+    onOpenLink?: (target: string, heading: string) => void;
   }
   export interface LinkTarget {
     link: string;
     detail: string;
     headings: string[];
   }
-  let { content, onChange, onFile, tags, people, links = () => [] }: Props = $props();
+  let { content, onChange, onFile, tags, people, links = () => [], onOpenLink = () => {} }: Props = $props();
 
   let host: HTMLDivElement;
   let view: EditorView | undefined;
@@ -171,6 +174,7 @@
         dueConverter,
         chordHighlight,
         fileHandlers,
+        editorLinks((t, h) => onOpenLink(t, h)),
         EditorView.updateListener.of((u) => {
           if (u.docChanged) onChange(u.state.doc.toString());
         }),

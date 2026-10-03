@@ -102,7 +102,9 @@ Done:
 - Images by paste or drop.
 - Dynamic and static TOC; clicking an entry (or any `[[#Heading]]` or
   `[text](#heading)` link) scrolls the preview and the editor to the
-  heading, and ← returns.
+  heading, and ← returns. In the editor (Edit mode, phones) a ```toc block
+  shows a clickable contents list, static TOC entries are clickable, and
+  Ctrl/Cmd+click follows any [[link]].
 - Tasks: toolbar buttons, state cycling, ticking from the preview, `[due:: …]`
   with natural-language dates.
 - Attn points: insert, resolve, convert to task.
