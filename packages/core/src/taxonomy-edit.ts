@@ -95,6 +95,21 @@ export function renameEntry(tax: Taxonomy, kind: TaxonomyKind, code: string, new
   return next;
 }
 
+/** Change the vault folder of a PARA (where its numbered notes go). */
+export function setParaFolder(tax: Taxonomy, code: string, folder: string): Taxonomy {
+  const clean = folder.trim().replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
+  if (!clean) throw new TaxonomyEditError("The folder name cannot be empty.");
+  if (/[:*?"<>|#^[\]]/.test(clean) || clean.split("/").some((p) => !p.trim() || p.startsWith("."))) {
+    throw new TaxonomyEditError(`"${clean}" cannot be used as a folder name.`);
+  }
+  if (!tax.paras.some((e) => e.code === code)) throw new TaxonomyEditError(`No PARA with code ${code}.`);
+  const other = tax.paras.find((e) => e.code !== code && e.folder?.toLowerCase() === clean.toLowerCase());
+  if (other) throw new TaxonomyEditError(`"${clean}" is already the folder of #${other.tag}.`);
+  const next = cloneTax(tax);
+  next.paras = next.paras.map((e) => (e.code === code ? { ...e, folder: clean } : e));
+  return next;
+}
+
 /** Remove an entry; refused while note IDs still use its code. */
 export function removeEntry(tax: Taxonomy, kind: TaxonomyKind, code: string, ids: Iterable<string>, para?: string): Taxonomy {
   const list = listOf(tax, kind, para);

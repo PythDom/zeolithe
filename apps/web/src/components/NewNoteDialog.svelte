@@ -20,6 +20,8 @@
 
   interface Props {
     taxonomy: Taxonomy;
+    /** Folder of Inbox notes (vault setting). */
+    inboxFolder?: string;
     /** Existing folders, suggested for free notes. */
     folders?: string[];
     existingIds: string[];
@@ -30,7 +32,7 @@
     onCreate: (note: NewNote, cursor: number | null) => void;
     onClose: () => void;
   }
-  let { taxonomy, existingIds, templates, readTemplate, journal, folders = [], onCreate, onClose }: Props = $props();
+  let { taxonomy, existingIds, templates, readTemplate, journal, folders = [], inboxFolder = "Inbox", onCreate, onClose }: Props = $props();
   let template = $state("");
   let templateTouched = $state(false);
 
@@ -111,7 +113,7 @@
       let note: NewNote;
       if (kind === "para") note = createParaNote({ taxonomy, para, category, sub, title, existingIds });
       else if (kind === "journal") note = createJournalNote(new Date(), journal);
-      else if (kind === "inbox") note = createInboxNote(title);
+      else if (kind === "inbox") note = createInboxNote(title, new Date(), inboxFolder);
       else note = createFreeNote(folder, title);
       let cursor: number | null = null;
       if (template) {

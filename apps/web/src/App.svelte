@@ -43,7 +43,8 @@
   import LinkDialog from "./components/LinkDialog.svelte";
   import AttachmentDialog from "./components/AttachmentDialog.svelte";
   import SyncDialog from "./components/SyncDialog.svelte";
-  import { MULTI_USER_CHECKS } from "./lib/features";
+  import { applyPrefs, multiUserChecks, prefs } from "./lib/features.svelte";
+  import SettingsDialog from "./components/SettingsDialog.svelte";
   import { describeReport, loadSyncSettings, runSync, saveSyncSettings, type SyncSettings } from "./lib/sync";
   import { WebDavClient } from "./lib/webdav";
   import { demoVault, starterVault } from "./lib/demo-vault";
@@ -65,7 +66,8 @@
   let vault = $state<Vault>(demo);
   let current = $state<string | null>(null);
   let content = $state("");
-  let mode = $state<Mode>(narrow() ? "edit" : "split");
+  applyPrefs();
+  let mode = $state<Mode>(prefs.startMode === "auto" ? (narrow() ? "edit" : "split") : prefs.startMode);
   let tab = $state<"files" | "tags" | "tasks" | "search">("files");
   let query = $state("");
   let showNew = $state(false);
@@ -86,6 +88,7 @@
   let linkFrom = $state<string | null>(null);
   /** Attachment shown from the Files list. */
   let attachment = $state<string | null>(null);
+  let showSettings = $state(false);
   let lastVault = $state<FileSystemDirectoryHandle | undefined>();
   let androidPicker = $state(false);
   const shell = platform();
@@ -272,7 +275,7 @@
   // Every 3 s; less often when checking the folder is slow (big vault, network or OneDrive folder).
   let checkEvery = 3000;
   $effect(() => {
-    if (!MULTI_USER_CHECKS || vault === demo || readOnlyCopy) return;
+    if (!multiUserChecks() || vault === demo || readOnlyCopy) return;
     let last = 0;
     const id = setInterval(() => {
       if (document.visibilityState !== "visible" || Date.now() - last < checkEvery) return;
@@ -598,7 +601,7 @@
 
   async function saveSearch(title: string, block: string) {
     showQuery = false;
-    const note = createFreeNote("Searches", title);
+    const note = createFreeNote(vault.settings.searchesFolder, title);
     await create({ ...note, content: `${note.content}${block}\n` });
     mode = mode === "edit" ? "split" : mode;
   }
@@ -824,6 +827,7 @@
         <div class="title">Zeolite</div>
         <div class="vault" title={vault.name}>{vault.name}</div>
       </div>
+      <button class="settings" onclick={() => (showSettings = true)} title="Settings: folders, journal, attachments, theme…" aria-label="Settings">⚙</button>
     </header>
     <div class="actions">
       <button class="primary" onclick={() => (showNew = true)} title="Ctrl+N">＋ New note</button>
@@ -1139,6 +1143,16 @@
   </div>
 {/if}
 
+{#if showSettings}
+  <SettingsDialog
+    {vault}
+    onOpenSync={vault !== demo && !readOnlyCopy ? () => ((showSettings = false), (showSync = true)) : undefined}
+    onSetupTaxonomy={() => ((showSettings = false), (showTaxonomy = true))}
+    onSaved={(m) => ((showSettings = false), (status = m))}
+    onClose={() => (showSettings = false)}
+  />
+{/if}
+
 {#if attachment}
   <AttachmentDialog
     {vault}
@@ -1177,6 +1191,7 @@
     templates={vault.templates()}
     readTemplate={(p) => vault.read(p)}
     journal={vault.settings.journal}
+    inboxFolder={vault.settings.inboxFolder}
     onCreate={create}
     onClose={() => (showNew = false)}
   />
@@ -1200,6 +1215,20 @@
     gap: 10px;
     align-items: center;
     padding: 14px 14px 10px;
+  }
+  .brand .settings {
+    margin-left: auto;
+    padding: 4px 8px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: none;
+    color: var(--muted);
+    font-size: 17px;
+    cursor: pointer;
+  }
+  .brand .settings:hover {
+    border-color: var(--border);
+    color: var(--fg);
   }
   .brand .title {
     font-weight: 700;

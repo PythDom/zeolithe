@@ -64,10 +64,11 @@ export function createJournalNote(date: Date = new Date(), settings: JournalSett
   };
 }
 
-export function createInboxNote(title: string, now: Date = new Date()): NewNote {
+export function createInboxNote(title: string, now: Date = new Date(), folder: string = INBOX_FOLDER): NewNote {
   const t = sanitizeTitle(title) || `Note ${toIsoMinute(now).replace(":", "h")}`;
+  const dir = folder.replace(/^\/+|\/+$/g, "");
   return {
-    path: `${INBOX_FOLDER}/${t}.md`,
+    path: `${dir ? `${dir}/` : ""}${t}.md`,
     content: `${serializeFrontmatter({ created: toIsoMinute(now) })}\n# ${t}\n\n`,
   };
 }

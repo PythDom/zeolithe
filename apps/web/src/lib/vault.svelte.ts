@@ -1,5 +1,8 @@
 import {
   buildNoteRecord,
+  applyZeoliteSettings,
+  writeVaultSettings,
+  SETTINGS_PATH,
   conflictPath,
   oneDriveConflictOf,
   findCollisions,
@@ -22,7 +25,7 @@ import {
   type QueryResult,
   type Taxonomy,
 } from "@zeolite/core";
-import { MULTI_USER_CHECKS } from "./features";
+import { multiUserChecks } from "./features.svelte";
 import { IGNORED_DIRS, type FileStamp, type VaultStorage } from "./storage";
 
 /** Paths inside ignored folders (.obsidian, .trash, .git…) are not shown. */
@@ -65,7 +68,7 @@ export class Vault {
     return run;
   }
   private async stamp(path: string) {
-    if (!MULTI_USER_CHECKS || !this.storage.stat) return;
+    if (!multiUserChecks() || !this.storage.stat) return;
     try {
       const s: FileStamp = await this.storage.stat(path);
       this.stamps.set(path, `${s.mtime}:${s.size}`);
@@ -118,6 +121,7 @@ export class Vault {
     for (const path of files) {
       if (IMAGE_EXT.test(path)) this.assetUrls.set(path, URL.createObjectURL(await this.storage.readBinary(path)));
     }
+    this.settings = applyZeoliteSettings(this.settings, this.contents.get(SETTINGS_PATH));
     this.files = files;
     this.dirs = ((await this.storage.listDirs?.()) ?? []).filter((d) => !d.split("/").some((p) => IGNORED_DIRS.has(p)));
     this.records = records;
@@ -129,11 +133,75 @@ export class Vault {
     this.taxonomy = text ? parseTaxonomy(text) : { paras: [], categories: [], subParas: {}, warnings: ["No _system/Taxonomy.md in this vault."] };
   }
 
+  /**
+   * Save new vault settings: Obsidian's own files in .obsidian/ (other keys
+   * kept) and Zeolite's settings note.
+   */
+  async saveSettings(next: VaultSettings) {
+    const out = writeVaultSettings(next, {
+      app: await this.readOptional(".obsidian/app.json"),
+      templates: await this.readOptional(".obsidian/templates.json"),
+      dailyNotes: await this.readOptional(".obsidian/daily-notes.json"),
+      note: this.contents.get(SETTINGS_PATH),
+    });
+    await this.storage.writeText(".obsidian/app.json", out.app);
+    await this.storage.writeText(".obsidian/templates.json", out.templates);
+    await this.storage.writeText(".obsidian/daily-notes.json", out.dailyNotes);
+    await this.save(SETTINGS_PATH, out.note);
+    this.settings = { ...structuredClone(next), fromObsidian: true };
+  }
+
+  /**
+   * Rename a folder with everything in it (notes and attachments). Note names
+   * do not change, so ordinary [[links]] keep working; links written with
+   * the folder path ([[Old/Note]]) are updated.
+   */
+  async renameFolder(from: string, to: string) {
+    from = from.replace(/\/+$/, "");
+    to = to.replace(/\/+$/, "");
+    if (from === to) return;
+    const moved = this.filesIn(from);
+    const target = (f: string) => `${to}/${f.slice(from.length + 1)}`;
+    const clash = moved.find((f) => this.files.includes(target(f)));
+    if (clash) throw new Error(`${target(clash)} already exists.`);
+    for (const f of moved) await this.storage.rename(f, target(f));
+    await this.storage.removeDir?.(from).catch(() => {});
+    const next = new Map(this.records);
+    for (const f of moved) {
+      const t = target(f);
+      const text = this.contents.get(f);
+      if (text !== undefined) {
+        this.contents.delete(f);
+        this.contents.set(t, text);
+        next.delete(f);
+        next.set(t, buildNoteRecord(t, text));
+      }
+      const url = this.assetUrls.get(f);
+      if (url) {
+        this.assetUrls.delete(f);
+        this.assetUrls.set(t, url);
+      }
+      this.stamps.delete(f);
+    }
+    const map = new Map(moved.map((f) => [f, target(f)]));
+    this.files = this.files.map((f) => map.get(f) ?? f).sort((a, b) => a.localeCompare(b));
+    this.dirs = this.dirs.map((d) => (d === from ? to : d.startsWith(`${from}/`) ? `${to}${d.slice(from.length)}` : d));
+    if (!this.dirs.includes(to)) this.dirs = [...this.dirs, to].sort((a, b) => a.localeCompare(b));
+    this.records = next;
+    // Links that spell out the old folder.
+    const esc = from.replace(/[.*+?^\${}()|[\]\\]/g, "\\$&");
+    const re = new RegExp(`(!?\\[\\[)${esc}/`, "g");
+    for (const [path, body] of [...this.contents]) {
+      const updated = body.replace(re, `$1${to}/`);
+      if (updated !== body) await this.save(path, updated);
+    }
+  }
+
   /** Original note of a conflict copy (Syncthing, OneDrive, Zeolite), or null. */
   conflictOf(path: string): string | null {
     const sync = /^(.*)\.sync-conflict-[^/]*\.md$/i.exec(path);
     if (sync) return `${sync[1]}.md`;
-    return MULTI_USER_CHECKS ? oneDriveConflictOf(path, (p) => this.records.has(p)) : null;
+    return multiUserChecks() ? oneDriveConflictOf(path, (p) => this.records.has(p)) : null;
   }
 
   /** Notes that count as real notes (conflict copies and templates excluded). */
@@ -176,7 +244,7 @@ export class Vault {
       if (this.contents.get(path) === content) return;
       const known = this.contents.get(path);
       // Changed on disk by another app since we read it? Keep that version instead of overwriting it.
-      if (MULTI_USER_CHECKS && known !== undefined && this.files.includes(path) && (await this.changedOnDisk(path))) {
+      if (multiUserChecks() && known !== undefined && this.files.includes(path) && (await this.changedOnDisk(path))) {
         const disk = await this.storage.readText(path).catch(() => undefined);
         if (disk !== undefined && disk !== known && disk !== content) {
           const copy = conflictPath(path, new Date(), "OTHER");

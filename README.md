@@ -114,9 +114,11 @@ Done:
   notes keep their ID; links across the vault are updated.
 - Web links open in the default browser (in the Windows and Android apps
   too); in the editor, Ctrl/Cmd+click a web address to open it.
-- Shared folders (OneDrive/SharePoint, Syncthing, network drives) —
-  temporarily switched off (`MULTI_USER_CHECKS` in
-  `apps/web/src/lib/features.ts`): files
+- Settings (⚙): PARA folders (with renaming), attachments, journal,
+  templates, Inbox/searches/exports folders (vault, Obsidian-compatible
+  where Obsidian has the setting), theme, text size, opening view.
+- Shared folders (OneDrive/SharePoint, Syncthing, network drives) — off by
+  default, ⚙ Settings → This device: files
   changed by other apps or colleagues are picked up within seconds (the
   open note too, when it has no edits of ours); a save never overwrites
   a version changed meanwhile (it is kept as a conflict copy); OneDrive

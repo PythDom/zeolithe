@@ -66,7 +66,8 @@
 
   async function saveToVault() {
     if (!result) return;
-    const path = await vault.writeFile(`exports/${result.name}`, result.blob);
+    const dir = vault.settings.exportsFolder;
+    const path = await vault.writeFile(`${dir ? `${dir}/` : ""}${result.name}`, result.blob);
     onSaved(path);
   }
 
@@ -110,7 +111,7 @@
       {#if !result}
         <button class="primary" disabled={busy} onclick={build}>{busy ? "Creating PDF…" : "Create PDF"}</button>
       {:else}
-        <button onclick={saveToVault} title="Saves into exports/ in the vault (works on every device)">Save to vault</button>
+        <button onclick={saveToVault} title="Saves into {vault.settings.exportsFolder || 'the vault root'}/ in the vault (works on every device)">Save to vault</button>
         {#if shell === "tauri"}
           <button class="primary" onclick={async () => { if (result) { const p = await tauriSaveAs(result.name, result.blob); if (p) onSaved(p); } }}>Save as…</button>
         {:else if shell === "web"}

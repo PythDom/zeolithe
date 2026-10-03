@@ -286,11 +286,11 @@ another app, for example a SharePoint library synced with OneDrive:
    company's name in File Explorer).
 3. Each colleague does the same on their PC.
 
-> [!warning] Temporarily switched off
-> The checks below are disabled in this version: Zeolite reads the folder
-> when it opens the vault, but does not notice changes made elsewhere
-> afterwards. Close and reopen the vault (📂) to see colleagues' changes,
-> and avoid working on the same notes at the same time.
+> [!note] Switch it on first
+> These checks are off by default: turn on **⚙ Settings → This device →
+> Notice changes made by other apps or people**. While off, reopen the
+> vault (📂) to see colleagues' changes, and avoid working on the same
+> notes at the same time.
 
 When switched on, Zeolite notices files changed by others within a few
 seconds, while its window is active:
@@ -309,6 +309,19 @@ Tips: avoid editing the same note at the same moment; let one person
 maintain `_system/Taxonomy.md`; if two people create a note in the same
 series at once, Zeolite warns about the duplicate number and offers to
 renumber the newer note.
+
+## Settings
+
+**⚙** next to the Zeolite title opens the settings.
+
+- **This vault** (the same on every device): the folder of each PARA
+  (optionally renaming the existing folders with their notes), where pasted
+  images and files go, the journal's folder, date format and template, and
+  the folders for templates, Inbox notes, saved searches and PDF exports.
+  Attachments, templates and journal settings are shared with Obsidian.
+- **This device**: theme (light, dark or like the system), text size, the
+  view notes open in, and whether Zeolite watches for changes made by other
+  apps or people in a shared folder.
 
 ## Keyboard shortcuts
 

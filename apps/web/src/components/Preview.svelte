@@ -141,6 +141,6 @@
     max-width: 820px;
     margin: 0 auto;
     line-height: 1.65;
-    font-size: 15px;
+    font-size: var(--note-size, 15px);
   }
 </style>

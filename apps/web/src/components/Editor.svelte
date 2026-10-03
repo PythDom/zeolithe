@@ -215,7 +215,7 @@
     height: 100%;
     background: var(--bg);
     color: var(--fg);
-    font-size: 15px;
+    font-size: var(--note-size, 15px);
   }
   .editor :global(.cm-editor.cm-focused) {
     outline: none;

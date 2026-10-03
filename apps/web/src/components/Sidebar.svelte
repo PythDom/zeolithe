@@ -101,7 +101,7 @@
   const openAttn = $derived(vault.notes.flatMap((r) => r.attn.filter((a) => !a.resolved).map((a) => ({ r, a }))));
 
   const hits = $derived(vault.search(query));
-  const savedSearches = $derived(vault.notes.filter((r) => r.folder === "Searches"));
+  const savedSearches = $derived(vault.notes.filter((r) => r.folder === vault.settings.searchesFolder));
   const label = (path: string) => path.split("/").pop()!.replace(/\.md$/i, "");
 </script>
 
