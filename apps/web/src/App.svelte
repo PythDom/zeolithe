@@ -137,13 +137,84 @@
     offerSetup = v !== demo && !readOnlyCopy && !v.files.some((f) => f.toLowerCase().endsWith(".md"));
     current = null;
     content = "";
+    back = [];
+    forward = [];
     const start = ["Welcome.md"].find((p) => v.exists(p)) ?? v.notes[0]?.path;
     if (start) await open(start);
   }
 
-  async function open(path: string, line?: number) {
+  // Back/forward through opened notes, like a web browser. Each entry keeps
+  // where the note was scrolled to and the cursor, restored when coming back.
+  interface Visit {
+    path: string;
+    cursor: number;
+    scroll: number[];
+  }
+  let back = $state<Visit[]>([]);
+  let forward = $state<Visit[]>([]);
+  const HISTORY_MAX = 50;
+
+  function here(): Visit | null {
+    if (!current) return null;
+    const scroll = [...document.querySelectorAll(".panes .cm-scroller, .panes .preview")].map((el) => el.scrollTop);
+    return { path: current, cursor: editor?.getView()?.state.selection.main.head ?? 0, scroll };
+  }
+
+  function restore(v: Visit) {
+    queueMicrotask(() => {
+      const view = editor?.getView();
+      if (view) view.dispatch({ selection: { anchor: Math.min(v.cursor, view.state.doc.length) } });
+      // The preview renders over a few frames (images, queries): retry until the position is reached.
+      let frames = 0;
+      const apply = () => {
+        let done = true;
+        document.querySelectorAll(".panes .cm-scroller, .panes .preview").forEach((el, i) => {
+          const want = v.scroll[i];
+          if (want === undefined || Math.abs(el.scrollTop - want) < 2) return;
+          el.scrollTop = want;
+          if (Math.abs(el.scrollTop - want) >= 2) done = false;
+        });
+        if (!done && ++frames < 40) requestAnimationFrame(apply);
+      };
+      requestAnimationFrame(apply);
+    });
+  }
+
+  /** Go back (-1) or forward (+1); notes deleted since are skipped. */
+  async function navigate(dir: -1 | 1) {
+    const from = dir < 0 ? back : forward;
+    const to = dir < 0 ? forward : back;
+    const stack = [...from];
+    let target: Visit | undefined;
+    while ((target = stack.pop()) && !vault.exists(target.path));
+    const cur = here();
+    if (dir < 0) back = stack;
+    else forward = stack;
+    if (!target) return;
+    if (cur) {
+      if (dir < 0) forward = [...to, cur];
+      else back = [...to, cur];
+    }
+    await open(target.path, undefined, false);
+    restore(target);
+  }
+
+  /** Paths in the history follow renamed and moved notes. */
+  function renameInHistory(from: string, to: string) {
+    const fix = (list: Visit[]) => list.map((v) => (v.path === from ? { ...v, path: to } : v));
+    back = fix(back);
+    forward = fix(forward);
+  }
+
+  /** Open a note. `remember`: the note left can be returned to with Back. */
+  async function open(path: string, line?: number, remember = true) {
     await flush();
     scrolling = false;
+    if (remember && current && current !== path) {
+      const cur = here();
+      if (cur) back = [...back, cur].slice(-HISTORY_MAX);
+      forward = [];
+    }
     current = path;
     content = vault.read(path);
     editor?.setContent(content);
@@ -278,9 +349,11 @@
     const from = current!;
     current = null;
     try {
-      await open(await vault.move(from, to, text));
+      const moved = await vault.move(from, to, text);
+      renameInHistory(from, moved);
+      await open(moved, undefined, false);
     } catch (e) {
-      await open(from);
+      await open(from, undefined, false);
       throw e;
     }
   }
@@ -355,6 +428,7 @@
       else {
         await flush();
         await vault.move(path, to);
+        renameInHistory(path, to);
       }
       status = `Moved to ${folder || "the vault root"}`;
     } catch (e) {
@@ -497,7 +571,17 @@
   start();
 </script>
 
-<svelte:window onkeydown={(e) => {
+<svelte:window
+  onmouseup={(e) => {
+    // Mouse side buttons.
+    if (e.button === 3 && back.length) { e.preventDefault(); navigate(-1); }
+    if (e.button === 4 && forward.length) { e.preventDefault(); navigate(1); }
+  }}
+  onkeydown={(e) => {
+  if (e.altKey && !e.ctrlKey && !e.metaKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
+    e.preventDefault();
+    navigate(e.key === "ArrowLeft" ? -1 : 1);
+  }
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "k" && current && mode !== "view") {
     e.preventDefault();
     const v = editor?.getView();
@@ -555,6 +639,20 @@
     {/if}
     <header class="notebar">
       <button class="menu" aria-label="Menu" onclick={() => (drawer = !drawer)}>☰</button>
+      <div class="nav">
+        <button
+          disabled={!back.length}
+          onclick={() => navigate(-1)}
+          aria-label="Back"
+          title={back.length ? `Back to “${back.at(-1)!.path.split("/").pop()!.replace(/\.md$/i, "")}” (Alt+←)` : "Back (Alt+←): returns to the previous note after following a link"}
+        >←</button>
+        <button
+          disabled={!forward.length}
+          onclick={() => navigate(1)}
+          aria-label="Forward"
+          title={forward.length ? `Forward to “${forward.at(-1)!.path.split("/").pop()!.replace(/\.md$/i, "")}” (Alt+→)` : "Forward (Alt+→)"}
+        >→</button>
+      </div>
       <div class="crumbs">
         {#if record?.id}
           <button class="id" onclick={async () => { await flush(); showChangeId = true; }} title="Change this note's ID">{record.id}</button>
@@ -939,6 +1037,26 @@
   }
   .notebar .trash {
     padding: 6px 8px;
+  }
+  .nav {
+    display: flex;
+    flex-shrink: 0;
+  }
+  .nav button {
+    padding: 6px 9px;
+    font-size: 15px;
+    line-height: 1;
+  }
+  .nav button:first-child {
+    border-radius: 6px 0 0 6px;
+  }
+  .nav button:last-child {
+    border-left: none;
+    border-radius: 0 6px 6px 0;
+  }
+  .nav button:disabled {
+    opacity: 0.35;
+    cursor: default;
   }
   .notebar .warnbtn {
     border-color: var(--warn);

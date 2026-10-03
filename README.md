@@ -105,6 +105,9 @@ Done:
 - New-note dialog: PARA ID generation, Journal, Inbox and Free notes.
 - Rename or move a note: click its path at the top, or press F2. PARA
   notes keep their ID; links across the vault are updated.
+- Back and forward (← → in the top bar, Alt+← / Alt+→, or the mouse's side
+  buttons): after following a link, return to the note you came from, at
+  the same scroll position and cursor, like in a web browser.
 - Close the open note (✕ in the top bar).
 - Move a note to another folder by dragging it onto the folder in the Files
   list (or onto "vault root" below the list); links are updated.
