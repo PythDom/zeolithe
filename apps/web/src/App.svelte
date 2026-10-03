@@ -1,6 +1,7 @@
 <script lang="ts">
   import {
     archiveNote,
+    conflictPath,
     headingLinkText,
     isArchived,
     nextId,
@@ -39,6 +40,9 @@
   import Toolbar from "./components/Toolbar.svelte";
   import NewFolderDialog from "./components/NewFolderDialog.svelte";
   import LinkDialog from "./components/LinkDialog.svelte";
+  import SyncDialog from "./components/SyncDialog.svelte";
+  import { describeReport, loadSyncSettings, runSync, saveSyncSettings, type SyncSettings } from "./lib/sync";
+  import { WebDavClient } from "./lib/webdav";
   import { demoVault, starterVault } from "./lib/demo-vault";
   import userGuide from "../../../docs/user-guide.md?raw";
   import { insertBlock } from "./lib/editor-commands";
@@ -131,9 +135,96 @@
     status = `⚠ ${(e as Error).message ?? e}`;
   }
 
+  // --- Sync with a WebDAV server -------------------------------------------
+  let showSync = $state(false);
+  let syncSettings = $state<SyncSettings | null>(null);
+  let syncing = $state(false);
+  let syncProgress = $state("");
+  let syncInfo = $state("");
+  let syncError = $state(false);
+  /** Question asked before deleting many files during a sync. */
+  let syncAsk = $state<{ text: string; sample: string[]; answer: (yes: boolean) => void } | null>(null);
+
+  async function syncNow() {
+    if (!syncSettings || syncing || readOnlyCopy) return;
+    syncing = true;
+    syncProgress = "";
+    syncError = false;
+    const v = vault;
+    try {
+      await flush();
+      const path = current;
+      const before = content;
+      const client = new WebDavClient(syncSettings.url, syncSettings.username, syncSettings.password);
+      const report = await runSync(v.storage, client, {
+        confirmDeletes: (count, side, sample) =>
+          new Promise((resolve) => {
+            syncAsk = {
+              text: side === "server" ? `Delete ${count} files on the server? They were deleted on this device.` : `Delete ${count} files on this device? They were deleted on the server (they go to .trash).`,
+              sample,
+              answer: (yes) => ((syncAsk = null), resolve(yes)),
+            };
+          }),
+        onProgress: (done, total) => (syncProgress = total ? `${done}/${total}` : ""),
+      });
+      if (report.localChanged && vault === v) {
+        await v.load();
+        if (path && v.exists(path)) {
+          const typed = content !== before;
+          if (typed && report.downloaded.includes(path)) {
+            // Typed during a sync that brought a new version: keep both.
+            await v.save(conflictPath(path, new Date(), "THIS-DEVICE"), content);
+          }
+          if (!typed || report.downloaded.includes(path)) {
+            content = v.read(path);
+            editor?.setContent(content);
+          } else scheduleSave();
+        } else if (path) {
+          current = null;
+          content = "";
+        }
+      }
+      const time = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      syncInfo = `${time}: ${describeReport(report)}`;
+      syncError = report.errors.length > 0;
+      if (report.errors.length) status = `⚠ Sync: ${report.errors[0]}${report.errors.length > 1 ? ` (+${report.errors.length - 1} more)` : ""}`;
+      else if (report.conflicts.length) status = `Sync: ${report.conflicts.length} note(s) changed on both sides; the server's version is kept as a conflict copy`;
+    } catch (e) {
+      syncError = true;
+      syncInfo = `failed: ${(e as Error).message}`;
+      status = `⚠ Sync failed: ${(e as Error).message}`;
+    } finally {
+      syncing = false;
+      syncProgress = "";
+    }
+  }
+
+  // Automatic sync: every N minutes, and when leaving the app (phone: switching apps).
+  $effect(() => {
+    const every = syncSettings?.every ?? 0;
+    if (!every) return;
+    const id = setInterval(() => void syncNow(), every * 60_000);
+    return () => clearInterval(id);
+  });
+  $effect(() => {
+    if (!syncSettings) return;
+    const onHide = () => document.visibilityState === "hidden" && void syncNow();
+    const onOnline = () => void syncNow();
+    document.addEventListener("visibilitychange", onHide);
+    window.addEventListener("online", onOnline);
+    return () => {
+      document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("online", onOnline);
+    };
+  });
+
   async function loadVault(v: Vault) {
     await v.load();
     vault = v;
+    // Never for the demo vault: its notes must not end up in a real vault's server folder.
+    syncSettings = readOnlyCopy || v === demo ? null : loadSyncSettings(v.name);
+    syncInfo = "";
+    syncError = false;
     // An empty real folder: offer to set it up as a new vault.
     offerSetup = v !== demo && !readOnlyCopy && !v.files.some((f) => f.toLowerCase().endsWith(".md"));
     current = null;
@@ -142,6 +233,7 @@
     forward = [];
     const start = ["Welcome.md"].find((p) => v.exists(p)) ?? v.notes[0]?.path;
     if (start) await open(start);
+    if (syncSettings) void syncNow();
   }
 
   // Back/forward through opened notes, like a web browser. Each entry keeps
@@ -626,6 +718,20 @@
       <button onclick={openFolder} title="Open a vault folder">📂</button>
       <button onclick={help} title="User guide (F1): adds it to this vault and opens it" aria-label="Help">❓</button>
     </div>
+    {#if !readOnlyCopy && vault !== demo}
+      <div class="syncbar">
+        {#if syncSettings}
+          <button class="sync" onclick={syncNow} disabled={syncing} title="Sync now with {syncSettings.url}">
+            <span class:spin={syncing}>⇅</span> {syncing ? `Syncing… ${syncProgress}` : "Sync"}
+          </button>
+          <button class="sync-info" class:err={syncError} onclick={() => (showSync = true)} title={syncInfo || "Sync settings"}>
+            {syncInfo || "Sync settings"}
+          </button>
+        {:else}
+          <button class="sync-setup" onclick={() => (showSync = true)} title="Sync this vault with a WebDAV server (e.g. on your Docker server)">⇅ Sync with your server…</button>
+        {/if}
+      </div>
+    {/if}
     {#if lastVault && vault.name !== lastVault.name}
       <button class="reopen" onclick={reopenVault} title="Reopen your last vault folder">📂 Reopen “{lastVault.name}”</button>
     {/if}
@@ -882,6 +988,42 @@
   />
 {/if}
 
+{#if showSync}
+  <SyncDialog
+    vaultName={vault.name}
+    settings={syncSettings}
+    last={syncInfo}
+    onSave={(s) => {
+      saveSyncSettings(vault.name, s);
+      syncSettings = s;
+      showSync = false;
+      void syncNow();
+    }}
+    onRemove={() => {
+      saveSyncSettings(vault.name, null);
+      syncSettings = null;
+      syncInfo = "";
+      showSync = false;
+      status = "Sync stopped on this device. Your files stay where they are.";
+    }}
+    onClose={() => (showSync = false)}
+  />
+{/if}
+
+{#if syncAsk}
+  <div class="backdrop" role="presentation">
+    <div class="dialog" role="alertdialog" aria-labelledby="sa-title">
+      <h2 id="sa-title">{syncAsk.text}</h2>
+      <p>That is a lot at once. If you did not delete them on purpose (for example, a different folder was opened), choose “Keep them”: they are copied back instead.</p>
+      <ul>{#each syncAsk.sample as f}<li><code>{f}</code></li>{/each}{#if syncAsk.sample.length >= 5}<li>…</li>{/if}</ul>
+      <div class="actions">
+        <button onclick={() => syncAsk?.answer(false)}>Keep them</button>
+        <button class="danger" onclick={() => syncAsk?.answer(true)}>Delete</button>
+      </div>
+    </div>
+  </div>
+{/if}
+
 {#if newFolderIn !== null}
   <NewFolderDialog {vault} parent={newFolderIn} onCreate={createFolder} onClose={() => (newFolderIn = null)} />
 {/if}
@@ -977,6 +1119,57 @@
     background: var(--accent);
     color: var(--on-accent);
     font-weight: 600;
+  }
+  .syncbar {
+    display: flex;
+    gap: 6px;
+    margin: 0 12px 10px;
+    font-size: 12.5px;
+  }
+  .syncbar button {
+    padding: 5px 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--fg);
+    font: inherit;
+    cursor: pointer;
+  }
+  .syncbar .sync {
+    flex-shrink: 0;
+    font-weight: 600;
+  }
+  .syncbar .sync:disabled {
+    cursor: progress;
+  }
+  .syncbar .sync-info {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    border-color: transparent;
+    background: none;
+    color: var(--muted);
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .syncbar .sync-info.err {
+    color: var(--danger);
+  }
+  .syncbar .sync-setup {
+    flex: 1;
+    border-style: dashed;
+    color: var(--muted);
+    text-align: left;
+  }
+  .spin {
+    display: inline-block;
+    animation: spin 1s linear infinite;
+  }
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
   }
   .reopen {
     margin: 0 12px 10px;

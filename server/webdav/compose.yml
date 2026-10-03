@@ -1,0 +1,14 @@
+# Zeolite sync server: a WebDAV server (hacdias/webdav) for your vault.
+# Usage: copy this folder to the Docker server, edit config.yml (user name and
+# password), then run `docker compose up -d`. The vault is stored in ./vault.
+services:
+  webdav:
+    image: ghcr.io/hacdias/webdav:latest
+    container_name: zeolite-webdav
+    restart: unless-stopped
+    ports:
+      - "6065:6065"
+    volumes:
+      - ./config.yml:/config.yml:ro
+      - ./vault:/data
+    command: -c /config.yml

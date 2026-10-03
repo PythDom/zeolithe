@@ -5,6 +5,7 @@ Notes are plain Markdown files, compatible with Obsidian vaults, and the app
 is shared between Windows and Android.
 
 - Specification: [docs/feasibility.md](docs/feasibility.md)
+- Sync with your own server (WebDAV, Docker): [docs/sync.md](docs/sync.md)
 - Taxonomy and numbering: [docs/taxonomy.md](docs/taxonomy.md)
 
 ## Repository layout
@@ -15,6 +16,7 @@ is shared between Windows and Android.
 | `apps/web` | Shared UI (Svelte + CodeMirror 6), with one storage adapter per platform (browser, Windows, Android). |
 | `apps/desktop` | Windows app (Tauri 2): portable `Zeolite.exe` and an installer. |
 | `apps/mobile` | Android app (Capacitor 8): APK. |
+| `server/webdav` | Docker setup of a WebDAV server for syncing vaults. |
 | `assets/logo` | Logo: an icon and a wordmark (SVG). |
 | `docs` | Specification. |
 
@@ -105,6 +107,9 @@ Done:
 - New-note dialog: PARA ID generation, Journal, Inbox and Free notes.
 - Rename or move a note: click its path at the top, or press F2. PARA
   notes keep their ID; links across the vault are updated.
+- Sync with a WebDAV server, e.g. a container on your Docker server
+  (⇅ in the sidebar): two-way, only changed files, conflicts kept as
+  Syncthing-style copies, deletions to `.trash`. See [docs/sync.md](docs/sync.md).
 - User guide: ❓ in the sidebar (or F1) writes `_system/Zeolite User Guide.md`
   into the vault (refreshed to the current version each time) and opens it.
   Source: [docs/user-guide.md](docs/user-guide.md).

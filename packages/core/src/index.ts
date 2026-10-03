@@ -16,3 +16,4 @@ export * from "./taxonomy-edit";
 export * from "./templates";
 export * from "./chords";
 export * from "./obsidian";
+export * from "./sync";

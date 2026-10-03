@@ -134,6 +134,15 @@ autoscroll for playing, and PDF export with aligned chords.
 **PDF** in the top bar (Ctrl+P) exports the note or its whole folder, with
 a clickable table of contents and page numbers.
 
+## Syncing with your server
+
+**⇅ Sync with your server…** in the sidebar connects the vault to a WebDAV
+folder, for example on your Docker server (setup: `docs/sync.md` in the
+Zeolite repository). Zeolite then syncs on opening, every few minutes and
+with the **⇅ Sync** button. A note changed on two devices keeps both
+versions: the other one appears as a "sync conflict" copy at the top of the
+Files list. Syncthing still works too if you prefer it.
+
 ## Keyboard shortcuts
 
 | Keys | Action |

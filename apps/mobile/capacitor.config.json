@@ -3,6 +3,6 @@
   "appName": "Zeolite",
   "webDir": "../web/dist",
   "android": {
-    "allowMixedContent": false
+    "allowMixedContent": true
   }
 }

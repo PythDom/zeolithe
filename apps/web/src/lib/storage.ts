@@ -25,7 +25,7 @@ export interface VaultStorage {
 }
 
 /** Folders never read or written by the app. */
-export const IGNORED_DIRS = new Set([".obsidian", ".git", ".trash", ".stfolder", ".stversions", "node_modules"]);
+export const IGNORED_DIRS = new Set([".obsidian", ".git", ".trash", ".zeolite", ".stfolder", ".stversions", "node_modules"]);
 
 export class MemoryStorage implements VaultStorage {
   private files = new Map<string, string | Blob>();

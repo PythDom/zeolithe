@@ -1,0 +1,24 @@
+# Zeolite sync server configuration (hacdias/webdav).
+address: 0.0.0.0
+port: 6065
+directory: /data
+permissions: CRUD
+
+# Behind a reverse proxy (HTTPS), set to true so that the logs show the real addresses.
+behindProxy: false
+
+# Lets the Zeolite apps (Windows, Android, portable HTML) talk to the server.
+cors:
+  enabled: true
+  credentials: false
+  allowed_hosts: ['*']
+  allowed_headers: [Authorization, Content-Type, Depth, Destination, Overwrite]
+  allowed_methods: [GET, HEAD, PUT, DELETE, MKCOL, MOVE, COPY, PROPFIND, OPTIONS]
+  exposed_headers: [ETag, Last-Modified]
+
+users:
+  # Change both. For a hashed password, run:
+  #   docker run --rm ghcr.io/hacdias/webdav bcrypt 'your-password'
+  # and write password: "{bcrypt}<the hash>"
+  - username: me
+    password: change-this-password
