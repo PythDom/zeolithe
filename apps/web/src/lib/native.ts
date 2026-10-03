@@ -216,6 +216,12 @@ export async function androidListFolders(path: string): Promise<string[]> {
     .sort((a, b) => a.localeCompare(b));
 }
 
+/** Create a folder at an absolute Android path (from the folder browser). */
+export async function androidMakeFolder(path: string): Promise<void> {
+  const { Filesystem } = await import("@capacitor/filesystem");
+  await Filesystem.mkdir({ path, recursive: true });
+}
+
 const base64ToBlob = (b64: string) => {
   const bin = atob(b64);
   const bytes = new Uint8Array(bin.length);

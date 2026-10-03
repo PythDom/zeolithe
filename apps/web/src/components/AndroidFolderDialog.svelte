@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
-  import { ANDROID_ROOT, androidHasAccess, androidListFolders, androidRequestAccess, onAndroidResume } from "../lib/native";
+  import { ANDROID_ROOT, androidHasAccess, androidListFolders, androidMakeFolder, androidRequestAccess, onAndroidResume } from "../lib/native";
 
   interface Props {
     onChoose: (path: string) => void;
@@ -12,6 +12,7 @@
   let path = $state(ANDROID_ROOT);
   let folders = $state<string[]>([]);
   let error = $state("");
+  let newName = $state<string | null>(null);
   let stop: (() => void) | undefined;
 
   async function refreshAccess() {
@@ -34,6 +35,20 @@
   onDestroy(() => stop?.());
 
   const shown = $derived(path === ANDROID_ROOT ? "Internal storage" : `Internal storage${path.slice(ANDROID_ROOT.length)}`);
+  async function makeFolder(e: SubmitEvent) {
+    e.preventDefault();
+    const name = (newName ?? "").trim();
+    if (!name) return;
+    if (/[\\/:*?"<>|]/.test(name) || name.startsWith(".")) return (error = "A folder name cannot start with a dot or contain / \\ : * ? \" < > |.");
+    try {
+      await androidMakeFolder(`${path}/${name}`);
+      newName = null;
+      await load(`${path}/${name}`);
+    } catch (err) {
+      error = (err as Error).message;
+    }
+  }
+
   const up = () => load(path.slice(0, path.lastIndexOf("/")) || ANDROID_ROOT);
 </script>
 
@@ -65,7 +80,16 @@
         {/each}
       </ul>
       {#if error}<p class="error">{error}</p>{/if}
+      {#if newName !== null}
+        <form class="new" onsubmit={makeFolder}>
+          <!-- svelte-ignore a11y_autofocus -->
+          <input bind:value={newName} placeholder="New folder name, e.g. Zeolite" autofocus />
+          <button class="primary" type="submit" disabled={!newName.trim()}>Create</button>
+          <button class="ghost" type="button" onclick={() => (newName = null)}>Cancel</button>
+        </form>
+      {/if}
       <footer>
+        <button class="ghost new-btn" onclick={() => (newName = "")} disabled={newName !== null}>＋ New folder</button>
         <button class="primary" disabled={path === ANDROID_ROOT} onclick={() => onChoose(path)}>Use “{path.split("/").pop()}”</button>
       </footer>
     {/if}
@@ -103,6 +127,24 @@
   }
   header {
     border-bottom: 1px solid var(--border);
+  }
+  .new {
+    display: flex;
+    gap: 6px;
+    padding: 8px 16px;
+  }
+  .new input {
+    flex: 1;
+    min-width: 0;
+    padding: 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--fg);
+    font: inherit;
+  }
+  .new-btn {
+    margin-right: auto;
   }
   footer {
     justify-content: flex-end;

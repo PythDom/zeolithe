@@ -134,14 +134,129 @@ autoscroll for playing, and PDF export with aligned chords.
 **PDF** in the top bar (Ctrl+P) exports the note or its whole folder, with
 a clickable table of contents and page numbers.
 
-## Syncing with your server
+## Syncing your PC, phone and tablet
 
-**⇅ Sync with your server…** in the sidebar connects the vault to a WebDAV
-folder, for example on your Docker server (setup: `docs/sync.md` in the
-Zeolite repository). Zeolite then syncs on opening, every few minutes and
-with the **⇅ Sync** button. A note changed on two devices keeps both
-versions: the other one appears as a "sync conflict" copy at the top of the
-Files list. Syncthing still works too if you prefer it.
+Zeolite can keep the same vault on all your devices through a folder on
+your own server (for example a Docker server at home). Each device keeps
+a full copy of the notes, works offline, and exchanges its changes with
+the server.
+
+```
+   PC (Zeolite.exe) ─┐
+ Work PC (portable) ─┼──  your server (WebDAV folder)
+ Phone / tablet ─────┘
+```
+
+You set it up once on the server, then once on each device.
+
+### Step 1 – Start the server (once)
+
+On the Docker server:
+
+1. Copy the folder `server/webdav` from the Zeolite repository (it holds
+   two files, `compose.yml` and `config.yml`). The ⇅ dialog in Zeolite
+   also shows both files, ready to copy.
+2. In `config.yml`, replace the user name `me` and the password
+   `change-this-password` with your own.
+3. In that folder, run `docker compose up -d`.
+4. Check it: open `http://<server>:6065/` in a browser and log in. You
+   should see a page (an empty listing or some XML).
+
+Your notes will be stored as normal `.md` files in the `vault` folder
+next to `compose.yml`: back that folder up with the rest of your server.
+
+### Step 2 – Choose the address
+
+All devices must use **exactly the same address**. It ends with a folder
+name for the vault (`zeolite/` below); Zeolite creates that folder.
+
+| Your devices reach the server… | Address |
+| ------------------------------ | ------- |
+| only at home | `http://192.168.1.20:6065/zeolite/` (your server's address) |
+| also away from home, through your HTTPS reverse proxy | `https://dav.example.com/zeolite/` |
+| also away from home, through Tailscale or another VPN | `http://<server-name>:6065/zeolite/` |
+
+Away from home, always use **https** or a VPN, otherwise your password
+travels unencrypted.
+
+### Step 3 – The first device: the one with all your notes
+
+Usually your main PC.
+
+1. Open Zeolite and your vault (📂).
+2. In the sidebar, press **⇅ Sync with your server…**.
+3. Enter the address, user name and password.
+4. Press **Test connection**: it should say "Connected" (the first time:
+   "the sync folder … has been created").
+5. Press **Save and sync**. The sidebar shows "… sent" when it is done.
+
+### Step 4 – Phone or tablet (Android)
+
+1. Install `Zeolite-android.apk` (allow "install unknown apps" once).
+2. Open Zeolite and press 📂. The first time, allow **All files access**
+   in the Android settings screen that opens, then come back.
+3. In the folder browser, go to a place such as **Documents**, press
+   **＋ New folder**, name it (for example `Zeolite`), then press
+   **Use "Zeolite"**.
+4. Zeolite says the folder is empty: press **Keep it empty** (do **not**
+   choose "Set up the vault": your notes come from the server).
+5. Press **⇅ Sync with your server…**, enter the **same** address, user
+   name and password, then **Save and sync**. All your notes arrive
+   ("… received").
+
+Tablets work the same way. (iPad is not supported.)
+
+### Step 5 – Another PC (home or work)
+
+1. Use `Zeolite.exe` (no installation needed) or `Zeolite.html` opened in
+   Edge or Chrome.
+2. Create an **empty** folder for the vault, for example
+   `Documents\Zeolite`, and open it with 📂. Choose **Keep it empty**.
+3. **⇅ Sync with your server…** with the same address, user name and
+   password, then **Save and sync**.
+
+At work, test the address in the browser first: company networks often
+block other servers. If it is blocked, use the VPN address, or keep
+Syncthing on that PC instead.
+
+### Every day
+
+- Nothing to do: Zeolite syncs when it opens the vault, every 5 minutes
+  (change it in the ⇅ dialog), and when you switch to another app. Press
+  **⇅ Sync** in the sidebar to sync right away, for example before
+  closing the laptop.
+- The text next to ⇅ Sync shows the last result, for example
+  "14:05: 2 received". Red text means a problem: click it to see the
+  settings and test the connection.
+- Without network, keep working: changes are sent at the next sync.
+- **The same note edited on two devices** before they synced: both
+  versions are kept. Yours stays the note; the other one appears at the
+  top of the Files list as "⇄ Sync conflict: … .sync-conflict-…". Open
+  it, copy what you need into the note, then delete the conflict copy.
+- **A note deleted** on one device is deleted on the others too, but goes
+  to the vault's `.trash` folder there, so it can be recovered. If a sync
+  would delete many notes at once, Zeolite asks first; when in doubt
+  choose **Keep them**.
+
+### Good to know
+
+- Coming from Syncthing: once every device syncs with the server, stop
+  syncing this vault folder in Syncthing (two sync systems on the same
+  folder can create needless conflict copies).
+- One server folder per vault. For a second vault, use another address
+  ending, for example `…/work-notes/`.
+- The sync settings (password included) are stored on each device only.
+  **Stop syncing** in the ⇅ dialog removes them; your notes stay.
+- Not synced: Obsidian's settings folder (`.obsidian`), `.trash`, and
+  empty folders (a folder appears on the other devices with its first
+  note).
+
+| Problem | Solution |
+| ------- | -------- |
+| "Cannot reach …" | Check the address (http/https, port 6065, the final `/`), the network or VPN, and that the container runs. |
+| "refused the user name or password" | Check `users` in `config.yml`, then restart the container (`docker compose restart`). |
+| "does not allow this" | In `config.yml`, `permissions: CRUD`. |
+| Notes missing on a new device | Check that it uses exactly the same address, then press ⇅ Sync. |
 
 ## Keyboard shortcuts
 
