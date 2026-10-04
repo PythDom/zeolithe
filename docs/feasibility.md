@@ -323,6 +323,7 @@ SORT file.mtime DESC
 | 3 | Numbering: taxonomy parser, new-note dialog, generator, archiving, collision detection, journal | 1–2 weeks |
 | 4 | Tasks and Attn: parser, toolbar buttons, date conversion, Dataview subset, writing ticks back from results | 2–3 weeks |
 | 5 | Polish: live preview, tag rename/merge, consistency checks, conflict view, themes | ongoing |
+| 6 | Local AI assistant (on request): see [ai-assistant.md](ai-assistant.md) | 3–8 weeks by step |
 
 ## 12. Decision log
 
@@ -346,3 +347,4 @@ SORT file.mtime DESC
 | 16 | Language | English-only keywords and interface |
 | 17 | Sync | Syncthing (Syncthing-Fork on Android) |
 | 18 | Vault size | About 75–100 notes today |
+| 19 | Local AI | Designed in [ai-assistant.md](ai-assistant.md); deferred until requested |
