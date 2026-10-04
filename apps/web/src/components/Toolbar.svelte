@@ -83,15 +83,15 @@
   <div class="group">
     <button title="Insert a table of contents (updates itself)" onclick={run((v) => insertBlock(v, "```toc\n```"))}>☰ TOC</button>
     <button title="Write/update a static table of contents" onclick={onStaticToc}>TOC⇣</button>
-    <button class="accent" title="Build a Dataview query" onclick={onQuery}>🔍<span class="lbl"> Query</span></button>
-    <button class="accent" class:on={tplOpen} title="Insert a template" onclick={() => ((tplOpen = !tplOpen), (dueOpen = false), (attnOpen = false))}>📄<span class="lbl"> Template</span></button>
+    <button class="accent" title="Build a Dataview query" onclick={onQuery}>🔍<span class="lbl">Query</span></button>
+    <button class="accent" class:on={tplOpen} title="Insert a template" onclick={() => ((tplOpen = !tplOpen), (dueOpen = false), (attnOpen = false))}>📄<span class="lbl">Template</span></button>
   </div>
   <div class="group tasks">
-    <button class="accent" title="Task" onclick={lines(makeTask)}>☐<span class="lbl"> Task</span></button>
-    <button class="accent" class:on={dueOpen} title="Task with deadline" onclick={() => ((dueOpen = !dueOpen), (attnOpen = false), (tplOpen = false), (dueText = ""))}>📅<span class="lbl"> Due</span></button>
-    <button class="accent" title="Cycle state: open → done → cancelled → deferred" onclick={lines((l) => cycleTaskStatus(l))}>✔<span class="lbl"> State</span></button>
+    <button class="accent" title="Task" onclick={lines(makeTask)}>☐<span class="lbl">Task</span></button>
+    <button class="accent" class:on={dueOpen} title="Task with deadline" onclick={() => ((dueOpen = !dueOpen), (attnOpen = false), (tplOpen = false), (dueText = ""))}>📅<span class="lbl">Due</span></button>
+    <button class="accent" title="Cycle state: open → done → cancelled → deferred" onclick={lines((l) => cycleTaskStatus(l))}>✔<span class="lbl">State</span></button>
     <button class="accent" title="Assign a person" onclick={run((v) => insertText(v, "@"))}>👤</button>
-    <button class="attn" class:on={attnOpen} title="Attn point" onclick={() => ((attnOpen = !attnOpen), (dueOpen = false), (tplOpen = false))}>⚠<span class="lbl"> Attn</span> ▾</button>
+    <button class="attn" class:on={attnOpen} title="Attn point" onclick={() => ((attnOpen = !attnOpen), (dueOpen = false), (tplOpen = false))}>⚠<span class="lbl">Attn</span> ▾</button>
   </div>
 </div>
 
@@ -155,6 +155,9 @@
     border-right: none;
   }
   /* Phones: one scrollable row (the Android shell docks it above the keyboard). */
+  .lbl {
+    margin-left: 4px;
+  }
   /* Phones and narrow windows: every button visible on a few compact rows. */
   @media (max-width: 800px) {
     .toolbar {

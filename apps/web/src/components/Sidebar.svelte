@@ -17,8 +17,10 @@
     onNewFolder: (parent: string) => void;
     /** An attachment (image, PDF…) was clicked in the Files list. */
     onOpenAttachment: (path: string) => void;
+    /** Ctrl/Cmd+click or middle-click on a note: open it in a new tab. */
+    onOpenNewTab?: (path: string) => void;
   }
-  let { vault, current, tab = $bindable(), query = $bindable(), onOpen, onQuery, onTaxonomy, onMoveNote, onDeleteFolder, onNewFolder, onOpenAttachment }: Props = $props();
+  let { vault, current, tab = $bindable(), query = $bindable(), onOpen, onQuery, onTaxonomy, onMoveNote, onDeleteFolder, onNewFolder, onOpenAttachment, onOpenNewTab }: Props = $props();
 
   // Drag & drop of notes onto folders.
   const DRAG_TYPE = "application/x-zeolite-note";
@@ -162,8 +164,9 @@
             draggable="true"
             ondragstart={(e) => dragStart(e, f)}
             ondragend={dragEnd}
-            onclick={() => onOpen(f)}
-            title="{f} (drag onto a folder to move it)"
+            onclick={(e) => ((e.ctrlKey || e.metaKey) && onOpenNewTab ? onOpenNewTab(f) : onOpen(f))}
+            onauxclick={(e) => e.button === 1 && onOpenNewTab?.(f)}
+            title="{f} (Ctrl+click: new tab; drag onto a folder to move it)"
           >
             {label(f)}
           </button>

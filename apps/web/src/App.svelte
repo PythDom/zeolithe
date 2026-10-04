@@ -128,27 +128,6 @@
   );
   const html = $derived(current ? render(content) : "");
 
-  // Side panel: a second note shown next to the open one (read-only preview).
-  let side = $state<string | null>(null);
-  const sideRender = $derived(
-    createRenderer({
-      resolveAsset: (t) => vault.resolveAsset(t),
-      resolveNote: (t) => vault.resolveNote(t),
-      readNote: (p) => (p === current ? content : vault.read(p)),
-      currentPath: () => side,
-      runQuery: (src) => vault.runQuery(src, side ?? undefined),
-    }),
-  );
-  const sideHtml = $derived.by(() => {
-    if (!side) return "";
-    // Re-render when notes change (records are reactive, contents are not).
-    void vault.records.get(side);
-    return sideRender(side === current ? content : vault.read(side));
-  });
-  // The note was deleted or renamed: close the panel.
-  $effect(() => {
-    if (side && !vault.records.has(side)) side = null;
-  });
   const record = $derived(current ? vault.records.get(current) : undefined);
   const collision = $derived(current ? vault.collisions.find((c) => c.renumber.some((n) => n.path === current)) : undefined);
 
@@ -364,8 +343,16 @@
     content = "";
     back = [];
     forward = [];
-    const start = ["Welcome.md"].find((p) => v.exists(p)) ?? v.notes[0]?.path;
-    if (start) await open(start);
+    const saved = v === demo || readOnlyCopy ? null : savedTabs(v);
+    if (saved) {
+      tabs = saved.paths.map((p) => blankTab(p));
+      await showTab(saved.active);
+    } else {
+      tabs = [blankTab()];
+      active = 0;
+      const start = ["Welcome.md"].find((p) => v.exists(p)) ?? v.notes[0]?.path;
+      if (start) await open(start);
+    }
     if (syncSettings) void syncNow();
   }
 
@@ -425,11 +412,111 @@
     restore(target);
   }
 
-  /** Paths in the history follow renamed and moved notes. */
+  /** Paths in the history (and in tabs) follow renamed and moved notes. */
   function renameInHistory(from: string, to: string) {
     const fix = (list: Visit[]) => list.map((v) => (v.path === from ? { ...v, path: to } : v));
     back = fix(back);
     forward = fix(forward);
+    for (const t of tabs) {
+      if (t.path === from) t.path = to;
+      t.back = fix(t.back);
+      t.forward = fix(t.forward);
+    }
+  }
+
+  // --- Tabs, like Obsidian: opening a note replaces the one in the current tab;
+  // ＋ (or Ctrl+click in the Files list) opens a new tab. Each tab has its own ← → history.
+  interface Tab {
+    id: number;
+    path: string | null;
+    back: Visit[];
+    forward: Visit[];
+    /** Scroll and cursor when the tab was left. */
+    pos: Visit | null;
+  }
+  let tabSeq = 0;
+  const blankTab = (path: string | null = null): Tab => ({ id: ++tabSeq, path, back: [], forward: [], pos: null });
+  let tabs = $state<Tab[]>([blankTab()]);
+  let active = $state(0);
+
+  /** Keep the leaving tab's place (history, scroll, cursor). */
+  function stashTab() {
+    const t = tabs[active];
+    if (!t) return;
+    t.pos = here();
+    t.back = back;
+    t.forward = forward;
+  }
+
+  async function showTab(i: number) {
+    active = i;
+    const t = tabs[i]!;
+    back = t.back;
+    forward = t.forward;
+    if (t.path && vault.exists(t.path)) {
+      await open(t.path, undefined, false);
+      if (t.pos) restore(t.pos);
+    } else {
+      t.path = null;
+      current = null;
+      content = "";
+    }
+  }
+
+  async function switchTab(i: number) {
+    if (i === active || !tabs[i]) return;
+    await flush();
+    stashTab();
+    await showTab(i);
+  }
+
+  /** A new empty tab: then pick a note in the Files list. */
+  async function newTab(path: string | null = null) {
+    await flush();
+    stashTab();
+    tabs.push(blankTab());
+    active = tabs.length - 1;
+    back = [];
+    forward = [];
+    current = null;
+    content = "";
+    drawer = false;
+    if (path) await open(path, undefined, false);
+  }
+
+  async function closeTab(i: number) {
+    await flush();
+    if (i !== active) {
+      tabs.splice(i, 1);
+      if (i < active) active--;
+      return;
+    }
+    clearTimeout(saveTimer);
+    tabs.splice(i, 1);
+    if (!tabs.length) tabs.push(blankTab());
+    await showTab(Math.min(i, tabs.length - 1));
+  }
+
+  // Open tabs are remembered per vault (on this device).
+  const tabsKey = () => `zeolite.tabs.${vault.name}`;
+  $effect(() => {
+    const paths = tabs.map((t) => t.path);
+    const a = active;
+    if (vault === demo || readOnlyCopy) return;
+    try {
+      localStorage.setItem(tabsKey(), JSON.stringify({ paths, active: a }));
+    } catch {
+      // Not remembered.
+    }
+  });
+  function savedTabs(v: Vault): { paths: string[]; active: number } | null {
+    try {
+      const s = JSON.parse(localStorage.getItem(`zeolite.tabs.${v.name}`) ?? "null") as { paths: (string | null)[]; active: number } | null;
+      const paths = (s?.paths ?? []).filter((p): p is string => !!p && v.exists(p));
+      return paths.length ? { paths, active: Math.min(Math.max(0, s!.active), paths.length - 1) } : null;
+    } catch {
+      return null;
+    }
   }
 
   /** Open a note. `remember`: the note left can be returned to with Back. */
@@ -442,6 +529,7 @@
       forward = [];
     }
     current = path;
+    if (tabs[active]) tabs[active]!.path = path;
     content = vault.read(path);
     editor?.setContent(content);
     drawer = false;
@@ -690,11 +778,10 @@
 
 
   /** Close the open note (unsaved edits are saved first). */
+  /** Close the open note: its tab closes. */
   async function closeNote() {
-    await flush();
-    current = null;
-    content = "";
     scrolling = false;
+    await closeTab(active);
   }
 
   /** Drag & drop: move a note into another folder ("" = vault root); links are updated. */
@@ -869,6 +956,9 @@
   }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "n") { e.preventDefault(); showNew = true; }
   if (e.key === "F1") { e.preventDefault(); help(); }
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "t") { e.preventDefault(); newTab(); }
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "w") { e.preventDefault(); closeTab(active); }
+  if (e.ctrlKey && e.key === "Tab") { e.preventDefault(); switchTab((active + (e.shiftKey ? tabs.length - 1 : 1)) % tabs.length); }
   if (e.key === "F2" && current) { e.preventDefault(); flush().then(() => (showRename = true)); }
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "p" && current) { e.preventDefault(); flush().then(() => (showExport = true)); }
   if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "q") { e.preventDefault(); showQuery = true; }
@@ -915,6 +1005,7 @@
       bind:tab
       bind:query
       onOpen={open}
+      onOpenNewTab={(p) => newTab(p)}
       onQuery={() => (showQuery = true)}
       onTaxonomy={() => (showTaxonomy = true)}
       onMoveNote={moveNote}
@@ -935,6 +1026,17 @@
     {#if readOnlyCopy}
       <div class="readonly" role="status">Read-only copy of “{vault.name.replace(" (read-only copy)", "")}”: changes stay in this window and are not saved to your files.</div>
     {/if}
+    <nav class="tabbar" aria-label="Open notes">
+      {#each tabs as t, i (t.id)}
+        <div class="tab" class:active={i === active}>
+          <button class="tab-name" onclick={() => switchTab(i)} onauxclick={(e) => e.button === 1 && closeTab(i)} title={t.path ?? "Empty tab: pick a note in the Files list"}>
+            {t.path ? t.path.split("/").pop()!.replace(/\.md$/i, "") : "New tab"}
+          </button>
+          <button class="tab-x" onclick={() => closeTab(i)} aria-label="Close tab" title="Close tab">✕</button>
+        </div>
+      {/each}
+      <button class="tab-new" onclick={() => newTab()} title="New tab, then pick a note in the Files list (Ctrl+click a note opens it in a new tab)" aria-label="New tab">＋</button>
+    </nav>
     <header class="notebar">
       <button class="menu" aria-label="Menu" onclick={() => (drawer = !drawer)}>☰</button>
       <div class="nav">
@@ -969,8 +1071,7 @@
       {/if}
       {#if current}<button class="pdf" onclick={async () => { await flush(); showExport = true; }} title="Export to PDF (Ctrl+P)">PDF</button>{/if}
       {#if current}<button class="trash" onclick={async () => { await flush(); showDelete = true; }} title="Delete note (moves it to .trash)" aria-label="Delete note">🗑</button>{/if}
-      {#if current}<button class="pin" class:on={side === current} onclick={() => (side = side === current ? null : current)} title={side === current ? "Close the side panel" : "Keep this note in a side panel, then open another note next to it"} aria-label="Side panel">⧉</button>{/if}
-      {#if current}<button class="close" onclick={closeNote} title="Close this note" aria-label="Close note">✕</button>{/if}
+      {#if current}<button class="close" onclick={closeNote} title="Close this note (and its tab)" aria-label="Close note">✕</button>{/if}
       <div class="modes" role="radiogroup" aria-label="Mode">
         <button class:active={mode === "edit"} onclick={() => (mode = "edit")}>Edit</button>
         <button class="split" class:active={mode === "split"} onclick={() => (mode = "split")}>Split</button>
@@ -990,7 +1091,6 @@
           onLink={(selected) => (linkFrom = selected)}
         />
       {/if}
-      <div class="work" class:with-side={!!side}>
       <div class="panes mode-{mode}">
         {#if mode !== "view"}
           <section class="pane">
@@ -1002,19 +1102,6 @@
             <Preview {html} onOpenLink={openLink} onToggleTask={toggleTask} {onTag} onChordAction={chordAction} {chordTip} autoscroll={scrolling ? scrollSpeed : null} onAutoscrollEnd={() => (scrolling = false)} />
           </section>
         {/if}
-      </div>
-      {#if side}
-        <aside class="side-pane" aria-label="Side panel">
-          <header>
-            <span class="side-name" title={side}>{side.split("/").pop()!.replace(/\.md$/i, "")}</span>
-            {#if side !== current}<button onclick={() => { const s = side!; side = current; open(s); }} title="Swap: edit this note, show the other one here">⇄</button>{/if}
-            <button onclick={() => (side = null)} title="Close the side panel" aria-label="Close the side panel">✕</button>
-          </header>
-          <div class="side-body">
-            <Preview html={sideHtml} onOpenLink={openLink} onToggleTask={(line, path) => toggleTask(line, path ?? side ?? undefined)} {onTag} />
-          </div>
-        </aside>
-      {/if}
       </div>
     {:else}
       <div class="empty">
@@ -1416,6 +1503,80 @@
     min-width: 0;
     min-height: 0;
   }
+  .tabbar {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    padding: 6px 8px 0;
+    overflow-x: auto;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+    scrollbar-width: thin;
+  }
+  .tab {
+    display: flex;
+    align-items: center;
+    flex: 0 1 180px;
+    min-width: 90px;
+    border: 1px solid var(--border);
+    border-bottom: none;
+    border-radius: 7px 7px 0 0;
+    background: var(--bg);
+    opacity: 0.75;
+  }
+  .tab.active {
+    margin-bottom: -1px;
+    border-color: var(--accent);
+    border-bottom: 1px solid var(--bg);
+    opacity: 1;
+  }
+  .tab-name {
+    flex: 1;
+    min-width: 0;
+    padding: 6px 4px 6px 10px;
+    overflow: hidden;
+    border: none;
+    background: none;
+    color: var(--fg);
+    font: inherit;
+    font-size: 12.5px;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .tab.active .tab-name {
+    font-weight: 600;
+  }
+  .tab-x {
+    padding: 2px 6px;
+    margin-right: 3px;
+    border: none;
+    border-radius: 4px;
+    background: none;
+    color: var(--muted);
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .tab-x:hover {
+    background: var(--hover);
+    color: var(--fg);
+  }
+  .tab-new {
+    flex-shrink: 0;
+    margin: 0 0 4px 4px;
+    padding: 3px 9px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: none;
+    color: var(--muted);
+    font-size: 15px;
+    cursor: pointer;
+  }
+  .tab-new:hover {
+    border-color: var(--border);
+    color: var(--fg);
+  }
   .notebar {
     display: flex;
     gap: 8px;
@@ -1544,70 +1705,10 @@
     color: var(--accent-strong);
     font-weight: 600;
   }
-  .work {
-    flex: 1;
-    display: flex;
-    min-height: 0;
-  }
   .panes {
     flex: 1;
     display: grid;
-    min-width: 0;
     min-height: 0;
-  }
-  .side-pane {
-    display: flex;
-    flex-direction: column;
-    width: min(42%, 560px);
-    min-width: 0;
-    border-left: 2px solid var(--accent);
-    background: var(--bg);
-  }
-  .side-pane header {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 4px 6px 4px 12px;
-    border-bottom: 1px solid var(--border);
-    background: var(--panel);
-    font-size: 13px;
-  }
-  .side-name {
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-    color: var(--accent-strong);
-    font-weight: 600;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .side-pane header button {
-    padding: 3px 8px;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    background: var(--bg);
-    color: var(--fg);
-    cursor: pointer;
-  }
-  .side-body {
-    flex: 1;
-    min-height: 0;
-  }
-  .notebar .pin.on {
-    border-color: var(--accent);
-    background: var(--accent-soft);
-  }
-  /* Narrow screens: the side panel goes below the note. */
-  @media (max-width: 900px) {
-    .work.with-side {
-      flex-direction: column;
-    }
-    .side-pane {
-      width: auto;
-      height: 45%;
-      border-left: none;
-      border-top: 2px solid var(--accent);
-    }
   }
   .panes.mode-split {
     grid-template-columns: 1fr 1fr;

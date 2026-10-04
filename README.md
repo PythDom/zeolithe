@@ -133,8 +133,9 @@ Done:
 - Back and forward (← → in the top bar, Alt+← / Alt+→, or the mouse's side
   buttons): after following a link, return to the note you came from, at
   the same scroll position and cursor, like in a web browser.
-- Close the open note (✕ in the top bar). Side panel (⧉): keep a note
-  next to the one being edited; ⇄ swaps them.
+- Tabs like Obsidian: a note opens in the current tab; ＋ (or Ctrl/middle
+  click in the Files list) opens a new tab; each tab has its own back /
+  forward history; open tabs are remembered per vault.
 - Note embeds: `![[Note]]` and `![[Note#Heading]]` show the note (or the
   section) in a frame; ticking a task there updates the embedded note.
 - Single line breaks are line breaks (like Obsidian's default). On phones

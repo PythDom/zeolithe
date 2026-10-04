@@ -60,8 +60,11 @@ belongs, and **Archive** moves a note to `04 Archives` in one click.
 - **←** and **→** in the top bar go back and forward between the notes you
   opened, like in a web browser (Alt+← / Alt+→).
 - **✕** closes the note, **🗑** moves it to the vault's `.trash` folder.
-- **⧉** keeps the open note in a side panel: open another note and see
-  both. **⇄** swaps them, **✕** closes the panel.
+- **Tabs**, like in Obsidian: clicking a note in the Files list replaces
+  the note of the current tab. To keep it and open another one, press
+  **＋** in the tab bar, then pick the note (or Ctrl+click it in the Files
+  list). **✕** on a tab closes it; ← and → work within each tab. Open tabs
+  come back when you reopen the vault.
 - One Enter is a new line; leave an empty line to start a new paragraph.
 - On Android, the system back key closes an open window or the menu;
   press it twice to close Zeolite.
@@ -372,7 +375,8 @@ renumber the newer note.
 | Ctrl+P | Export to PDF |
 | Ctrl+Shift+Q | Query builder |
 | F2 | Rename or move the note |
-| Alt+← / Alt+→ | Back / forward |
+| Alt+← / Alt+→ | Back / forward (in the current tab) |
+| Ctrl+T / Ctrl+W / Ctrl+Tab | New tab / close tab / next tab (Windows app) |
 | F1 | This guide |
 
 ## Using your Obsidian vault
