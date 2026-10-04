@@ -60,6 +60,11 @@ belongs, and **Archive** moves a note to `04 Archives` in one click.
 - **←** and **→** in the top bar go back and forward between the notes you
   opened, like in a web browser (Alt+← / Alt+→).
 - **✕** closes the note, **🗑** moves it to the vault's `.trash` folder.
+- **⧉** keeps the open note in a side panel: open another note and see
+  both. **⇄** swaps them, **✕** closes the panel.
+- One Enter is a new line; leave an empty line to start a new paragraph.
+- On Android, the system back key closes an open window or the menu;
+  press it twice to close Zeolite.
 
 ## Creating notes
 
@@ -123,7 +128,7 @@ addresses open in your browser the same way.
 | `[[Note#Heading]]` | link to a heading in that note |
 | `[[Note\|text]]` | link shown as "text" |
 | `![[image.png]]` | show an image |
-| `![[Note]]` | show another note inside this one |
+| `![[Note]]` | show another note inside this one (`![[Note#Heading]]`: one section) |
 
 A grey link points to a note that does not exist yet: clicking it creates
 the note.

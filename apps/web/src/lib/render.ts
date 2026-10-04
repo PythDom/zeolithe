@@ -4,6 +4,7 @@ import {
   displayValue,
   generateToc,
   headingLinkText,
+  extractHeadings,
   isLink,
   lookupFingerings,
   parseSheet,
@@ -32,6 +33,10 @@ export interface RenderContext {
   resolveNote(target: string): string | undefined;
   /** Run a Dataview query over the vault (throws QueryError on bad queries). */
   runQuery(source: string): QueryResult;
+  /** Text of a note, for ![[Note]] embeds. */
+  readNote?(path: string): string;
+  /** The note being shown (it is never embedded into itself). */
+  currentPath?(): string | null | undefined;
   /** View state of chord sheets (transposition, fingerings, diagrams). */
   chords?: ChordView;
 }
@@ -185,7 +190,8 @@ export function createMarkdown(lineOffset: () => number = () => 0): MarkdownIt {
   const md: MarkdownIt = new MarkdownIt({
     html: true,
     linkify: true,
-    breaks: false,
+    // Like Obsidian (without "strict line breaks"): one Enter starts a new line.
+    breaks: true,
     highlight: (code, lang) => {
       if (lang && hljs.getLanguage(lang)) {
         try {
@@ -214,8 +220,13 @@ export function createMarkdown(lineOffset: () => number = () => 0): MarkdownIt {
   return md;
 }
 
-export function createRenderer(ctx: RenderContext) {
+/** Embeds inside embeds are shown down to this depth (and never a note inside itself). */
+const MAX_EMBED_DEPTH = 2;
+
+export function createRenderer(ctx: RenderContext, depth = 0, parents: string[] = []) {
   let offset = 0;
+  let embedRenderer: ((markdown: string) => string) | undefined;
+  let embedPath = "";
   let source = "";
   const md = createMarkdown(() => offset);
 
@@ -251,8 +262,29 @@ export function createRenderer(ctx: RenderContext) {
     const path = target ? ctx.resolveNote(target.trim()) : "";
     const label = alias ?? (heading && !target ? heading : targetPart);
     const cls = `wikilink${path === undefined ? " unresolved" : ""}${embed ? " embed" : ""}`;
-    return `<a class="${cls}" href="#" data-target="${esc(target.trim())}" data-heading="${esc(heading ?? "")}">${esc(label)}</a>`;
+    const link = `<a class="${cls}" href="#" data-target="${esc(target.trim())}" data-heading="${esc(heading ?? "")}">${esc(label)}</a>`;
+    if (embed && path && ctx.readNote && depth < MAX_EMBED_DEPTH && !parents.includes(path) && path !== ctx.currentPath?.()) return embedNote(path, heading, link);
+    return link;
   };
+
+  /** ![[Note]] / ![[Note#Heading]]: the note's content (or that section) in a frame. */
+  function embedNote(path: string, heading: string | undefined, link: string): string {
+    const text = ctx.readNote!(path);
+    let shown = text;
+    if (heading) {
+      const hs = extractHeadings(text);
+      const h = hs.find((x) => headingLinkText(x.text) === headingLinkText(heading));
+      if (!h) return `${link} <span class="missing">(no heading “${esc(heading)}”)</span>`;
+      const end = hs.find((x) => x.line > h.line && x.level <= h.level);
+      const lines = text.split("\n");
+      // Blank lines before the section keep line numbers right (ticking a task edits the embedded note).
+      shown = "\n".repeat(h.line) + lines.slice(h.line, end ? end.line : lines.length).join("\n");
+    }
+    embedRenderer ??= createRenderer(ctx, depth + 1, [...parents, path]);
+    embedPath = path;
+    const inner = embedRenderer(shown).replace(/class="task-box" data-line=/g, `class="task-box" data-path="${esc(embedPath)}" data-line=`);
+    return `<div class="embed-note"><div class="embed-title">${link}</div>${inner}</div>`;
+  }
 
   const linkOpen = r.link_open ?? ((t: Token[], i: number, o, _e, self) => self.renderToken(t, i, o));
   r.link_open = (tokens: Token[], idx: number, opts, env, self) => {

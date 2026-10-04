@@ -386,7 +386,8 @@ class Builder {
           push(c.content);
           break;
         case "softbreak":
-          push(" ");
+          // As on screen: one line break in the note is a line break.
+          push("\n");
           break;
         case "hardbreak":
           push("\n");

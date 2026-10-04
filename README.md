@@ -133,7 +133,13 @@ Done:
 - Back and forward (← → in the top bar, Alt+← / Alt+→, or the mouse's side
   buttons): after following a link, return to the note you came from, at
   the same scroll position and cursor, like in a web browser.
-- Close the open note (✕ in the top bar).
+- Close the open note (✕ in the top bar). Side panel (⧉): keep a note
+  next to the one being edited; ⇄ swaps them.
+- Note embeds: `![[Note]]` and `![[Note#Heading]]` show the note (or the
+  section) in a frame; ticking a task there updates the embedded note.
+- Single line breaks are line breaks (like Obsidian's default). On phones
+  the toolbar wraps onto rows; ``` (code block) and TOC buttons.
+- Android: system back closes dialogs/menu, twice to exit.
 - Move a note to another folder by dragging it onto the folder in the Files
   list (or onto "vault root" below the list); links are updated.
 - New folder (📁＋ New folder at the top of the Files list, or ＋ next to a

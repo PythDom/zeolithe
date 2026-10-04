@@ -42,6 +42,16 @@
   }
   const duePreview = $derived(parseNaturalDate(dueText));
 
+  /** ``` around the selected lines, or an empty code block. */
+  function codeBlock(v: EditorView) {
+    const sel = v.state.selection.main;
+    if (sel.empty) return insertBlock(v, "```\n\n```");
+    const from = v.state.doc.lineAt(sel.from).from;
+    const to = v.state.doc.lineAt(sel.to).to;
+    v.dispatch({ changes: { from, to, insert: `\`\`\`\n${v.state.sliceDoc(from, to)}\n\`\`\`` } });
+    v.focus();
+  }
+
   function attn(fn: (l: string) => string) {
     attnOpen = false;
     const v = view();
@@ -66,22 +76,22 @@
     <button title="Bullet list" onclick={run((v) => toggleLinePrefix(v, "- "))}>•≡</button>
     <button title="Numbered list" onclick={run((v) => toggleLinePrefix(v, "1. "))}>1≡</button>
     <button title="Quote" onclick={run((v) => toggleLinePrefix(v, "> "))}>❝</button>
-    <button title="Code block" onclick={run((v) => insertBlock(v, "```\n\n```"))}>{"{ }"}</button>
+    <button title="Code block (``` … ```): wraps the selection, or inserts an empty block" onclick={run(codeBlock)}><code>```</code></button>
     <button title="Link to a note (Ctrl+K). Tip: typing [[ in the editor also suggests notes." onclick={run((v) => onLink(v.state.sliceDoc(v.state.selection.main.from, v.state.selection.main.to)))}>[[ ]]</button>
     <button title="Table" onclick={run((v) => insertBlock(v, "| Column | Column |\n| ------ | ------ |\n|        |        |"))}>▦</button>
   </div>
   <div class="group">
-    <button title="Insert dynamic table of contents" onclick={run((v) => insertBlock(v, "```toc\n```"))}>TOC</button>
+    <button title="Insert a table of contents (updates itself)" onclick={run((v) => insertBlock(v, "```toc\n```"))}>☰ TOC</button>
     <button title="Write/update a static table of contents" onclick={onStaticToc}>TOC⇣</button>
-    <button class="accent" title="Build a Dataview query" onclick={onQuery}>🔍 Query</button>
-    <button class="accent" class:on={tplOpen} title="Insert a template" onclick={() => ((tplOpen = !tplOpen), (dueOpen = false), (attnOpen = false))}>📄 Template</button>
+    <button class="accent" title="Build a Dataview query" onclick={onQuery}>🔍<span class="lbl"> Query</span></button>
+    <button class="accent" class:on={tplOpen} title="Insert a template" onclick={() => ((tplOpen = !tplOpen), (dueOpen = false), (attnOpen = false))}>📄<span class="lbl"> Template</span></button>
   </div>
   <div class="group tasks">
-    <button class="accent" title="Task" onclick={lines(makeTask)}>☐ Task</button>
-    <button class="accent" class:on={dueOpen} title="Task with deadline" onclick={() => ((dueOpen = !dueOpen), (attnOpen = false), (tplOpen = false), (dueText = ""))}>📅 Due</button>
-    <button class="accent" title="Cycle state: open → done → cancelled → deferred" onclick={lines((l) => cycleTaskStatus(l))}>✔ State</button>
+    <button class="accent" title="Task" onclick={lines(makeTask)}>☐<span class="lbl"> Task</span></button>
+    <button class="accent" class:on={dueOpen} title="Task with deadline" onclick={() => ((dueOpen = !dueOpen), (attnOpen = false), (tplOpen = false), (dueText = ""))}>📅<span class="lbl"> Due</span></button>
+    <button class="accent" title="Cycle state: open → done → cancelled → deferred" onclick={lines((l) => cycleTaskStatus(l))}>✔<span class="lbl"> State</span></button>
     <button class="accent" title="Assign a person" onclick={run((v) => insertText(v, "@"))}>👤</button>
-    <button class="attn" class:on={attnOpen} title="Attn point" onclick={() => ((attnOpen = !attnOpen), (dueOpen = false), (tplOpen = false))}>⚠ Attn ▾</button>
+    <button class="attn" class:on={attnOpen} title="Attn point" onclick={() => ((attnOpen = !attnOpen), (dueOpen = false), (tplOpen = false))}>⚠<span class="lbl"> Attn</span> ▾</button>
   </div>
 </div>
 
@@ -145,14 +155,25 @@
     border-right: none;
   }
   /* Phones: one scrollable row (the Android shell docks it above the keyboard). */
+  /* Phones and narrow windows: every button visible on a few compact rows. */
   @media (max-width: 800px) {
     .toolbar {
-      flex-wrap: nowrap;
-      overflow-x: auto;
-      scrollbar-width: none;
+      gap: 4px;
+      padding: 4px 6px;
+    }
+    .group {
+      padding-right: 4px;
     }
     .tasks {
       order: -1;
+    }
+    .lbl {
+      display: none;
+    }
+    button {
+      min-width: 30px !important;
+      height: 30px;
+      padding: 0 5px !important;
     }
   }
   button {

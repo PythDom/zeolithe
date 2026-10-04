@@ -153,9 +153,13 @@ pub fn run() {
                 .cloned()
                 .ok_or("No main window in the configuration.")?;
             app.manage(DataDir(data.clone()));
-            WebviewWindowBuilder::from_config(app.handle(), &config)?
-                .data_directory(data.join("webview"))
-                .build()?;
+            let mut window = WebviewWindowBuilder::from_config(app.handle(), &config)?.data_directory(data.join("webview"));
+            // A window built by hand has no icon by default (Windows then shows a generic one
+            // in the taskbar): give it the app's icon.
+            if let Some(icon) = app.default_window_icon() {
+                window = window.icon(icon.clone())?;
+            }
+            window.build()?;
             Ok(())
         })
         .plugin(tauri_plugin_fs::init())

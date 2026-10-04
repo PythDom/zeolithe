@@ -54,7 +54,7 @@
   import { folderAccessProblem, FsAccessStorage, fsAccessSupported, memoryCopyFromFiles, MemoryStorage } from "./lib/storage";
   import { Vault } from "./lib/vault.svelte";
   import { loadLastVault, regainAccess, saveLastVault } from "./lib/last-vault";
-  import { CapacitorStorage, lastVaultPath, platform, rememberVaultPath, TauriStorage } from "./lib/native";
+  import { androidExit, CapacitorStorage, lastVaultPath, onAndroidBack, platform, rememberVaultPath, TauriStorage } from "./lib/native";
   import AndroidFolderDialog from "./components/AndroidFolderDialog.svelte";
   import logo from "../../../assets/logo/zeolite-icon.svg";
 
@@ -111,6 +111,8 @@
     createRenderer({
       resolveAsset: (t) => vault.resolveAsset(t),
       resolveNote: (t) => vault.resolveNote(t),
+      readNote: (p) => (p === current ? content : vault.read(p)),
+      currentPath: () => current,
       runQuery: (src) => vault.runQuery(src, current ?? undefined),
       chords: {
         transpose: (block) => transposed[`${current}#${block}`] ?? 0,
@@ -125,6 +127,28 @@
     }),
   );
   const html = $derived(current ? render(content) : "");
+
+  // Side panel: a second note shown next to the open one (read-only preview).
+  let side = $state<string | null>(null);
+  const sideRender = $derived(
+    createRenderer({
+      resolveAsset: (t) => vault.resolveAsset(t),
+      resolveNote: (t) => vault.resolveNote(t),
+      readNote: (p) => (p === current ? content : vault.read(p)),
+      currentPath: () => side,
+      runQuery: (src) => vault.runQuery(src, side ?? undefined),
+    }),
+  );
+  const sideHtml = $derived.by(() => {
+    if (!side) return "";
+    // Re-render when notes change (records are reactive, contents are not).
+    void vault.records.get(side);
+    return sideRender(side === current ? content : vault.read(side));
+  });
+  // The note was deleted or renamed: close the panel.
+  $effect(() => {
+    if (side && !vault.records.has(side)) side = null;
+  });
   const record = $derived(current ? vault.records.get(current) : undefined);
   const collision = $derived(current ? vault.collisions.find((c) => c.renumber.some((n) => n.path === current)) : undefined);
 
@@ -271,6 +295,38 @@
       checking = false;
     }
   }
+
+  // Android back key: closes an open dialog or the menu; otherwise a second press within 2 s closes the app.
+  let exitArmed = false;
+  $effect(() => {
+    if (shell !== "android") return;
+    let stop: (() => void) | undefined;
+    let disposed = false;
+    void onAndroidBack(() => {
+      if (document.querySelector(".backdrop")) {
+        window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+        return;
+      }
+      if (drawer) {
+        drawer = false;
+        return;
+      }
+      if (exitArmed) {
+        void flush().finally(() => void androidExit());
+        return;
+      }
+      exitArmed = true;
+      status = "Press back again to close Zeolite";
+      setTimeout(() => {
+        exitArmed = false;
+        if (status === "Press back again to close Zeolite") status = "";
+      }, 2000);
+    }).then((s) => (disposed ? s() : (stop = s)));
+    return () => {
+      disposed = true;
+      stop?.();
+    };
+  });
 
   // Every 3 s; less often when checking the folder is slow (big vault, network or OneDrive folder).
   let checkEvery = 3000;
@@ -913,6 +969,7 @@
       {/if}
       {#if current}<button class="pdf" onclick={async () => { await flush(); showExport = true; }} title="Export to PDF (Ctrl+P)">PDF</button>{/if}
       {#if current}<button class="trash" onclick={async () => { await flush(); showDelete = true; }} title="Delete note (moves it to .trash)" aria-label="Delete note">🗑</button>{/if}
+      {#if current}<button class="pin" class:on={side === current} onclick={() => (side = side === current ? null : current)} title={side === current ? "Close the side panel" : "Keep this note in a side panel, then open another note next to it"} aria-label="Side panel">⧉</button>{/if}
       {#if current}<button class="close" onclick={closeNote} title="Close this note" aria-label="Close note">✕</button>{/if}
       <div class="modes" role="radiogroup" aria-label="Mode">
         <button class:active={mode === "edit"} onclick={() => (mode = "edit")}>Edit</button>
@@ -933,6 +990,7 @@
           onLink={(selected) => (linkFrom = selected)}
         />
       {/if}
+      <div class="work" class:with-side={!!side}>
       <div class="panes mode-{mode}">
         {#if mode !== "view"}
           <section class="pane">
@@ -944,6 +1002,19 @@
             <Preview {html} onOpenLink={openLink} onToggleTask={toggleTask} {onTag} onChordAction={chordAction} {chordTip} autoscroll={scrolling ? scrollSpeed : null} onAutoscrollEnd={() => (scrolling = false)} />
           </section>
         {/if}
+      </div>
+      {#if side}
+        <aside class="side-pane" aria-label="Side panel">
+          <header>
+            <span class="side-name" title={side}>{side.split("/").pop()!.replace(/\.md$/i, "")}</span>
+            {#if side !== current}<button onclick={() => { const s = side!; side = current; open(s); }} title="Swap: edit this note, show the other one here">⇄</button>{/if}
+            <button onclick={() => (side = null)} title="Close the side panel" aria-label="Close the side panel">✕</button>
+          </header>
+          <div class="side-body">
+            <Preview html={sideHtml} onOpenLink={openLink} onToggleTask={(line, path) => toggleTask(line, path ?? side ?? undefined)} {onTag} />
+          </div>
+        </aside>
+      {/if}
       </div>
     {:else}
       <div class="empty">
@@ -1368,6 +1439,16 @@
     .crumbs button.id.add {
       display: none;
     }
+    .notebar {
+      gap: 4px;
+      padding: 6px 8px;
+    }
+    .notebar button {
+      padding: 6px 7px;
+    }
+    .notebar .modes button {
+      padding: 6px 8px;
+    }
   }
   .crumbs button.id {
     flex-shrink: 1;
@@ -1463,10 +1544,70 @@
     color: var(--accent-strong);
     font-weight: 600;
   }
+  .work {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+  }
   .panes {
     flex: 1;
     display: grid;
+    min-width: 0;
     min-height: 0;
+  }
+  .side-pane {
+    display: flex;
+    flex-direction: column;
+    width: min(42%, 560px);
+    min-width: 0;
+    border-left: 2px solid var(--accent);
+    background: var(--bg);
+  }
+  .side-pane header {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 6px 4px 12px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+    font-size: 13px;
+  }
+  .side-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--accent-strong);
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .side-pane header button {
+    padding: 3px 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--fg);
+    cursor: pointer;
+  }
+  .side-body {
+    flex: 1;
+    min-height: 0;
+  }
+  .notebar .pin.on {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+  /* Narrow screens: the side panel goes below the note. */
+  @media (max-width: 900px) {
+    .work.with-side {
+      flex-direction: column;
+    }
+    .side-pane {
+      width: auto;
+      height: 45%;
+      border-left: none;
+      border-top: 2px solid var(--accent);
+    }
   }
   .panes.mode-split {
     grid-template-columns: 1fr 1fr;

@@ -346,6 +346,24 @@ body {
 .markdown .query-table table {
   margin: 0.4em 0;
 }
+.markdown .embed-note {
+  margin: 0.8em 0;
+  padding: 2px 14px 4px;
+  border-left: 3px solid var(--accent);
+  border-radius: 0 6px 6px 0;
+  background: var(--panel);
+}
+.markdown .embed-note .embed-title {
+  margin: 6px 0 2px;
+  font-size: 0.85em;
+}
+.markdown .embed-note .embed-title::before {
+  content: "↳ ";
+  color: var(--muted);
+}
+.markdown p:empty {
+  display: none;
+}
 .markdown .missing {
   color: var(--danger);
 }

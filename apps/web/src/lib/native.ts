@@ -231,6 +231,21 @@ export async function onAndroidResume(cb: () => void): Promise<() => void> {
   return () => void handle.remove();
 }
 
+/**
+ * Android's system back key (or gesture). With a listener, Android no longer
+ * closes the app by itself: the app decides (see App.svelte).
+ */
+export async function onAndroidBack(cb: () => void): Promise<() => void> {
+  const { App } = await import("@capacitor/app");
+  const handle = await App.addListener("backButton", cb);
+  return () => void handle.remove();
+}
+
+export async function androidExit(): Promise<void> {
+  const { App } = await import("@capacitor/app");
+  await App.exitApp();
+}
+
 /** Sub-folders of an absolute Android path (for the in-app folder browser). */
 export async function androidListFolders(path: string): Promise<string[]> {
   const { Filesystem } = await import("@capacitor/filesystem");
