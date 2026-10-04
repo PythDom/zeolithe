@@ -43,7 +43,7 @@
   import LinkDialog from "./components/LinkDialog.svelte";
   import AttachmentDialog from "./components/AttachmentDialog.svelte";
   import SyncDialog from "./components/SyncDialog.svelte";
-  import { applyPrefs, multiUserChecks, prefs } from "./lib/features.svelte";
+  import { applyPrefs, DEFAULT_LAYOUT, multiUserChecks, prefs, savePrefs } from "./lib/features.svelte";
   import SettingsDialog from "./components/SettingsDialog.svelte";
   import { describeReport, loadSyncSettings, runSync, saveSyncSettings, type SyncSettings } from "./lib/sync";
   import { WebDavClient } from "./lib/webdav";
@@ -273,6 +273,27 @@
     } finally {
       checking = false;
     }
+  }
+
+  /** Drag the sidebar edge or the editor/preview separator (sizes kept on this device). */
+  function startResize(e: PointerEvent, kind: "sidebar" | "split") {
+    e.preventDefault();
+    const handle = e.currentTarget as HTMLElement;
+    handle.setPointerCapture(e.pointerId);
+    const box = kind === "split" ? handle.parentElement!.getBoundingClientRect() : null;
+    const move = (ev: PointerEvent) => {
+      if (kind === "sidebar") prefs.sidebarWidth = Math.round(Math.min(640, Math.max(200, ev.clientX)));
+      else prefs.split = Math.min(0.85, Math.max(0.15, (ev.clientX - box!.left) / box!.width));
+    };
+    const up = () => {
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", up);
+      handle.removeEventListener("pointercancel", up);
+      savePrefs({ ...prefs });
+    };
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", up);
+    handle.addEventListener("pointercancel", up);
   }
 
   // Android back key: closes an open dialog or the menu; otherwise a second press within 2 s closes the app.
@@ -965,8 +986,17 @@
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "e") { e.preventDefault(); mode = mode === "view" ? "edit" : "view"; }
 }} />
 
-<div class="app" class:drawer>
+<div class="app" class:drawer style="--sidebar-w: {prefs.sidebarWidth}px">
   <aside class="sidebar">
+    <div
+      class="resizer side-resizer"
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize the sidebar"
+      title="Drag to resize (double-click: default width)"
+      onpointerdown={(e) => startResize(e, "sidebar")}
+      ondblclick={() => savePrefs({ ...prefs, sidebarWidth: DEFAULT_LAYOUT.sidebarWidth })}
+    ></div>
     <header class="brand">
       <img src={logo} alt="" width="28" height="28" />
       <div>
@@ -1091,7 +1121,19 @@
           onLink={(selected) => (linkFrom = selected)}
         />
       {/if}
-      <div class="panes mode-{mode}">
+      <div class="panes mode-{mode}" style="--split-a: {prefs.split}fr; --split-b: {1 - prefs.split}fr">
+        {#if mode === "split"}
+          <div
+            class="resizer split-resizer"
+            style="left: calc({prefs.split * 100}% - 3px)"
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize the editor and the preview"
+            title="Drag to resize (double-click: half and half)"
+            onpointerdown={(e) => startResize(e, "split")}
+            ondblclick={() => savePrefs({ ...prefs, split: DEFAULT_LAYOUT.split })}
+          ></div>
+        {/if}
         {#if mode !== "view"}
           <section class="pane">
             <Editor bind:this={editor} {content} {onChange} {onFile} tags={allTags} people={() => vault.people()} links={linkTargets} onOpenLink={openLink} />
@@ -1358,10 +1400,27 @@
 <style>
   .app {
     display: grid;
-    grid-template-columns: 290px 1fr;
+    grid-template-columns: var(--sidebar-w, 290px) 1fr;
     height: 100%;
   }
+  .resizer {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    z-index: 5;
+    width: 6px;
+    cursor: col-resize;
+    touch-action: none;
+  }
+  .resizer:hover,
+  .resizer:active {
+    background: var(--accent-soft);
+  }
+  .side-resizer {
+    right: -3px;
+  }
   .sidebar {
+    position: relative;
     display: flex;
     flex-direction: column;
     min-height: 0;
@@ -1394,7 +1453,7 @@
     color: var(--accent-strong);
   }
   .brand .vault {
-    max-width: 210px;
+    max-width: calc(var(--sidebar-w, 290px) - 80px);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1710,8 +1769,11 @@
     display: grid;
     min-height: 0;
   }
+  .panes {
+    position: relative;
+  }
   .panes.mode-split {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: var(--split-a, 1fr) var(--split-b, 1fr);
   }
   .panes.mode-split .pane + .pane {
     border-left: 1px solid var(--border);
@@ -1864,6 +1926,9 @@
     }
     .panes.mode-split {
       grid-template-columns: 1fr;
+    }
+    .resizer {
+      display: none;
     }
   }
 </style>

@@ -65,6 +65,8 @@ belongs, and **Archive** moves a note to `04 Archives` in one click.
   **＋** in the tab bar, then pick the note (or Ctrl+click it in the Files
   list). **✕** on a tab closes it; ← and → work within each tab. Open tabs
   come back when you reopen the vault.
+- Drag the edge of the sidebar, or the separator between editor and
+  preview in Split view, to resize them (double-click: back to default).
 - One Enter is a new line; leave an empty line to start a new paragraph.
 - On Android, the system back key closes an open window or the menu;
   press it twice to close Zeolite.

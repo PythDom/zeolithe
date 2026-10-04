@@ -133,6 +133,7 @@ Done:
 - Back and forward (← → in the top bar, Alt+← / Alt+→, or the mouse's side
   buttons): after following a link, return to the note you came from, at
   the same scroll position and cursor, like in a web browser.
+- Resizable sidebar and editor/preview separator (kept per device).
 - Tabs like Obsidian: a note opens in the current tab; ＋ (or Ctrl/middle
   click in the Files list) opens a new tab; each tab has its own back /
   forward history; open tabs are remembered per vault.

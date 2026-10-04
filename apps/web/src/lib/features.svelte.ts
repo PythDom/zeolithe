@@ -14,10 +14,14 @@ export interface Prefs {
   /** Note text size in px (editor and preview). */
   textSize: number;
   multiUser: boolean;
+  /** Sidebar width (px) and editor share of the Split view (0–1), set by dragging. */
+  sidebarWidth: number;
+  split: number;
 }
 
 const KEY = "zeolite.prefs";
-const DEFAULTS: Prefs = { theme: "auto", startMode: "auto", textSize: 15, multiUser: false };
+const DEFAULTS: Prefs = { theme: "auto", startMode: "auto", textSize: 15, multiUser: false, sidebarWidth: 290, split: 0.5 };
+export const DEFAULT_LAYOUT = { sidebarWidth: DEFAULTS.sidebarWidth, split: DEFAULTS.split };
 
 function load(): Prefs {
   try {
