@@ -17,10 +17,12 @@ export interface Prefs {
   /** Sidebar width (px) and editor share of the Split view (0–1), set by dragging. */
   sidebarWidth: number;
   split: number;
+  /** Left panel hidden on wide screens (☰ or Ctrl+\). Phones use the ☰ menu instead. */
+  sidebarHidden: boolean;
 }
 
 const KEY = "zeolite.prefs";
-const DEFAULTS: Prefs = { theme: "auto", startMode: "auto", textSize: 15, multiUser: false, sidebarWidth: 290, split: 0.5 };
+const DEFAULTS: Prefs = { theme: "auto", startMode: "auto", textSize: 15, multiUser: false, sidebarWidth: 290, split: 0.5, sidebarHidden: false };
 export const DEFAULT_LAYOUT = { sidebarWidth: DEFAULTS.sidebarWidth, split: DEFAULTS.split };
 
 function load(): Prefs {

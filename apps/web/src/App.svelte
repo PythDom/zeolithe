@@ -60,6 +60,8 @@
 
   type Mode = "edit" | "split" | "view";
   const narrow = () => window.matchMedia("(max-width: 800px)").matches;
+  /** ☰: the drawer on phones, show/hide the left panel on wide screens. */
+  const toggleSidebar = () => (narrow() ? (drawer = !drawer) : savePrefs({ ...prefs, sidebarHidden: !prefs.sidebarHidden }));
 
   const demo = new Vault(new MemoryStorage("Demo vault", demoVault()));
   let offerSetup = $state(false);
@@ -983,10 +985,11 @@
   if (e.key === "F2" && current) { e.preventDefault(); flush().then(() => (showRename = true)); }
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "p" && current) { e.preventDefault(); flush().then(() => (showExport = true)); }
   if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "q") { e.preventDefault(); showQuery = true; }
+  if ((e.ctrlKey || e.metaKey) && e.key === "\\") { e.preventDefault(); toggleSidebar(); }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "e") { e.preventDefault(); mode = mode === "view" ? "edit" : "view"; }
 }} />
 
-<div class="app" class:drawer style="--sidebar-w: {prefs.sidebarWidth}px">
+<div class="app" class:drawer class:side-hidden={prefs.sidebarHidden} style="--sidebar-w: {prefs.sidebarWidth}px">
   <aside class="sidebar">
     <div
       class="resizer side-resizer"
@@ -1068,7 +1071,7 @@
       <button class="tab-new" onclick={() => newTab()} title="New tab, then pick a note in the Files list (Ctrl+click a note opens it in a new tab)" aria-label="New tab">＋</button>
     </nav>
     <header class="notebar">
-      <button class="menu" aria-label="Menu" onclick={() => (drawer = !drawer)}>☰</button>
+      <button class="menu" aria-label="Show or hide the left panel" title="Show or hide the left panel (Ctrl+\)" onclick={toggleSidebar}>☰</button>
       <div class="nav">
         <button
           disabled={!back.length}
@@ -1643,8 +1646,13 @@
     padding: 8px 12px;
     border-bottom: 1px solid var(--border);
   }
-  .notebar .menu {
-    display: none;
+  @media (min-width: 801px) {
+    .app.side-hidden {
+      grid-template-columns: 1fr;
+    }
+    .app.side-hidden .sidebar {
+      display: none;
+    }
   }
   .crumbs {
     flex: 1;
@@ -1916,9 +1924,6 @@
       z-index: 30;
       border: none;
       background: rgb(0 0 0 / 0.35);
-    }
-    .notebar .menu {
-      display: block;
     }
     .modes .split,
     .notebar .ghost {
