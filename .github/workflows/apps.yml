@@ -8,8 +8,9 @@ on:
   push:
   workflow_dispatch:
 
+# Separate groups: a push (checks only) must not cancel a requested app build.
 concurrency:
-  group: apps-${{ github.ref }}
+  group: apps-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 
 jobs:
