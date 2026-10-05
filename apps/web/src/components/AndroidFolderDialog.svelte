@@ -66,6 +66,11 @@
         <p>To edit notes in an ordinary folder (the one Syncthing keeps in sync), Zeolite needs Android's <b>All files access</b>, like Obsidian and Syncthing-Fork.</p>
         <p class="muted">The next screen opens Android settings: turn on <b>Allow access to manage all files</b> for Zeolite, then come back.</p>
         <button class="primary" onclick={androidRequestAccess}>Open Android settings</button>
+        <details>
+          <summary>The setting is not under “Permissions”</summary>
+          <p class="muted">All files access is a <i>special</i> access, so the app's Permissions page says no permissions are requested. Look instead in <b>Settings → Apps → Special app access → All files access → Zeolite</b> (Samsung: <b>Settings → Apps → ⋮ → Special access → All files access</b>). You can also search Settings for “All files access”.</p>
+        </details>
+        <button class="ghost" onclick={refreshAccess}>I've allowed it: check again</button>
       </div>
     {:else}
       <div class="crumbs">
@@ -168,6 +173,14 @@
   }
   .muted {
     color: var(--muted);
+  }
+  details summary {
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--accent-strong);
+  }
+  details p {
+    margin-top: 6px;
   }
   .crumbs span {
     overflow-wrap: anywhere;

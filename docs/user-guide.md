@@ -274,7 +274,10 @@ Usually your main PC.
 
 1. Install `Zeolite-android.apk` (allow "install unknown apps" once).
 2. Open Zeolite and press 📂. The first time, allow **All files access**
-   in the Android settings screen that opens, then come back.
+   in the Android settings screen that opens, then come back. It is a
+   *special* access: the app's **Permissions** page shows nothing to grant.
+   If needed, find it in **Settings → Apps → Special app access → All files
+   access → Zeolite** (Samsung: **Apps → ⋮ → Special access**).
 3. In the folder browser, go to a place such as **Documents**, press
    **＋ New folder**, name it (for example `Zeolite`), then press
    **Use "Zeolite"**.
