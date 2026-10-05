@@ -3,8 +3,10 @@
     convertAttnToTask,
     cycleTaskStatus,
     makeAttn,
+    makeDecide,
     makeTask,
     parseNaturalDate,
+    recordDecision,
     setDue,
     toggleAttnResolved,
   } from "@zeolite/core";
@@ -92,6 +94,10 @@
     <button class="accent" title="Cycle state: open → done → cancelled → deferred" onclick={lines((l) => cycleTaskStatus(l))}>✔<span class="lbl">State</span></button>
     <button class="accent" title="Assign a person" onclick={run((v) => insertText(v, "@"))}>👤</button>
     <button class="attn" class:on={attnOpen} title="Attn point" onclick={() => ((attnOpen = !attnOpen), (dueOpen = false), (tplOpen = false))}>⚠<span class="lbl">Attn</span> ▾</button>
+  </div>
+  <div class="group">
+    <button class="decide" title="Decision required (Decide::)" onclick={lines(makeDecide)}>❓<span class="lbl">Decision rqd</span></button>
+    <button class="decide" title="Decision taken (Decision:: … [decided:: today]); turns a Decision rqd into a decision" onclick={lines((l) => recordDecision(l))}>⚖<span class="lbl">Decision</span></button>
   </div>
 </div>
 
@@ -202,6 +208,10 @@
   }
   button.attn {
     color: var(--warn);
+    font-weight: 600;
+  }
+  button.decide {
+    color: var(--decide);
     font-weight: 600;
   }
   mark {

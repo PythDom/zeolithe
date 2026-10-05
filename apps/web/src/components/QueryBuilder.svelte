@@ -46,7 +46,7 @@
   /** Sensible sort/group defaults for each kind of result. */
   function retarget() {
     if (spec.target === "tasks") (spec.sort = "due"), (spec.group = "file");
-    else if (spec.target === "attn") (spec.sort = "name"), (spec.group = "file");
+    else if (spec.target === "attn" || spec.target === "decisions") (spec.sort = "name"), (spec.group = "file");
     else (spec.sort = spec.target === "table" ? "id" : "name"), (spec.group = "none");
   }
 
@@ -77,7 +77,7 @@
         <fieldset>
           <legend>Find</legend>
           <div class="seg">
-            {#each [["tasks", "☐ Tasks"], ["attn", "⚠ Attn points"], ["notes", "Notes"], ["table", "Table"]] as [k, l]}
+            {#each [["tasks", "☐ Tasks"], ["attn", "⚠ Attn points"], ["decisions", "⚖ Decisions"], ["notes", "Notes"], ["table", "Table"]] as [k, l]}
               <label class:active={spec.target === k}><input type="radio" bind:group={spec.target} value={k} onchange={retarget} />{l}</label>
             {/each}
           </div>
@@ -150,8 +150,17 @@
             </label>
           {/if}
 
+          {#if spec.target === "decisions"}
+            <label>State
+              <select bind:value={spec.decision}>
+                <option value="required">Required (Decide::)</option>
+                <option value="taken">Taken (Decision::)</option>
+              </select>
+            </label>
+          {/if}
+
           <div class="row">
-            {#if spec.target === "tasks" || spec.target === "attn"}
+            {#if spec.target === "tasks" || spec.target === "attn" || spec.target === "decisions"}
               <label>Person
                 <input list="qb-people" placeholder="@anyone" bind:value={spec.person} />
                 <datalist id="qb-people">{#each people as p}<option value={p}></option>{/each}</datalist>

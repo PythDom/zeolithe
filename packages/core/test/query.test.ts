@@ -20,6 +20,8 @@ created: 2026-10-01T09:00
 - [-] Old idea
 Attn:: Budget overrun @bob
 - went well, but [Attn:: supplier delay] needs follow-up
+Decide:: Pick the supplier @carol
+- Agreed to [Decision:: keep lot 3] [decided:: 2026-10-01]
 `,
   ),
   buildNoteRecord(
@@ -39,7 +41,7 @@ See [[01.02.05.001 Typhoon status]]
 ];
 
 const texts = (src: string) =>
-  runQuery(src, notes, today).groups.flatMap((g) => g.rows.map((r) => r.task?.text ?? r.attn?.text ?? r.name));
+  runQuery(src, notes, today).groups.flatMap((g) => g.rows.map((r) => r.task?.text ?? r.attn?.text ?? r.decision?.text ?? r.name));
 
 describe("runQuery", () => {
   it("lists open tasks sorted by due", () => {
@@ -79,6 +81,13 @@ describe("runQuery", () => {
     expect(texts("LIST Attn WHERE Attn AND resolved")).toEqual(["Room booking"]);
     expect(runQuery("LIST Attn", notes, today).kind).toBe("attn");
   });
+  it("lists decisions to take and decisions taken", () => {
+    expect(texts("LIST Decide WHERE Decide")).toEqual(["Pick the supplier @carol"]);
+    expect(texts("LIST Decision WHERE decided")).toEqual(["keep lot 3"]);
+    const r = runQuery("LIST Decision", notes, today);
+    expect(r.kind).toBe("decision");
+    expect(r.groups[0]!.rows[0]!.decision!.decided).toBe("2026-10-01");
+  });
   it("lists and tables notes", () => {
     expect(texts('LIST WHERE startswith(id, "01.02")')).toEqual(["01.02.05.001 Typhoon status", "01.02.05.002 Old"]);
     const t = runQuery('TABLE id, file.tags AS "Tags" FROM #SAS', notes, today);
@@ -116,6 +125,12 @@ describe("buildQuery", () => {
     const attn = buildQuery({ ...DEFAULT_QUERY, target: "attn", group: "none", sort: "none" });
     expect(attn).toBe("LIST Attn\nWHERE Attn AND !resolved");
     expect(texts(attn)).toEqual(["Budget overrun @bob", "supplier delay"]);
+
+    const decide = buildQuery({ ...DEFAULT_QUERY, target: "decisions", person: "carol", group: "none", sort: "none" });
+    expect(decide).toBe('LIST Decide\nWHERE Decide AND contains(Decide, "@carol")');
+    expect(texts(decide)).toEqual(["Pick the supplier @carol"]);
+    const taken = buildQuery({ ...DEFAULT_QUERY, target: "decisions", decision: "taken", group: "none", sort: "none" });
+    expect(texts(taken)).toEqual(["keep lot 3"]);
 
     const list = buildQuery({ ...DEFAULT_QUERY, target: "notes", idPrefix: "01.02", sort: "id", group: "none", excludeFolder: "04 Archives" });
     expect(list).toBe('LIST\nFROM "" AND -"04 Archives"\nWHERE startswith(id, "01.02")\nSORT id ASC');

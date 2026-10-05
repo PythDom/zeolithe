@@ -217,3 +217,80 @@ export function convertAttnToTask(line: string): string {
   const sentence = cleaned.slice(0, f2.start) + f2.value + cleaned.slice(f2.end);
   return `${sentence}\n${indent}- [ ] ${f2.value}`;
 }
+
+// ---------------------------------------------------------------------------
+// Decisions: `Decide:: X` (a decision is needed) and `Decision:: X` (taken,
+// usually with [decided:: date]). Like Attn points, as a line field or inline.
+
+export interface DecisionPoint {
+  line: number;
+  text: string;
+  raw: string;
+  inline: boolean;
+  /** True for `Decide::` (still to be taken). */
+  required: boolean;
+  decided?: string;
+  assignees: string[];
+}
+
+const isDecisionKey = (k: string) => /^(decide|decision)$/i.test(k);
+
+export function parseDecisionLine(text: string, line = 0): DecisionPoint | null {
+  const field = parseInlineFields(text).find((f) => isDecisionKey(f.key));
+  if (!field) return null;
+  const decided = getField(text, "decided")?.value;
+  return {
+    line,
+    text: field.value.replace(/\s+/g, " ").trim(),
+    raw: text,
+    inline: field.bracketed,
+    required: field.key.toLowerCase() === "decide",
+    decided: decided || undefined,
+    assignees: extractAssignees(field.value),
+  };
+}
+
+export function parseDecisions(markdown: string): DecisionPoint[] {
+  const out: DecisionPoint[] = [];
+  for (const l of scanLines(markdown)) {
+    if (l.inCode) continue;
+    const d = parseDecisionLine(l.text, l.index);
+    if (d) out.push(d);
+  }
+  return out;
+}
+
+/** Replace the key of a field in place (`Attn::` → `Decide::`, `[Decide:: …]` → `[Decision:: …]`). */
+function renameField(line: string, start: number, bracketed: boolean, key: string): string {
+  const at = bracketed ? start + 1 : start;
+  const colon = line.indexOf("::", at);
+  return line.slice(0, at) + key + line.slice(colon);
+}
+
+/** Turn a line into a decision to take (`Decide:: text`). */
+export function makeDecide(line: string): string {
+  const field = parseInlineFields(line).find((f) => isDecisionKey(f.key) || f.key.toLowerCase() === "attn");
+  if (field) {
+    const out = renameField(line, field.start, field.bracketed, "Decide");
+    return removeBracketField(removeBracketField(out, "decided"), "resolved");
+  }
+  const tm = TASK.exec(line);
+  if (tm) return `${tm[1]}Decide:: ${tm[5]}`;
+  const lm = LIST.exec(line);
+  if (lm) return `${lm[1]}${lm[2]} Decide:: ${lm[3]}`;
+  const indent = /^\s*/.exec(line)![0];
+  return `${indent}Decide:: ${line.slice(indent.length)}`;
+}
+
+/**
+ * Record a decision: `Decide:: X` → `Decision:: X [decided:: today]`. A plain
+ * line becomes a decision taken today; on a decision already taken, the date
+ * is set if missing.
+ */
+export function recordDecision(line: string, today: Date = new Date()): string {
+  const field = parseInlineFields(line).find((f) => isDecisionKey(f.key) || f.key.toLowerCase() === "attn");
+  let out: string;
+  if (field) out = removeBracketField(renameField(line, field.start, field.bracketed, "Decision"), "resolved");
+  else out = makeDecide(line).replace("Decide::", "Decision::");
+  return getField(out, "decided") ? out : setBracketField(out, "decided", toIsoDate(today));
+}

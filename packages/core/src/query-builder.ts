@@ -3,10 +3,12 @@
  * so the same block works in Zeolite and in Obsidian with Dataview.
  */
 
-export type QueryTarget = "tasks" | "attn" | "notes" | "table";
+export type QueryTarget = "tasks" | "attn" | "decisions" | "notes" | "table";
 export type TaskStatusFilter = "open" | "done" | "cancelled" | "deferred" | "any";
 export type DueFilter = "any" | "overdue" | "today" | "week" | "next" | "has" | "none";
 export type AttnFilter = "open" | "resolved" | "any";
+/** Decisions still to take (`Decide::`) or taken (`Decision::`). */
+export type DecisionFilter = "required" | "taken";
 export type QuerySort = "due" | "name" | "created-desc" | "created" | "id" | "none";
 export type QueryGroup = "none" | "file" | "due" | "folder";
 
@@ -23,6 +25,7 @@ export interface QuerySpec {
   /** Days ahead for due = "next". */
   dueDays: number;
   attn: AttnFilter;
+  decision?: DecisionFilter;
   /** Person without '@'. */
   person: string;
   /** Text the task/Attn/note name must contain (case-insensitive). */
@@ -45,6 +48,7 @@ export const DEFAULT_QUERY: QuerySpec = {
   due: "any",
   dueDays: 7,
   attn: "open",
+  decision: "required",
   person: "",
   text: "",
   idPrefix: "",
@@ -115,6 +119,12 @@ export function buildQuery(spec: QuerySpec): string {
     if (spec.attn === "resolved") where.push("resolved");
     if (person) where.push(`contains(Attn, ${q(`@${person}`)})`);
     if (text) where.push(`icontains(Attn, ${q(text)})`);
+  } else if (spec.target === "decisions") {
+    const key = spec.decision === "taken" ? "Decision" : "Decide";
+    lines.push(`LIST ${key}`);
+    where.push(key);
+    if (person) where.push(`contains(${key}, ${q(`@${person}`)})`);
+    if (text) where.push(`icontains(${key}, ${q(text)})`);
   } else {
     if (spec.target === "notes") lines.push("LIST");
     else lines.push(`TABLE ${(spec.columns.length ? spec.columns : ["id"]).join(", ")}`);

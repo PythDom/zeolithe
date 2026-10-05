@@ -1,7 +1,7 @@
 import { splitFrontmatter } from "./frontmatter";
 import { idFromFileName, parseId } from "./ids";
 import { extractLinks, linkNameOf, type WikiLink } from "./links";
-import { parseAttnPoints, parseTasks, type AttnPoint, type Task } from "./tasks";
+import { parseAttnPoints, parseDecisions, parseTasks, type AttnPoint, type DecisionPoint, type Task } from "./tasks";
 import { collectTags } from "./tags";
 import { extractHeadings, type Heading } from "./toc";
 
@@ -18,6 +18,7 @@ export interface NoteRecord {
   tags: string[];
   tasks: Task[];
   attn: AttnPoint[];
+  decisions: DecisionPoint[];
   headings: Heading[];
   links: WikiLink[];
   body: string;
@@ -67,6 +68,7 @@ export function buildNoteRecord(path: string, content: string): NoteRecord {
     tags: collectTags(data.tags, content),
     tasks: parseTasks(content),
     attn: parseAttnPoints(content),
+    decisions: parseDecisions(content),
     headings,
     links: extractLinks(content),
     body,

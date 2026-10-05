@@ -18,6 +18,8 @@
   --ok: #15803d;
   --warn: #b45309;
   --warn-soft: #fef3c7;
+  --decide: #6d28d9;
+  --decide-soft: #ede9fe;
   --danger: #b91c1c;
   color-scheme: light;
 }
@@ -41,6 +43,8 @@
     --ok: #4ade80;
     --warn: #fbbf24;
     --warn-soft: #3d3215;
+    --decide: #c4b5fd;
+    --decide-soft: #2e2650;
     --danger: #f87171;
     color-scheme: dark;
   }
@@ -64,6 +68,8 @@
   --ok: #4ade80;
   --warn: #fbbf24;
   --warn-soft: #3d3215;
+  --decide: #c4b5fd;
+  --decide-soft: #2e2650;
   --danger: #f87171;
   color-scheme: dark;
 }
@@ -282,6 +288,36 @@ body {
   background: none;
   color: var(--muted);
 }
+/* Decisions: Decide:: (to take) and Decision:: (taken) */
+.markdown .field-decide,
+.markdown .field-decision {
+  border-color: var(--decide);
+}
+.markdown .field-decide .field-key,
+.markdown .field-decision .field-key,
+.markdown .linefield-decide,
+.markdown .linefield-decision {
+  background: var(--decide-soft);
+  color: var(--decide);
+  font-weight: 700;
+}
+.markdown .field-decide .field-key::before,
+.markdown .linefield-decide::before {
+  content: "❓ ";
+}
+.markdown .field-decision .field-key::before,
+.markdown .linefield-decision::before {
+  content: "⚖ ";
+}
+.markdown p.decide,
+.markdown p.decision {
+  padding: 6px 10px;
+  border-left: 3px solid var(--decide);
+  border-radius: 0 6px 6px 0;
+}
+.markdown p.decide {
+  background: color-mix(in srgb, var(--decide-soft) 55%, transparent);
+}
 
 /* TOC and query blocks */
 .markdown .toc {
@@ -339,6 +375,10 @@ body {
 }
 .markdown .attn-row.attn-resolved {
   color: var(--muted);
+}
+.markdown .decision-row {
+  list-style: none;
+  margin-left: -1.4em;
 }
 .markdown .query-table {
   overflow-x: auto;

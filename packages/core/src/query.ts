@@ -13,13 +13,14 @@
  * startswith(), endswith(), lower(), upper(), length(), default().
  *
  * Zeolite extension: `LIST Attn` lists individual Attn points (with their own
- * `resolved` field) instead of notes.
+ * `resolved` field) instead of notes; `LIST Decide` lists decisions still to
+ * take and `LIST Decision` decisions taken (with their `decided` field).
  */
 import { toIsoDate } from "./dates";
 import { parseInlineFields } from "./fields";
 import { scanLines } from "./lines";
 import type { NoteRecord } from "./note-record";
-import type { AttnPoint, Task } from "./tasks";
+import type { AttnPoint, DecisionPoint, Task } from "./tasks";
 
 export class QueryError extends Error {}
 
@@ -418,6 +419,7 @@ interface Row {
   fields: Fields;
   task?: Task;
   attn?: AttnPoint;
+  decision?: DecisionPoint;
 }
 
 function setField(map: Fields, key: string, value: Value) {
@@ -636,6 +638,17 @@ function matchSource(s: Source, r: NoteRecord): boolean {
   }
 }
 
+function decisionFields(r: NoteRecord, d: DecisionPoint, base: Fields): Fields {
+  const f = new Map(base);
+  setField(f, d.required ? "decide" : "decision", d.text);
+  setField(f, d.required ? "decision" : "decide", null);
+  setField(f, "decided", d.decided ?? null);
+  setField(f, "assignees", d.assignees);
+  setField(f, "text", d.text);
+  setField(f, "line", d.line);
+  return f;
+}
+
 // ---------------------------------------------------------------------------
 // Results
 
@@ -646,10 +659,11 @@ export interface ResultRow {
   values: Value[];
   task?: Task;
   attn?: AttnPoint;
+  decision?: DecisionPoint;
 }
 
 export interface QueryResult {
-  kind: "task" | "list" | "table" | "attn";
+  kind: "task" | "list" | "table" | "attn" | "decision";
   /** Column headers (TABLE), including the leading file column unless WITHOUT ID. */
   headers: string[];
   withoutId: boolean;
@@ -665,7 +679,10 @@ export function runQuery(source: string, notes: NoteRecord[], today: Date = new 
   const q = parseQuery(source);
   const self = thisPath ? notes.find((n) => n.path === thisPath) : undefined;
   thisFields = self ? noteFields(self) : new Map();
-  const attnList = q.type === "LIST" && q.fields.length === 1 && q.fields[0]!.expr.k === "id" && q.fields[0]!.expr.name.toLowerCase() === "attn";
+  const listOf = q.type === "LIST" && q.fields.length === 1 && q.fields[0]!.expr.k === "id" ? q.fields[0]!.expr.name.toLowerCase() : "";
+  const attnList = listOf === "attn";
+  const decisionList = listOf === "decide" || listOf === "decision";
+  const pointList = attnList || decisionList;
 
   const rows: Row[] = [];
   for (const r of notes) {
@@ -673,6 +690,9 @@ export function runQuery(source: string, notes: NoteRecord[], today: Date = new 
     const base = noteFields(r);
     if (q.type === "TASK") for (const t of r.tasks) rows.push({ record: r, fields: taskFields(r, t, base), task: t });
     else if (attnList) for (const a of r.attn) rows.push({ record: r, fields: attnFields(r, a, base), attn: a });
+    else if (decisionList) {
+      for (const d of r.decisions) if (d.required === (listOf === "decide")) rows.push({ record: r, fields: decisionFields(r, d, base), decision: d });
+    }
     else rows.push({ record: r, fields: base });
   }
 
@@ -685,7 +705,7 @@ export function runQuery(source: string, notes: NoteRecord[], today: Date = new 
       }
       return 0;
     });
-  } else if (q.type !== "TASK" && !attnList) {
+  } else if (q.type !== "TASK" && !pointList) {
     filtered = [...filtered].sort((a, b) => a.record.name.localeCompare(b.record.name));
   }
   if (q.limit !== undefined) filtered = filtered.slice(0, q.limit);
@@ -693,9 +713,10 @@ export function runQuery(source: string, notes: NoteRecord[], today: Date = new 
   const toResult = (row: Row): ResultRow => ({
     path: row.record.path,
     name: row.record.name,
-    values: attnList ? [] : q.fields.map((f) => evalExpr(f.expr, row.fields, today)),
+    values: pointList ? [] : q.fields.map((f) => evalExpr(f.expr, row.fields, today)),
     task: row.task,
     attn: row.attn,
+    decision: row.decision,
   });
 
   let groups: QueryResult["groups"];
@@ -713,7 +734,7 @@ export function runQuery(source: string, notes: NoteRecord[], today: Date = new 
   }
 
   return {
-    kind: q.type === "TASK" ? "task" : attnList ? "attn" : q.type === "TABLE" ? "table" : "list",
+    kind: q.type === "TASK" ? "task" : attnList ? "attn" : decisionList ? "decision" : q.type === "TABLE" ? "table" : "list",
     headers: q.type === "TABLE" ? [...(q.withoutId ? [] : ["File"]), ...q.fields.map((f) => f.name)] : [],
     withoutId: q.withoutId,
     groups,

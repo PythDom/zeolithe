@@ -168,12 +168,31 @@ Inline form: [Attn:: check the drawings]
 The **⚠ Attn** button inserts one, resolves it (adds `[resolved:: date]`)
 or converts it to a task. Open Attn points are listed in the Tasks tab.
 
+## Decisions
+
+Two markers keep track of decisions:
+
+```markdown
+Decide:: choose the supplier for lot 3 @Marc
+Decision:: keep the current supplier [decided:: 2026-10-05]
+Inline form: we agreed to [Decision:: freeze the design] [decided:: 2026-10-05]
+```
+
+- **❓ Decision rqd** turns the current line into `Decide::`: a decision
+  still to take.
+- **⚖ Decision** records it: `Decide::` becomes `Decision::` with today's
+  date. On a plain line it writes a decision taken today.
+
+Decisions still to take are listed in the Tasks tab. **🔍 Query → ⚖
+Decisions** lists them across notes (`LIST Decide` or `LIST Decision`), for
+example all the decisions taken in a project.
+
 ## Searching
 
 - The **Search** tab searches all notes. Click a tag in the **Tags** tab to
   find its notes.
 - **🔍 Query** (Ctrl+Shift+Q) builds a Dataview query with a form: tasks,
-  lists or tables of notes, filtered by tag, folder, date or person. Insert
+  Attn points, decisions, lists or tables of notes, filtered by tag, folder, date or person. Insert
   it in a note, or save it as a search note in `Searches/`. The results are
   live.
 

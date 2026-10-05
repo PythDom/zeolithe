@@ -12,7 +12,7 @@ is shared between Windows and Android.
 
 | Path | Content |
 | ---- | ------- |
-| `packages/core` | Shared, platform-independent logic: taxonomy, `XX.YY.ZZ.NNN` IDs, tasks, Attn points, dates, tags, TOC. Unit-tested. |
+| `packages/core` | Shared, platform-independent logic: taxonomy, `XX.YY.ZZ.NNN` IDs, tasks, Attn points, decisions, dates, tags, TOC. Unit-tested. |
 | `apps/web` | Shared UI (Svelte + CodeMirror 6), with one storage adapter per platform (browser, Windows, Android). |
 | `apps/desktop` | Windows app (Tauri 2): portable `Zeolite.exe` and an installer. |
 | `apps/mobile` | Android app (Capacitor 8): APK. |
@@ -109,6 +109,9 @@ Done:
 - Tasks: toolbar buttons, state cycling, ticking from the preview, `[due:: …]`
   with natural-language dates.
 - Attn points: insert, resolve, convert to task.
+- Decisions: `Decide::` (decision required) and `Decision::` (taken, with
+  `[decided:: date]`), from two toolbar buttons; listed in the Tasks tab and
+  by `LIST Decide` / `LIST Decision` queries.
 - New-note dialog: PARA ID generation, Journal, Inbox and Free notes.
 - Rename or move a note: click its path at the top, or press F2. PARA
   notes keep their ID; links across the vault are updated.

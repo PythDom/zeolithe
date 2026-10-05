@@ -4,6 +4,9 @@ import {
   convertDueFields,
   cycleTaskStatus,
   makeAttn,
+  makeDecide,
+  parseDecisions,
+  recordDecision,
   makeTask,
   parseAttnPoints,
   parseTasks,
@@ -103,5 +106,28 @@ describe("Attn points", () => {
       "- Went well, but supplier delay needs work\n- [ ] supplier delay",
     );
     expect(makeTask("Attn:: Call")).toBe("- [ ] Call");
+  });
+});
+
+describe("decisions", () => {
+  it("parses Decide and Decision, as line fields or inline", () => {
+    const d = parseDecisions("Decide:: Pick supplier @carol\n- Agreed to [Decision:: keep lot 3] [decided:: 2026-10-01]\n```\nDecide:: not this\n```\n");
+    expect(d).toMatchObject([
+      { line: 0, text: "Pick supplier @carol", required: true, inline: false, assignees: ["carol"] },
+      { line: 1, text: "keep lot 3", required: false, inline: true, decided: "2026-10-01" },
+    ]);
+  });
+  it("makes a decision required", () => {
+    expect(makeDecide("Pick supplier")).toBe("Decide:: Pick supplier");
+    expect(makeDecide("  - [ ] Pick supplier")).toBe("  Decide:: Pick supplier");
+    expect(makeDecide("1. Pick supplier")).toBe("1. Decide:: Pick supplier");
+    expect(makeDecide("Attn:: Budget [resolved:: 2026-10-01]")).toBe("Decide:: Budget");
+    expect(makeDecide("Decision:: Keep [decided:: 2026-10-01]")).toBe("Decide:: Keep");
+  });
+  it("records a decision with today's date", () => {
+    expect(recordDecision("Decide:: Keep lot 3", today)).toBe("Decision:: Keep lot 3 [decided:: 2026-10-02]");
+    expect(recordDecision("- Agreed to [Decide:: keep lot 3] today", today)).toBe("- Agreed to [Decision:: keep lot 3] today [decided:: 2026-10-02]");
+    expect(recordDecision("Keep lot 3", today)).toBe("Decision:: Keep lot 3 [decided:: 2026-10-02]");
+    expect(recordDecision("Decision:: Keep [decided:: 2026-09-01]", today)).toBe("Decision:: Keep [decided:: 2026-09-01]");
   });
 });

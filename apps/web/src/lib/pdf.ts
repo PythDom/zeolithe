@@ -65,8 +65,18 @@ const C = {
   mark: "#fde68a",
   warn: "#b45309",
   warnSoft: "#fef3c7",
+  decide: "#6d28d9",
+  decideSoft: "#ede9fe",
   danger: "#b91c1c",
 };
+
+/** Text and background colours of a field key: Attn and decisions stand out. */
+function keyColours(key: string): [string, string | undefined] {
+  const k = key.toLowerCase();
+  if (k === "attn") return [C.warn, C.warnSoft];
+  if (k === "decide" || k === "decision") return [C.decide, C.decideSoft];
+  return [C.muted, undefined];
+}
 
 const IMAGE = /\.(png|jpe?g|gif|webp|svg|bmp)$/i;
 
@@ -186,6 +196,8 @@ class Builder {
           const cls = tok.attrGet("class") ?? "";
           const para = this.paragraph(t[i + 1]!);
           if (/\battn\b/.test(cls)) out.push(this.bar(para, C.warn, /resolved/.test(cls) ? undefined : C.warnSoft));
+          else if (/\bdecide\b/.test(cls)) out.push(this.bar(para, C.decide, C.decideSoft));
+          else if (/\bdecision\b/.test(cls)) out.push(this.bar(para, C.decide));
           else out.push(para);
           i = close + 1;
           break;
@@ -425,14 +437,14 @@ class Builder {
         case "field": {
           const m = c.meta as RegExpExecArray;
           const key = m[1]!.trim();
-          const attn = key.toLowerCase() === "attn";
-          push(` ${key} `, { fontSize: 8.5, bold: attn, color: attn ? C.warn : C.muted, background: attn ? C.warnSoft : C.code });
-          push(` ${m[2]} `, { fontSize: 8.5, background: attn ? C.warnSoft : C.code });
+          const [color, soft] = keyColours(key);
+          push(` ${key} `, { fontSize: 8.5, bold: !!soft, color, background: soft ?? C.code });
+          push(` ${m[2]} `, { fontSize: 8.5, background: soft ?? C.code });
           break;
         }
         case "linefield": {
           const key = (c.meta as RegExpExecArray)[1]!;
-          push(`${key}: `, { bold: true, color: key.toLowerCase() === "attn" ? C.warn : C.muted });
+          push(`${key}: `, { bold: true, color: keyColours(key)[0] });
           break;
         }
         case "wikilink": {
@@ -528,7 +540,7 @@ class Builder {
     } catch (e) {
       return this.bar({ text: `Dataview query error: ${(e as Error).message}`, color: C.danger }, C.danger);
     }
-    const noun = res.kind === "task" ? "task" : res.kind === "attn" ? "Attn point" : "note";
+    const noun = res.kind === "task" ? "task" : res.kind === "attn" ? "Attn point" : res.kind === "decision" ? "decision" : "note";
     const parts: Node[] = [{ text: `DATAVIEW · ${res.count} ${noun.toUpperCase()}${res.count === 1 ? "" : "S"}`, style: "label" }];
     for (const g of res.groups) {
       if (g.key !== undefined) parts.push({ text: g.key === null ? "(none)" : this.valueRuns(g.key), bold: true, margin: [0, 6, 0, 2] });
@@ -552,6 +564,16 @@ class Builder {
         } else if (r.attn) {
           parts.push({
             text: [{ text: "Attn: ", bold: true, color: C.warn }, { text: r.attn.text }, { text: `  · ${r.name}`, color: C.muted, fontSize: 9 }],
+            margin: [0, 1, 0, 1],
+          });
+        } else if (r.decision) {
+          const d = r.decision;
+          parts.push({
+            text: [
+              { text: d.required ? "Decide: " : "Decision: ", bold: true, color: C.decide },
+              { text: d.text },
+              { text: `${d.decided ? ` (${d.decided})` : ""}  · ${r.name}`, color: C.muted, fontSize: 9 },
+            ],
             margin: [0, 1, 0, 1],
           });
         } else {

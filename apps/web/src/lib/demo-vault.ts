@@ -48,6 +48,15 @@ Typing \`[due:: friday]\` converts the date to ISO as soon as you close the brac
 Attn:: Something that needs attention @alice
 - Inline form works too: [Attn:: check this sentence]
 
+## Decisions
+
+Decide:: Choose the supplier for lot 3 @bob
+
+Decision:: Keep the weekly meeting on Mondays [decided:: ${day}]
+
+**❓ Decision rqd** and **⚖ Decision** in the toolbar write these; the Tasks
+tab lists decisions still to take.
+
 ## Queries
 
 Dataview blocks show live results. Press **🔍 Query** in the toolbar to build
@@ -81,6 +90,7 @@ created: ${created}
 ## Notes
 
 Attn:: Budget overrun risk on lot 3 @bob
+Decide:: Accept the revised delivery date for T601
 - Meeting went well, but [Attn:: supplier delay on T601] needs follow-up
 `,
     "02 Areas/02.00.00.001 Weekly team meeting.md": `---

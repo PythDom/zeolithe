@@ -93,7 +93,7 @@
   });
   let showUnused = $state(false);
 
-  // Open tasks and unresolved Attn points across the vault.
+  // Open tasks, unresolved Attn points and decisions still to take across the vault.
   const openTasks = $derived(
     vault.notes
       .filter((r) => !isArchived(vault.taxonomy, r.path))
@@ -101,6 +101,9 @@
       .sort((a, b) => (a.t.due ?? "9999") .localeCompare(b.t.due ?? "9999")),
   );
   const openAttn = $derived(vault.notes.flatMap((r) => r.attn.filter((a) => !a.resolved).map((a) => ({ r, a }))));
+  const openDecisions = $derived(
+    vault.notes.filter((r) => !isArchived(vault.taxonomy, r.path)).flatMap((r) => r.decisions.filter((d) => d.required).map((d) => ({ r, d }))),
+  );
 
   const hits = $derived(vault.search(query));
   const savedSearches = $derived(vault.notes.filter((r) => r.folder === vault.settings.searchesFolder));
@@ -229,6 +232,15 @@
       </button>
     {:else}
       <p class="empty">No open Attn points.</p>
+    {/each}
+    <h4>Decisions required ({openDecisions.length})</h4>
+    {#each openDecisions as { r, d }}
+      <button class="item" onclick={() => onOpen(r.path, d.line)}>
+        <span class="text decide">❓ {d.text}</span>
+        <span class="meta">{label(r.path)}</span>
+      </button>
+    {:else}
+      <p class="empty">No decisions required.</p>
     {/each}
   {:else}
     <input class="search" type="search" placeholder="Words or #tag" bind:value={query} />
@@ -403,6 +415,9 @@
   }
   .attn {
     color: var(--warn);
+  }
+  .decide {
+    color: var(--decide);
   }
   .due {
     margin-right: 6px;

@@ -164,7 +164,7 @@ function headingIds(state: StateCore) {
   }
 }
 
-/** Mark paragraphs that start with `Attn::` and carry source lines. */
+/** Mark paragraphs that start with `Attn::`, `Decide::` or `Decision::` and carry source lines. */
 function attnParagraphs(lineOffset: () => number) {
   return (state: StateCore) => {
     const tokens = state.tokens;
@@ -174,6 +174,9 @@ function attnParagraphs(lineOffset: () => number) {
       const inline = tokens[i + 1];
       if (inline && /(^|\n)Attn::/i.test(inline.content)) {
         t.attrJoin("class", /\[resolved::/i.test(inline.content) ? "attn attn-resolved" : "attn");
+        t.attrSet("data-line", String((t.map?.[0] ?? 0) + lineOffset()));
+      } else if (inline && /^(Decide|Decision)::/i.test(inline.content)) {
+        t.attrJoin("class", /^Decide::/i.test(inline.content) ? "decide" : "decision");
         t.attrSet("data-line", String((t.map?.[0] ?? 0) + lineOffset()));
       }
     }
@@ -333,6 +336,12 @@ export function createRenderer(ctx: RenderContext, depth = 0, parents: string[] 
       const a = row.attn;
       return `<li class="attn-row${a.resolved ? " attn-resolved" : ""}"><span class="linefield linefield-attn">Attn</span> ${md.renderInline(a.text)} <span class="query-src">· ${noteLink(row.path, row.name)}</span></li>`;
     }
+    if (row.decision) {
+      const d = row.decision;
+      const key = d.required ? "Decide" : "Decision";
+      const when = d.decided ? ` <span class="query-src">(${esc(d.decided)})</span>` : "";
+      return `<li class="decision-row"><span class="linefield linefield-${key.toLowerCase()}">${key}</span> ${md.renderInline(d.text)}${when} <span class="query-src">· ${noteLink(row.path, row.name)}</span></li>`;
+    }
     const value = row.values.length ? `: ${row.values.map(valueHtml).join(" ")}` : "";
     return `<li>${noteLink(row.path, row.name)}${value}</li>`;
   };
@@ -360,7 +369,7 @@ export function createRenderer(ctx: RenderContext, depth = 0, parents: string[] 
         return title + content;
       })
       .join("");
-    const noun = res.kind === "task" ? "task" : res.kind === "attn" ? "Attn point" : "note";
+    const noun = res.kind === "task" ? "task" : res.kind === "attn" ? "Attn point" : res.kind === "decision" ? "decision" : "note";
     const empty = res.count === 0 ? `<p class="query-empty">No matching ${noun}s.</p>` : groups;
     return `<div class="query"><div class="query-title">Dataview · ${res.count} ${noun}${res.count === 1 ? "" : "s"}</div>${empty}</div>`;
   }

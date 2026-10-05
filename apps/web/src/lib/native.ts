@@ -205,15 +205,18 @@ interface AllFilesAccessPlugin {
   request(): Promise<void>;
 }
 
-async function allFiles(): Promise<AllFilesAccessPlugin> {
+// Wrapped in an object: a Capacitor plugin proxy treats every property as a
+// native method, `then` included, so resolving a promise with the proxy itself
+// would call a native `then` and never settle ("Checking access…" forever).
+async function allFiles(): Promise<{ plugin: AllFilesAccessPlugin }> {
   const { registerPlugin } = await import("@capacitor/core");
-  return registerPlugin<AllFilesAccessPlugin>("AllFilesAccess");
+  return { plugin: registerPlugin<AllFilesAccessPlugin>("AllFilesAccess") };
 }
 
 /** Whether the app may read and write ordinary folders (Android "All files access"). */
 export async function androidHasAccess(): Promise<boolean> {
   try {
-    return (await (await allFiles()).check()).granted;
+    return (await (await allFiles()).plugin.check()).granted;
   } catch {
     return false;
   }
@@ -221,7 +224,7 @@ export async function androidHasAccess(): Promise<boolean> {
 
 /** Open the system screen where the user allows "All files access" for Zeolite. */
 export async function androidRequestAccess(): Promise<void> {
-  await (await allFiles()).request();
+  await (await allFiles()).plugin.request();
 }
 
 /** Resolve when the app comes back to the foreground (after the settings screen). */
