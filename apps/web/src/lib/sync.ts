@@ -1,19 +1,47 @@
 /**
- * Sync of the vault folder with a WebDAV server: settings (kept per device
- * and per vault in local storage), and one sync run. The decisions are made
- * by planSync in @zeolite/core; this file does the reading and writing.
+ * Sync of the vault folder with a WebDAV server or a OneDrive folder:
+ * settings (kept per device and per vault in local storage), and one sync
+ * run. The decisions are made by planSync in @zeolite/core; this file does
+ * the reading and writing.
  */
 import { conflictPath, hashBytes, isSyncedPath, planSync, type SyncAction, type SyncBase } from "@zeolite/core";
 import type { VaultStorage } from "./storage";
+import { OneDriveClient } from "./onedrive";
 import { WebDavClient } from "./webdav";
 
 export interface SyncSettings {
+  /** Missing in settings saved before OneDrive support: WebDAV. */
+  kind?: "webdav" | "onedrive";
+  /** WebDAV folder address and account. */
   url: string;
   username: string;
   password: string;
+  /** OneDrive: folder in the user's OneDrive, and the app registration used to sign in. */
+  folder?: string;
+  clientId?: string;
   /** Minutes between automatic syncs (0: only on opening and with the button). */
   every: number;
 }
+
+/** What runSync needs from a server. */
+export interface SyncRemote {
+  /** Identifies the server and folder (another one starts a fresh sync state). */
+  readonly url: string;
+  test(): Promise<"ok" | "created">;
+  /** Every synced file with its server version. */
+  list(): Promise<Map<string, string>>;
+  get(path: string): Promise<Blob>;
+  /** Upload; returns the new server version. */
+  put(path: string, data: Blob): Promise<string>;
+  remove(path: string): Promise<void>;
+}
+
+export function makeRemote(s: SyncSettings): SyncRemote {
+  return s.kind === "onedrive" ? new OneDriveClient(s.clientId ?? "", s.folder ?? "") : new WebDavClient(s.url, s.username, s.password);
+}
+
+/** Short description of where a vault syncs to. */
+export const syncTarget = (s: SyncSettings) => (s.kind === "onedrive" ? `OneDrive: ${s.folder}` : s.url);
 
 const key = (vault: string) => `zeolite.sync.${vault}`;
 
@@ -89,7 +117,7 @@ async function stampOf(storage: VaultStorage, path: string): Promise<string | un
 /** Many deletions at once usually mean a wrong folder: ask first. */
 const tooMany = (n: number, known: number) => n > 5 && n > known * 0.3;
 
-export async function runSync(storage: VaultStorage, client: WebDavClient, opts: SyncOptions): Promise<SyncReport> {
+export async function runSync(storage: VaultStorage, client: SyncRemote, opts: SyncOptions): Promise<SyncReport> {
   const report: SyncReport = { uploaded: [], downloaded: [], deletedLocal: [], deletedRemote: [], conflicts: [], errors: [], localChanged: false };
   const base = await readState(storage, client.url);
 

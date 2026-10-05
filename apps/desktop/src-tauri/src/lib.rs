@@ -166,6 +166,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         // Web links open in the default browser.
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_http::init())
         .invoke_handler(tauri::generate_handler![allow_vault, scan_vault])
         .run(tauri::generate_context!())
         .expect("error while running Zeolite");

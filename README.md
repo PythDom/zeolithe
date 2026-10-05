@@ -5,7 +5,7 @@ Notes are plain Markdown files, compatible with Obsidian vaults, and the app
 is shared between Windows and Android.
 
 - Specification: [docs/feasibility.md](docs/feasibility.md)
-- Sync with your own server (WebDAV, Docker): [docs/sync.md](docs/sync.md)
+- Sync with your own server (WebDAV, Docker) or OneDrive: [docs/sync.md](docs/sync.md)
 - Taxonomy and numbering: [docs/taxonomy.md](docs/taxonomy.md)
 
 ## Repository layout
@@ -130,6 +130,8 @@ Done:
   (⇅ in the sidebar): two-way, only changed files (unchanged local files
   are not even re-read), conflicts kept as
   Syncthing-style copies, deletions to `.trash`. See [docs/sync.md](docs/sync.md).
+- Or sync with a OneDrive folder (Microsoft Graph, device-code sign-in;
+  Windows and Android apps), with the same conflict handling.
 - User guide: ❓ in the sidebar (or F1) writes `_system/Zeolite User Guide.md`
   into the vault (refreshed to the current version each time) and opens it.
   Source: [docs/user-guide.md](docs/user-guide.md).

@@ -45,8 +45,7 @@
   import SyncDialog from "./components/SyncDialog.svelte";
   import { applyPrefs, DEFAULT_LAYOUT, multiUserChecks, prefs, savePrefs } from "./lib/features.svelte";
   import SettingsDialog from "./components/SettingsDialog.svelte";
-  import { describeReport, loadSyncSettings, runSync, saveSyncSettings, type SyncSettings } from "./lib/sync";
-  import { WebDavClient } from "./lib/webdav";
+  import { describeReport, loadSyncSettings, makeRemote, runSync, saveSyncSettings, syncTarget, type SyncSettings } from "./lib/sync";
   import { demoVault, starterVault } from "./lib/demo-vault";
   import userGuide from "../../../docs/user-guide.md?raw";
   import { insertBlock } from "./lib/editor-commands";
@@ -168,7 +167,7 @@
       await flush();
       const path = current;
       const before = content;
-      const client = new WebDavClient(syncSettings.url, syncSettings.username, syncSettings.password);
+      const client = makeRemote(syncSettings);
       const report = await runSync(v.storage, client, {
         confirmDeletes: (count, side, sample) =>
           new Promise((resolve) => {
@@ -1019,14 +1018,14 @@
     {#if !readOnlyCopy && vault !== demo}
       <div class="syncbar">
         {#if syncSettings}
-          <button class="sync" onclick={syncNow} disabled={syncing} title="Sync now with {syncSettings.url}">
+          <button class="sync" onclick={syncNow} disabled={syncing} title="Sync now with {syncTarget(syncSettings)}">
             <span class:spin={syncing}>⇅</span> {syncing ? `Syncing… ${syncProgress}` : "Sync"}
           </button>
           <button class="sync-info" class:err={syncError} onclick={() => (showSync = true)} title={syncInfo || "Sync settings"}>
             {syncInfo || "Sync settings"}
           </button>
         {:else}
-          <button class="sync-setup" onclick={() => (showSync = true)} title="Sync this vault with a WebDAV server (e.g. on your Docker server)">⇅ Sync with your server…</button>
+          <button class="sync-setup" onclick={() => (showSync = true)} title="Sync this vault with a WebDAV server (e.g. on your Docker server) or OneDrive">⇅ Set up sync…</button>
         {/if}
       </div>
     {/if}

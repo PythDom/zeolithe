@@ -219,9 +219,9 @@ a clickable table of contents and page numbers.
 ## Syncing your PC, phone and tablet
 
 Zeolite can keep the same vault on all your devices through a folder on
-your own server (for example a Docker server at home). Each device keeps
-a full copy of the notes, works offline, and exchanges its changes with
-the server.
+your own server (for example a Docker server at home) or in **OneDrive**
+(see "Syncing through OneDrive" below). Each device keeps a full copy of
+the notes, works offline, and exchanges its changes with the server.
 
 ```
    PC (Zeolite.exe) ─┐
@@ -266,7 +266,7 @@ travels unencrypted.
 Usually your main PC.
 
 1. Open Zeolite and your vault (📂).
-2. In the sidebar, press **⇅ Sync with your server…**.
+2. In the sidebar, press **⇅ Set up sync…**.
 3. Enter the address, user name and password.
 4. Press **Test connection**: it should say "Connected" (the first time:
    "the sync folder … has been created").
@@ -285,7 +285,7 @@ Usually your main PC.
    **Use "Zeolite"**.
 4. Zeolite says the folder is empty: press **Keep it empty** (do **not**
    choose "Set up the vault": your notes come from the server).
-5. Press **⇅ Sync with your server…**, enter the **same** address, user
+5. Press **⇅ Set up sync…**, enter the **same** address, user
    name and password, then **Save and sync**. All your notes arrive
    ("… received").
 
@@ -297,7 +297,7 @@ Tablets work the same way. (iPad is not supported.)
    Edge or Chrome.
 2. Create an **empty** folder for the vault, for example
    `Documents\Zeolite`, and open it with 📂. Choose **Keep it empty**.
-3. **⇅ Sync with your server…** with the same address, user name and
+3. **⇅ Set up sync…** with the same address, user name and
    password, then **Save and sync**.
 
 At work, test the address in the browser first: company networks often
@@ -342,6 +342,50 @@ Syncthing on that PC instead.
 | "refused the user name or password" | Check `users` in `config.yml`, then restart the container (`docker compose restart`). |
 | "does not allow this" | In `config.yml`, `permissions: CRUD`. |
 | Notes missing on a new device | Check that it uses exactly the same address, then press ⇅ Sync. |
+
+### Syncing through OneDrive
+
+Instead of your own server, the vault can sync with a folder in your
+OneDrive. Zeolite talks to OneDrive itself: no OneDrive app is needed on
+the phone or tablet.
+
+**Once: register Zeolite with Microsoft** (free, about 5 minutes). Zeolite
+needs an "application ID" to be allowed to use OneDrive:
+
+1. Open **entra.microsoft.com** (or portal.azure.com) and sign in with
+   your Microsoft account.
+2. **App registrations → New registration**. Name: `Zeolite`. Supported
+   account types: **Accounts in any organizational directory and personal
+   Microsoft accounts**. Leave the redirect URI empty. **Register**.
+3. Copy the **Application (client) ID** shown on the app's page (keep it:
+   every device uses the same one).
+4. **Authentication → Allow public client flows → Yes → Save.**
+
+**On each device** (Windows or Android app; a web browser cannot sign
+in):
+
+1. Open the vault (on a new device: an empty folder, **Keep it empty**).
+2. **⇅ Set up sync… → OneDrive.** Folder in your OneDrive: for example
+   `Zeolite/My notes` (created if missing). Paste the application ID.
+3. **Sign in to Microsoft…** shows a code. Press **Open the Microsoft
+   page** (or open microsoft.com/devicelogin on any device), enter the
+   code and sign in. Zeolite then shows "Signed in as …".
+4. **Save and sync.**
+
+The sign-in is remembered on the device; Zeolite renews it by itself.
+Everything else works as with your own server: conflict copies,
+deletions to `.trash`, automatic syncs.
+
+Work or school accounts: your organisation may block apps it has not
+approved. If sign-in says an administrator must approve, ask your IT
+team, or use your personal OneDrive.
+
+| Problem | Solution |
+| ------- | -------- |
+| "does not recognise this application ID" | Check the ID, and that the registration allows personal accounts. |
+| "must allow public client flows" | Step 4 of the registration. |
+| "sign-in expired" | ⇅ dialog → **Sign in to Microsoft…** again. |
+| "not possible from a web page" | Set up OneDrive sync in the Windows or Android app. |
 
 ## Sharing a vault with colleagues (SharePoint, OneDrive, Syncthing)
 

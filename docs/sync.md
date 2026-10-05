@@ -49,7 +49,7 @@ browser there first.
 ## 3. Set up Zeolite
 
 On each device, open the vault, then in the sidebar press
-**⇅ Sync with your server…**:
+**⇅ Set up sync…**:
 
 - server address, user name and password;
 - how often to sync automatically.
@@ -101,3 +101,28 @@ adds these headers in front of it, or use the container above.
 | Cannot reach the server | Address, network, VPN; CORS enabled on the server; an `http://` server cannot be used from the `https://` test page. |
 | The server refused the user name or password | `users` in `config.yml` (restart the container after a change). |
 | The server does not allow this | The user needs `permissions: CRUD`. |
+
+## OneDrive instead of WebDAV
+
+The ⇅ dialog can also sync with a folder in OneDrive, through Microsoft
+Graph. The sync logic is the same (three-way comparison, conflict copies,
+`.trash`); only the server side differs:
+
+- **Sign-in:** OAuth 2.0 device code flow (`/common` endpoint, scopes
+  `Files.ReadWrite offline_access`). The user enters a short code on
+  microsoft.com/devicelogin. Tokens are kept in the device's app storage
+  and refreshed automatically.
+- **App registration:** each user registers Zeolite once in Microsoft
+  Entra (any organisational directory and personal accounts, *Allow
+  public client flows* = Yes) and pastes the application (client) ID. A
+  build can ship a default ID in `DEFAULT_CLIENT_ID`
+  (`apps/web/src/lib/onedrive.ts`).
+- **Why the Windows and Android apps only:** Microsoft's token endpoint
+  does not accept cross-origin requests for the device code flow, so the
+  sign-in requests go through the native HTTP layer (Tauri's HTTP plugin,
+  Capacitor's CapacitorHttp). Graph calls and downloads (pre-authenticated
+  `@microsoft.graph.downloadUrl`) run from the web view.
+- **Versions:** the item's `cTag` (changes only when the content
+  changes) plays the role of the WebDAV ETag.
+- **Work accounts:** the organisation may require admin consent for the
+  app registration.
