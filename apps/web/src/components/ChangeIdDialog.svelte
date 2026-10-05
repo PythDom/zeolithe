@@ -121,7 +121,7 @@
     z-index: 50;
     display: grid;
     place-items: center;
-    padding: 16px;
+    padding: calc(16px + var(--safe-top)) calc(16px + var(--safe-right)) calc(16px + var(--safe-bottom)) calc(16px + var(--safe-left));
     background: rgb(0 0 0 / 0.35);
   }
   .dialog {

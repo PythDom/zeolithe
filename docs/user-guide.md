@@ -67,8 +67,8 @@ belongs, and **Archive** moves a note to `04 Archives` in one click.
   come back when you reopen the vault.
 - Drag the edge of the sidebar, or the separator between editor and
   preview in Split view, to resize them (double-click: back to default).
-- **☰** (top left of the note, or Ctrl+\\) hides the left panel for more
-  room, and shows it again. On phones, ☰ opens it as a menu.
+- **«** at the top of the left panel (or Ctrl+\\) hides it for more room;
+  **☰** (top left of the note) shows it again. On phones, ☰ opens it as a menu.
 - One Enter is a new line; leave an empty line to start a new paragraph.
 - On Android, the system back key closes an open window or the menu;
   press it twice to close Zeolite.

@@ -1007,6 +1007,7 @@
         <div class="vault" title={vault.name}>{vault.name}</div>
       </div>
       <button class="settings" onclick={() => (showSettings = true)} title="Settings: folders, journal, attachments, theme…" aria-label="Settings">⚙</button>
+      <button class="settings hide-side" onclick={toggleSidebar} title="Hide this panel (Ctrl+\); ☰ brings it back" aria-label="Hide the left panel">«</button>
     </header>
     <div class="actions">
       <button class="primary" onclick={() => (showNew = true)} title="Ctrl+N">＋ New note</button>
@@ -1445,6 +1446,9 @@
     color: var(--muted);
     font-size: 17px;
     cursor: pointer;
+  }
+  .brand .hide-side {
+    margin-left: 0;
   }
   .brand .settings:hover {
     border-color: var(--border);
@@ -1910,7 +1914,9 @@
       position: fixed;
       inset: 0 auto 0 0;
       z-index: 40;
+      box-sizing: border-box;
       width: min(86vw, 320px);
+      padding: var(--safe-top) 0 var(--safe-bottom) var(--safe-left);
       transform: translateX(-100%);
       transition: transform 0.2s ease;
     }
