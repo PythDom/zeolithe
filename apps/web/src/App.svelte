@@ -1122,6 +1122,7 @@
           onTemplate={applyTemplate}
           onManageTemplates={() => (showTemplates = true)}
           onLink={(selected) => (linkFrom = selected)}
+          people={() => vault.people()}
         />
       {/if}
       <div class="panes mode-{mode}" style="--split-a: {prefs.split}fr; --split-b: {1 - prefs.split}fr">

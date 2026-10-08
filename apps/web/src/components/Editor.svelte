@@ -129,6 +129,12 @@
       const from = tag.from + tag.text.indexOf("#") + 1;
       return { from, options: tags().map((label) => ({ label, type: "keyword" })), validFor: /^[\p{L}\p{N}_\-/]*$/u };
     }
+    // Inside [owner:: …]: known people.
+    const owner = ctx.matchBefore(/\[owner::\s*[^\],]*$/iu);
+    if (owner) {
+      const from = owner.from + owner.text.search(/::\s*/) + owner.text.match(/::\s*/)![0].length;
+      return { from, options: people().map((label) => ({ label, type: "variable" })), validFor: /^[^\],]*$/ };
+    }
     const person = ctx.matchBefore(/(?:^|[\s(])@[\p{L}\p{N}_.-]*/u);
     if (person) {
       const from = person.from + person.text.indexOf("@") + 1;

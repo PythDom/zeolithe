@@ -260,6 +260,9 @@ body {
 .markdown .field-due .field-key::before {
   content: "📅 ";
 }
+.markdown .field-owner .field-key::before {
+  content: "👤 ";
+}
 .markdown .field-done .field-key::before,
 .markdown .field-resolved .field-key::before {
   content: "✓ ";

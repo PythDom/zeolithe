@@ -107,7 +107,8 @@ Done:
   shows a clickable contents list, static TOC entries are clickable, and
   Ctrl/Cmd+click follows any [[link]].
 - Tasks: toolbar buttons, state cycling, ticking from the preview, `[due:: …]`
-  with natural-language dates.
+  with natural-language dates, `[owner:: name]` assignments (👤, queryable
+  by Dataview; older `@name` mentions still count).
 - Attn points: insert, resolve, convert to task.
 - Decisions: `Decide::` (decision required) and `Decision::` (taken, with
   `[decided:: date]`), from two toolbar buttons; listed in the Tasks tab and

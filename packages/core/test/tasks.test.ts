@@ -8,6 +8,7 @@ import {
   parseDecisions,
   recordDecision,
   makeTask,
+  setOwner,
   parseAttnPoints,
   parseTasks,
   setDue,
@@ -129,5 +130,23 @@ describe("decisions", () => {
     expect(recordDecision("- Agreed to [Decide:: keep lot 3] today", today)).toBe("- Agreed to [Decision:: keep lot 3] today [decided:: 2026-10-02]");
     expect(recordDecision("Keep lot 3", today)).toBe("Decision:: Keep lot 3 [decided:: 2026-10-02]");
     expect(recordDecision("Decision:: Keep [decided:: 2026-09-01]", today)).toBe("Decision:: Keep [decided:: 2026-09-01]");
+  });
+});
+
+describe("owners", () => {
+  it("reads [owner:: name] and older @mentions", () => {
+    const [t] = parseTasks("- [ ] Draft report [owner:: alice] [due:: 2026-10-07]\n");
+    expect(t!.assignees).toEqual(["alice"]);
+    expect(parseTasks("- [ ] Plan [owner:: alice, bob] with @carol\n")[0]!.assignees).toEqual(["alice", "bob", "carol"]);
+    expect(parseAttnPoints("Attn:: Budget overrun [owner:: bob]\n")[0]!.assignees).toEqual(["bob"]);
+    expect(parseDecisions("Decide:: Pick supplier [owner:: carol]\n")[0]!.assignees).toEqual(["carol"]);
+  });
+  it("assigns a line", () => {
+    expect(setOwner("- [ ] Draft report", "@alice")).toBe("- [ ] Draft report [owner:: alice]");
+    expect(setOwner("- [ ] Draft report [owner:: bob]", "alice")).toBe("- [ ] Draft report [owner:: alice]");
+    expect(setOwner("Draft report", "alice")).toBe("- [ ] Draft report [owner:: alice]");
+    expect(setOwner("Attn:: Budget", "bob")).toBe("Attn:: Budget [owner:: bob]");
+    expect(setOwner("Decide:: Supplier", "carol")).toBe("Decide:: Supplier [owner:: carol]");
+    expect(setOwner("- [ ] x", "  ")).toBe("- [ ] x");
   });
 });

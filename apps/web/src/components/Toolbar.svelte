@@ -7,11 +7,12 @@
     makeTask,
     parseNaturalDate,
     recordDecision,
+    setOwner,
     setDue,
     toggleAttnResolved,
   } from "@zeolite/core";
   import type { EditorView } from "@codemirror/view";
-  import { insertBlock, insertText, toggleLinePrefix, transformLines, wrapSelection } from "../lib/editor-commands";
+  import { insertBlock, toggleLinePrefix, transformLines, wrapSelection } from "../lib/editor-commands";
 
   interface Props {
     view: () => EditorView | undefined;
@@ -22,13 +23,29 @@
     onManageTemplates: () => void;
     /** Open the link dialog with the selected text. */
     onLink: (selected: string) => void;
+    /** People already assigned in the vault, for the 👤 picker. */
+    people: () => string[];
   }
-  let { view, onStaticToc, onQuery, templates, onTemplate, onManageTemplates, onLink }: Props = $props();
+  let { view, onStaticToc, onQuery, templates, onTemplate, onManageTemplates, onLink, people }: Props = $props();
   let tplOpen = $state(false);
 
   let dueOpen = $state(false);
   let dueText = $state("");
   let attnOpen = $state(false);
+  let ownerOpen = $state(false);
+  let ownerText = $state("");
+  const known = $derived(ownerOpen ? people() : []);
+
+  /** [owner:: name] on the selected lines (other lines become tasks). */
+  function applyOwner(name: string) {
+    ownerOpen = false;
+    const n = name.trim().replace(/^@/, "");
+    const v = view();
+    if (v && n) transformLines(v, (l) => setOwner(l, n));
+  }
+  /** Focus the name box when it appears (the click left focus on the toolbar button). */
+  const focusNow = (el: HTMLInputElement) => void requestAnimationFrame(() => el.focus());
+  const closeOthers = () => ((dueOpen = false), (attnOpen = false), (tplOpen = false), (ownerOpen = false));
 
   const run = (fn: (v: EditorView) => void) => () => {
     const v = view();
@@ -86,14 +103,14 @@
     <button title="Insert a table of contents (updates itself)" onclick={run((v) => insertBlock(v, "```toc\n```"))}>☰ TOC</button>
     <button title="Write/update a static table of contents" onclick={onStaticToc}>TOC⇣</button>
     <button class="accent" title="Build a Dataview query" onclick={onQuery}>🔍<span class="lbl">Query</span></button>
-    <button class="accent" class:on={tplOpen} title="Insert a template" onclick={() => ((tplOpen = !tplOpen), (dueOpen = false), (attnOpen = false))}>📄<span class="lbl">Template</span></button>
+    <button class="accent" class:on={tplOpen} title="Insert a template" onclick={() => ((tplOpen = !tplOpen), (dueOpen = false), (attnOpen = false), (ownerOpen = false))}>📄<span class="lbl">Template</span></button>
   </div>
   <div class="group tasks">
     <button class="accent" title="Task" onclick={lines(makeTask)}>☐<span class="lbl">Task</span></button>
-    <button class="accent" class:on={dueOpen} title="Task with deadline" onclick={() => ((dueOpen = !dueOpen), (attnOpen = false), (tplOpen = false), (dueText = ""))}>📅<span class="lbl">Due</span></button>
+    <button class="accent" class:on={dueOpen} title="Task with deadline" onclick={() => ((dueOpen = !dueOpen), (attnOpen = false), (tplOpen = false), (ownerOpen = false), (dueText = ""))}>📅<span class="lbl">Due</span></button>
     <button class="accent" title="Cycle state: open → done → cancelled → deferred" onclick={lines((l) => cycleTaskStatus(l))}>✔<span class="lbl">State</span></button>
-    <button class="accent" title="Assign a person" onclick={run((v) => insertText(v, "@"))}>👤</button>
-    <button class="attn" class:on={attnOpen} title="Attn point" onclick={() => ((attnOpen = !attnOpen), (dueOpen = false), (tplOpen = false))}>⚠<span class="lbl">Attn</span> ▾</button>
+    <button class="accent" class:on={ownerOpen} title="Assign to a person: [owner:: name], which Dataview queries can find" onclick={() => { const was = ownerOpen; closeOthers(); ownerOpen = !was; ownerText = ""; }}>👤<span class="lbl">Owner</span></button>
+    <button class="attn" class:on={attnOpen} title="Attn point" onclick={() => ((attnOpen = !attnOpen), (dueOpen = false), (tplOpen = false), (ownerOpen = false))}>⚠<span class="lbl">Attn</span> ▾</button>
   </div>
   <div class="group">
     <button class="decide" title="Decision required (Decide::)" onclick={lines(makeDecide)}>❓<span class="lbl">Decision rqd</span></button>
@@ -118,6 +135,26 @@
       <button onclick={() => applyDue(parseNaturalDate(q))}>{q}</button>
     {/each}
     <button class="close" aria-label="Close" onclick={() => (dueOpen = false)}>✕</button>
+  </div>
+{/if}
+
+{#if ownerOpen}
+  <div class="options" role="group" aria-label="Owner">
+    <input
+      class="natural"
+      aria-label="Person"
+      placeholder="Name, then Enter"
+      list="owner-people"
+      use:focusNow
+      bind:value={ownerText}
+      onkeydown={(e) => (e.key === "Enter" ? (e.preventDefault(), applyOwner(ownerText)) : e.key === "Escape" && (ownerOpen = false))}
+    />
+    <datalist id="owner-people">{#each known as p}<option value={p}></option>{/each}</datalist>
+    {#if ownerText.trim()}<button class="primary" onclick={() => applyOwner(ownerText)}>Assign to {ownerText.trim().replace(/^@/, "")}</button>{/if}
+    {#each known.slice(0, 8) as p}
+      <button onclick={() => applyOwner(p)}>👤 {p}</button>
+    {/each}
+    <button class="close" aria-label="Close" onclick={() => (ownerOpen = false)}>✕</button>
   </div>
 {/if}
 

@@ -115,7 +115,8 @@ The toolbar formats the line or the selection: headings, **bold**,
   which notes use it, link it in the open note, or open it with its usual
   app (Windows app).
 - **Tags:** `#tag`. Typing `#` suggests existing tags.
-- **People:** `@name`. Typing `@` suggests people already mentioned.
+- **People:** `@name` mentions someone. To *assign* a task, use **👤
+  Owner** instead (see Tasks).
 - **Table of contents:** **TOC** inserts one that updates itself, **TOC⇣**
   writes a fixed one. Click an entry to jump to that heading, in the
   preview as well as in the editor (where the TOC shows a clickable
@@ -149,21 +150,28 @@ Tasks are list items starting with a box:
 - [x] done
 - [-] cancelled
 - [>] deferred
-- [ ] call the supplier @Anna [due:: 2026-10-15]
+- [ ] call the supplier [owner:: Anna] [due:: 2026-10-15]
 ```
 
 - **☐ Task** turns the line into a task, **✔ State** cycles its state.
 - **📅 Due** adds a deadline. You can type "friday", "next week" or
   "in 3 days": Zeolite writes the date as `2026-10-15`.
+- **👤 Owner** assigns the line to a person: it writes `[owner:: Anna]`
+  (pick a name already used, or type a new one). Plain lines become tasks;
+  Attn points and decisions can have an owner too. Inside `[owner:: ` the
+  editor suggests known names. Dataview finds them, in Zeolite and in
+  Obsidian: `TASK WHERE owner = "Anna"`. The query builder's **Person**
+  filter uses it (and still finds older `@Anna` mentions).
 - Tick tasks directly in the preview.
-- The **Tasks** tab lists every open task, soonest deadline first.
+- The **Tasks** tab lists every open task, soonest deadline first, with
+  its owner.
 
 ## Attn points
 
 An Attn point marks something to keep an eye on:
 
 ```markdown
-Attn:: the budget must be approved before the review @Marc
+Attn:: the budget must be approved before the review [owner:: Marc]
 Inline form: [Attn:: check the drawings]
 ```
 
@@ -175,7 +183,7 @@ or converts it to a task. Open Attn points are listed in the Tasks tab.
 Two markers keep track of decisions:
 
 ```markdown
-Decide:: choose the supplier for lot 3 @Marc
+Decide:: choose the supplier for lot 3 [owner:: Marc]
 Decision:: keep the current supplier [decided:: 2026-10-05]
 Inline form: we agreed to [Decision:: freeze the design] [decided:: 2026-10-05]
 ```

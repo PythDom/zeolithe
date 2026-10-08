@@ -42,15 +42,16 @@ Use the toolbar buttons, or type them:
 - [>] Deferred task
 
 Typing \`[due:: friday]\` converts the date to ISO as soon as you close the bracket.
+**👤 Owner** assigns a task with \`[owner:: name]\`, which Dataview queries can find.
 
 ## Attn points
 
-Attn:: Something that needs attention @alice
+Attn:: Something that needs attention [owner:: alice]
 - Inline form works too: [Attn:: check this sentence]
 
 ## Decisions
 
-Decide:: Choose the supplier for lot 3 @bob
+Decide:: Choose the supplier for lot 3 [owner:: bob]
 
 Decision:: Keep the weekly meeting on Mondays [decided:: ${day}]
 
@@ -83,13 +84,13 @@ created: ${created}
 
 ## Actions
 
-- [ ] Draft report for the program office @alice #Typhoon [due:: ${plus(5)}]
+- [ ] Draft report for the program office #Typhoon [owner:: alice] [due:: ${plus(5)}]
 - [ ] Review supplier schedule [due:: ${plus(-1)}]
 - [x] Send meeting minutes [done:: ${day}]
 
 ## Notes
 
-Attn:: Budget overrun risk on lot 3 @bob
+Attn:: Budget overrun risk on lot 3 [owner:: bob]
 Decide:: Accept the revised delivery date for T601
 - Meeting went well, but [Attn:: supplier delay on T601] needs follow-up
 `,
@@ -101,7 +102,7 @@ created: ${created}
 # Weekly team meeting
 
 - [ ] Plan training sessions #Training [due:: ${plus(10)}]
-- [ ] Update quality dashboard @carol
+- [ ] Update quality dashboard [owner:: carol]
 
 Attn:: Confirm room booking [resolved:: ${day}]
 `,

@@ -26,7 +26,7 @@ export interface QuerySpec {
   dueDays: number;
   attn: AttnFilter;
   decision?: DecisionFilter;
-  /** Person without '@'. */
+  /** Person without '@': matches [owner:: person] and @person. */
   person: string;
   /** Text the task/Attn/note name must contain (case-insensitive). */
   text: string;
@@ -73,6 +73,9 @@ function fromClause(spec: QuerySpec): string {
   return `FROM ${parts.join(" AND ")}`;
 }
 
+/** Assigned with [owner:: name], or mentioned as @name in the text (older notes). */
+const byPerson = (person: string, textField: string) => `(contains(owner, ${q(person)}) OR contains(${textField}, ${q(`@${person}`)}))`;
+
 function dueCondition(spec: QuerySpec): string | null {
   switch (spec.due) {
     case "overdue":
@@ -110,20 +113,20 @@ export function buildQuery(spec: QuerySpec): string {
     if (spec.status !== "any") where.push(STATUS[spec.status]);
     const due = dueCondition(spec);
     if (due) where.push(due);
-    if (person) where.push(`contains(text, ${q(`@${person}`)})`);
+    if (person) where.push(byPerson(person, "text"));
     if (text) where.push(`icontains(text, ${q(text)})`);
   } else if (spec.target === "attn") {
     lines.push("LIST Attn");
     where.push("Attn");
     if (spec.attn === "open") where.push("!resolved");
     if (spec.attn === "resolved") where.push("resolved");
-    if (person) where.push(`contains(Attn, ${q(`@${person}`)})`);
+    if (person) where.push(byPerson(person, "Attn"));
     if (text) where.push(`icontains(Attn, ${q(text)})`);
   } else if (spec.target === "decisions") {
     const key = spec.decision === "taken" ? "Decision" : "Decide";
     lines.push(`LIST ${key}`);
     where.push(key);
-    if (person) where.push(`contains(${key}, ${q(`@${person}`)})`);
+    if (person) where.push(byPerson(person, key));
     if (text) where.push(`icontains(${key}, ${q(text)})`);
   } else {
     if (spec.target === "notes") lines.push("LIST");

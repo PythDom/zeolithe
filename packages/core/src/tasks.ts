@@ -50,10 +50,33 @@ const CHAR_FOR: Record<Exclude<TaskStatus, "other">, string> = {
 };
 const CYCLE: Exclude<TaskStatus, "other">[] = ["open", "done", "cancelled", "deferred"];
 
-export function extractAssignees(text: string): string[] {
+/**
+ * People a line is assigned to: `[owner:: name]` fields (Dataview-readable;
+ * several names separated by commas), plus `@name` mentions written before
+ * owner fields existed.
+ */
+export function extractAssignees(text: string, mentionsIn: string = text): string[] {
   const out = new Set<string>();
-  for (const m of stripInlineCode(text).matchAll(ASSIGNEE)) out.add(m[2]!);
+  for (const f of parseInlineFields(text)) {
+    if (f.key.toLowerCase() !== "owner") continue;
+    for (const name of f.value.split(",")) {
+      const n = name.trim().replace(/^@/, "");
+      if (n) out.add(n);
+    }
+  }
+  for (const m of stripInlineCode(mentionsIn).matchAll(ASSIGNEE)) out.add(m[2]!);
   return [...out];
+}
+
+/**
+ * Assign a line to a person with `[owner:: name]` (replacing any owner).
+ * Tasks, Attn points and decisions keep their kind; other lines become tasks.
+ */
+export function setOwner(line: string, name: string): string {
+  const n = name.trim().replace(/^@/, "");
+  if (!n) return line;
+  const keep = TASK.test(line) || parseAttnLine(line) || parseDecisionLine(line);
+  return setBracketField(keep ? line : makeTask(line), "owner", n);
 }
 
 function stripFields(text: string): string {
@@ -104,7 +127,7 @@ export function parseAttnLine(text: string, line = 0): AttnPoint | null {
     raw: text,
     inline: field.bracketed,
     resolved: resolved || undefined,
-    assignees: extractAssignees(field.value),
+    assignees: extractAssignees(text, field.value),
   };
 }
 
@@ -246,7 +269,7 @@ export function parseDecisionLine(text: string, line = 0): DecisionPoint | null 
     inline: field.bracketed,
     required: field.key.toLowerCase() === "decide",
     decided: decided || undefined,
-    assignees: extractAssignees(field.value),
+    assignees: extractAssignees(text, field.value),
   };
 }
 

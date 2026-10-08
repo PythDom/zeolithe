@@ -594,6 +594,7 @@ export class Vault {
     for (const r of this.notes) {
       for (const t of r.tasks) t.assignees.forEach((a) => s.add(a));
       for (const a of r.attn) a.assignees.forEach((p) => s.add(p));
+      for (const d of r.decisions) d.assignees.forEach((p) => s.add(p));
     }
     return [...s].sort();
   }

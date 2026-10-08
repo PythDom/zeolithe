@@ -218,6 +218,7 @@
         <span class="text">☐ {t.text}</span>
         <span class="meta">
           {#if t.due}<span class="due" class:overdue={t.due < today} class:today={t.due === today}>📅 {t.due}</span>{/if}
+          {#if t.assignees.length}<span class="due">👤 {t.assignees.join(", ")}</span>{/if}
           {label(r.path)}
         </span>
       </button>

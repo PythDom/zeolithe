@@ -31,7 +31,7 @@ id: 02.00.00.001
 tags: [Areas, General, Team_meetings]
 created: 2026-09-20T10:00
 ---
-- [ ] Plan training [due:: 2026-10-02]
+- [ ] Plan training [due:: 2026-10-02] [owner:: dave]
 - [>] Later thing
 Attn:: Room booking [resolved:: 2026-10-01]
 See [[01.02.05.001 Typhoon status]]
@@ -88,6 +88,15 @@ describe("runQuery", () => {
     expect(r.kind).toBe("decision");
     expect(r.groups[0]!.rows[0]!.decision!.decided).toBe("2026-10-01");
   });
+  it("finds tasks by owner, and by older @mentions", () => {
+    const q = buildQuery({ ...DEFAULT_QUERY, target: "tasks", status: "any", person: "dave", group: "none", sort: "none" });
+    expect(q).toBe('TASK\nWHERE (contains(owner, "dave") OR contains(text, "@dave"))');
+    // "Later thing" is in the same note but not assigned to dave.
+    expect(texts(q)).toEqual(["Plan training"]);
+    expect(texts('TASK WHERE owner = "dave"')).toEqual(["Plan training"]);
+    const alice = buildQuery({ ...DEFAULT_QUERY, target: "tasks", person: "@alice", group: "none", sort: "none" });
+    expect(texts(alice)).toEqual(["Draft report @alice #Typhoon"]);
+  });
   it("lists and tables notes", () => {
     expect(texts('LIST WHERE startswith(id, "01.02")')).toEqual(["01.02.05.001 Typhoon status", "01.02.05.002 Old"]);
     const t = runQuery('TABLE id, file.tags AS "Tags" FROM #SAS', notes, today);
@@ -114,7 +123,7 @@ describe("buildQuery", () => {
       [
         "TASK",
         'FROM (#Typhoon OR #SAS) AND -"04 Archives"',
-        'WHERE status = " " AND due AND due >= date(today) AND due <= date(today) + dur(14 days) AND contains(text, "@alice")',
+        'WHERE status = " " AND due AND due >= date(today) AND due <= date(today) + dur(14 days) AND (contains(owner, "alice") OR contains(text, "@alice"))',
         "SORT due ASC",
         "GROUP BY file.link",
       ].join("\n"),
@@ -127,7 +136,7 @@ describe("buildQuery", () => {
     expect(texts(attn)).toEqual(["Budget overrun @bob", "supplier delay"]);
 
     const decide = buildQuery({ ...DEFAULT_QUERY, target: "decisions", person: "carol", group: "none", sort: "none" });
-    expect(decide).toBe('LIST Decide\nWHERE Decide AND contains(Decide, "@carol")');
+    expect(decide).toBe('LIST Decide\nWHERE Decide AND (contains(owner, "carol") OR contains(Decide, "@carol"))');
     expect(texts(decide)).toEqual(["Pick the supplier @carol"]);
     const taken = buildQuery({ ...DEFAULT_QUERY, target: "decisions", decision: "taken", group: "none", sort: "none" });
     expect(texts(taken)).toEqual(["keep lot 3"]);

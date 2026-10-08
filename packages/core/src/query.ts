@@ -472,8 +472,7 @@ function noteFields(r: NoteRecord): Fields {
 const STATUS_CHAR: Record<string, string> = { open: " ", done: "x", cancelled: "-", deferred: ">" };
 
 function taskFields(r: NoteRecord, t: Task, base: Fields): Fields {
-  const f = new Map(base);
-  for (const field of parseInlineFields(t.raw)) setField(f, field.key, field.value);
+  const f = lineFields(base, t.raw);
   setField(f, "text", t.raw.replace(/^\s*(?:[-*+]|\d+[.)])\s+\[.\]\s?/, ""));
   setField(f, "status", t.status === "other" ? t.char : STATUS_CHAR[t.status]!);
   setField(f, "completed", t.status === "done");
@@ -489,8 +488,17 @@ function taskFields(r: NoteRecord, t: Task, base: Fields): Fields {
   return f;
 }
 
-function attnFields(r: NoteRecord, a: AttnPoint, base: Fields): Fields {
+/** Fields written on the line itself ([owner:: …], [resolved:: …], …) override the note's. */
+function lineFields(base: Fields, raw: string): Fields {
   const f = new Map(base);
+  // Who a line is assigned to belongs to that line only, never to the rest of the note.
+  f.set("owner", null);
+  for (const field of parseInlineFields(raw)) setField(f, field.key, field.value);
+  return f;
+}
+
+function attnFields(r: NoteRecord, a: AttnPoint, base: Fields): Fields {
+  const f = lineFields(base, a.raw);
   setField(f, "attn", a.text);
   setField(f, "resolved", a.resolved ?? null);
   setField(f, "assignees", a.assignees);
@@ -639,7 +647,7 @@ function matchSource(s: Source, r: NoteRecord): boolean {
 }
 
 function decisionFields(r: NoteRecord, d: DecisionPoint, base: Fields): Fields {
-  const f = new Map(base);
+  const f = lineFields(base, d.raw);
   setField(f, d.required ? "decide" : "decision", d.text);
   setField(f, d.required ? "decision" : "decide", null);
   setField(f, "decided", d.decided ?? null);
