@@ -18,3 +18,4 @@ export * from "./chords";
 export * from "./obsidian";
 export * from "./sync";
 export * from "./meetings";
+export * from "./related";

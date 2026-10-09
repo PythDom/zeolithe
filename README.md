@@ -138,6 +138,13 @@ Done:
   (⇅ in the sidebar): two-way, only changed files (unchanged local files
   are not even re-read), conflicts kept as
   Syncthing-style copies, deletions to `.trash`. See [docs/sync.md](docs/sync.md).
+- Or sync directly with the PC over the local Wi-Fi: the Windows app shares
+  the open vault (address + pairing code), phones and tablets sync with it.
+- Related tab: unlinked mentions (one-click links), related notes (shared
+  words, plus meaning with a small on-device embedding model or a server),
+  possible duplicates, suggested tags, search by meaning, notes with no
+  links; with an Ollama / OpenAI-compatible server: summarise, review, find
+  actions, ask your notes (with sources).
 - Or sync with a OneDrive folder (Microsoft Graph, device-code sign-in;
   Windows and Android apps), with the same conflict handling.
 - User guide: ❓ in the sidebar (or F1) writes `_system/Zeolite User Guide.md`

@@ -1,6 +1,8 @@
 # Zeolite: local AI assistant (design)
 
-Status: design only, no code written yet. To be picked up on request.
+Status: steps 0 and 1 implemented (Related tab), with the server option
+(2a: Ollama / OpenAI-compatible) for chat and, optionally, embeddings.
+Steps 2b and 2c (a generative model embedded in the apps) are not done.
 
 Goal: help review notes, infer connections, propose links and make
 suggestions, with everything running on the user's own devices (or their own
@@ -170,3 +172,8 @@ Effort: 2–4 weeks, mostly device testing.
 
 - 2026-10-04: design written; implementation deferred until requested.
   Recommended order 0 → 1 → 2a → 2b.
+- 2026-10-09: steps 0, 1 and 2a implemented. On-device embeddings use
+  Transformers.js 4.3.1 loaded from cdn.jsdelivr.net and
+  Xenova/multilingual-e5-small (q8) from huggingface.co, nothing bundled;
+  embeddings can come from the server instead. Index in
+  `.zeolite/embeddings.json` (per device, not synced).

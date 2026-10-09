@@ -1,11 +1,14 @@
 <script lang="ts">
+  import type { Snippet } from "svelte";
   import { isArchived, TAXONOMY_PATH, toIsoDate } from "@zeolite/core";
   import type { Vault } from "../lib/vault.svelte";
 
   interface Props {
     vault: Vault;
     current: string | null;
-    tab: "files" | "tags" | "tasks" | "search";
+    tab: "files" | "tags" | "tasks" | "search" | "related";
+    /** Content of the Related tab (rendered by the app, which owns the editor). */
+    related?: Snippet;
     query: string;
     onOpen: (path: string, line?: number) => void;
     onQuery: () => void;
@@ -22,7 +25,7 @@
     /** Ctrl/Cmd+click or middle-click on a note: open it in a new tab. */
     onOpenNewTab?: (path: string) => void;
   }
-  let { vault, current, tab = $bindable(), query = $bindable(), onOpen, onQuery, onDashboard, onTaxonomy, onMoveNote, onDeleteFolder, onNewFolder, onOpenAttachment, onOpenNewTab }: Props = $props();
+  let { vault, current, tab = $bindable(), query = $bindable(), related, onOpen, onQuery, onDashboard, onTaxonomy, onMoveNote, onDeleteFolder, onNewFolder, onOpenAttachment, onOpenNewTab }: Props = $props();
 
   // Drag & drop of notes onto folders.
   const DRAG_TYPE = "application/x-zeolite-note";
@@ -113,7 +116,7 @@
 </script>
 
 <nav class="tabs">
-  {#each [["files", "Files"], ["tags", "Tags"], ["tasks", "Tasks"], ["search", "Search"]] as [k, l]}
+  {#each [["files", "Files"], ["tags", "Tags"], ["tasks", "Tasks"], ["search", "Search"], ["related", "Related"]] as [k, l]}
     <button class:active={tab === k} onclick={() => (tab = k as Props["tab"])}>{l}</button>
   {/each}
 </nav>
@@ -246,6 +249,8 @@
     {:else}
       <p class="empty">No decisions required.</p>
     {/each}
+  {:else if tab === "related"}
+    {@render related?.()}
   {:else}
     <input class="search" type="search" placeholder="Words or #tag" bind:value={query} />
     <button class="build" onclick={onQuery}>🔍 Build a Dataview query…</button>

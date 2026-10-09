@@ -240,6 +240,39 @@ example all the decisions taken in a project.
   it in a note, or save it as a search note in `Searches/`. The results are
   live.
 
+## Related notes and AI
+
+The **Related** tab (left panel) shows, for the open note:
+
+- **Mentioned here, not linked**: other notes whose title appears in this
+  note as plain text. **🔗 Link** turns the text into a link.
+- **Notes naming this one**: notes that write this note's title without
+  linking it; **🔗 Link** links them.
+- **Related notes**: notes about the same things (shared rare words, and
+  meaning when enabled). **＋** inserts a link at the cursor.
+- **Possible duplicates** (with meaning on) and **suggested tags** (tags
+  of closely related notes; click to add).
+- **Search by meaning** (or by words when meaning is off), and the list of
+  **notes with no links**.
+
+**Meaning** (⚙ Settings → AI, per device): *On this device* downloads a
+small multilingual model once (about 120 MB, from huggingface.co); it runs
+on the device and nothing leaves it. *From the AI server* asks your server
+instead (useful when a work PC blocks the download). The index is kept per
+device in `.zeolite/` and only changed sections are re-read.
+
+**AI server** (optional, ⚙ Settings → AI): Ollama (or any OpenAI-compatible
+server) on your Docker server or PC. The Related tab then offers
+**Summarise**, **Review**, **Find actions** (as tasks you can insert) and
+**Ask your notes** (answers from your most relevant notes, with the
+sources linked). Notes go only to that server.
+
+To run Ollama on the Docker server: `docker run -d -p 11434:11434 -e
+'OLLAMA_ORIGINS=*' -v ollama:/root/.ollama ollama/ollama`, then `docker exec
+<container> ollama pull llama3.2` (chat) and `ollama pull nomic-embed-text`
+(meaning). In Zeolite: server `http://<server>:11434`, type Ollama, **Test
+the server**.
+
 ## Numbering and taxonomy
 
 Numbers follow `PARA.Category.Sub-PARA.Sequence`, defined in
@@ -397,6 +430,28 @@ Syncthing on that PC instead.
 | "refused the user name or password" | Check `users` in `config.yml`, then restart the container (`docker compose restart`). |
 | "does not allow this" | In `config.yml`, `permissions: CRUD`. |
 | Notes missing on a new device | Check that it uses exactly the same address, then press ⇅ Sync. |
+
+### Syncing directly with your PC over Wi-Fi
+
+No server, no internet: a phone or tablet syncs with Zeolite on your PC
+when both are on the same Wi-Fi (or on the phone's hotspot).
+
+1. **On the PC** (Windows app): **⇅ → Share with a phone or tablet →
+   Share this vault**. Zeolite shows an **address** (e.g.
+   `192.168.1.20:47123`) and a **pairing code**. The first time, allow
+   Zeolite on **private networks** if Windows asks.
+2. **On the phone or tablet**: open the vault (a new device: an empty
+   folder, **Keep it empty**), **⇅ → PC on this Wi-Fi**, enter the address
+   and the code, **Save and sync**.
+
+The PC shares the vault whenever Zeolite is open there (**Stop sharing**
+ends it). Changes from the phone appear on the PC at once; if you were
+editing the same note, the other version is kept as a conflict copy.
+**New code** replaces the pairing code (paired devices then enter the new
+one). After 20 wrong codes, sharing stops until you start it again.
+
+Company Wi-Fi networks often block device-to-device connections: use the
+phone's hotspot, or another sync method there.
 
 ### Syncing through OneDrive
 

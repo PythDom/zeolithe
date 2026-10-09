@@ -3,6 +3,8 @@
   import { untrack } from "svelte";
   import { prefs, savePrefs, type Prefs } from "../lib/features.svelte";
   import type { Vault } from "../lib/vault.svelte";
+  import { ai as aiState, setAiSettings } from "../lib/ai-state.svelte";
+  import { testServer, type AiSettings } from "../lib/ai";
 
   interface Props {
     vault: Vault;
@@ -37,6 +39,19 @@
 
   // --- This device ----------------------------------------------------------
   let device = $state<Prefs>({ ...prefs });
+  let aiSettings = $state<AiSettings>(untrack(() => ({ ...aiState.settings })));
+  let aiTest = $state<{ ok: boolean; text: string } | null>(null);
+  let aiTesting = $state(false);
+  async function testAi() {
+    aiTesting = true;
+    aiTest = null;
+    try {
+      aiTest = { ok: true, text: await testServer($state.snapshot(aiSettings) as AiSettings) };
+    } catch (e) {
+      aiTest = { ok: false, text: (e as Error).message };
+    }
+    aiTesting = false;
+  }
 
   let error = $state("");
   let busy = $state(false);
@@ -109,6 +124,12 @@
       if (JSON.stringify(device) !== JSON.stringify({ ...prefs })) {
         savePrefs({ ...device });
         done.push("device preferences saved");
+      }
+      const nextAi = { ...$state.snapshot(aiSettings), serverUrl: aiSettings.serverUrl.trim() } as AiSettings;
+      if (JSON.stringify(nextAi) !== JSON.stringify(aiState.settings)) {
+        if (nextAi.embeddings === "server" && !nextAi.serverUrl) throw new Error("AI: meaning “from the server” needs a server address.");
+        setAiSettings(nextAi);
+        done.push("AI settings saved");
       }
       onSaved(done.length ? `Settings: ${done.join(", ")}` : "Settings: nothing changed");
     } catch (e) {
@@ -226,6 +247,40 @@
       </label>
       <p class="hint">Checks the vault folder every few seconds and never overwrites a note changed elsewhere. Off: reopen the vault (📂) to see changes made elsewhere.</p>
       {#if onOpenSync}<button class="secondary" onclick={onOpenSync}>⇅ Sync with a server…</button>{/if}
+
+      <h4>AI</h4>
+      <label>Related notes and search by meaning
+        <select bind:value={aiSettings.embeddings}>
+          <option value="off">Off (related notes by shared words only)</option>
+          <option value="device">On this device (downloads a 120 MB model once)</option>
+          <option value="server">From the AI server below</option>
+        </select>
+      </label>
+      <div class="row">
+        <label>AI server (optional) <input bind:value={aiSettings.serverUrl} placeholder="http://192.168.1.20:11434" inputmode="url" /></label>
+        <label>Type
+          <select bind:value={aiSettings.serverKind}>
+            <option value="ollama">Ollama</option>
+            <option value="openai">OpenAI-compatible</option>
+          </select>
+        </label>
+      </div>
+      {#if aiSettings.serverUrl.trim()}
+        <div class="row">
+          <label>Chat model <input bind:value={aiSettings.chatModel} placeholder="llama3.2" /></label>
+          <label>Embedding model <input bind:value={aiSettings.embedModel} placeholder="nomic-embed-text" /></label>
+        </div>
+        <label>API key (if the server needs one) <input bind:value={aiSettings.apiKey} type="password" autocomplete="off" /></label>
+        <div class="row ai-test">
+          <button type="button" onclick={testAi} disabled={aiTesting}>{aiTesting ? "Testing…" : "Test the server"}</button>
+          {#if aiTest}<span class={aiTest.ok ? "ok" : "error"}>{aiTest.ok ? "✓" : "⚠"} {aiTest.text}</span>{/if}
+        </div>
+      {/if}
+      <p class="hint">
+        The server (e.g. Ollama on your Docker server) summarises and reviews notes and answers questions about them, in the
+        <b>Related</b> tab. Notes are sent only to that server. Ollama must allow Zeolite: start it with
+        <code>OLLAMA_ORIGINS=*</code>.
+      </p>
     </section>
 
     {#if error}<p class="error">⚠ {error}</p>{/if}
@@ -237,6 +292,22 @@
 </div>
 
 <style>
+  .ai-test {
+    align-items: center;
+  }
+  .ai-test button {
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--fg);
+    font: inherit;
+    cursor: pointer;
+  }
+  .ok {
+    color: var(--ok);
+    font-size: 13px;
+  }
   .person input {
     flex: 1;
     min-width: 0;

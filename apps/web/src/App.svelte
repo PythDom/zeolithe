@@ -42,6 +42,7 @@
   import QueryBuilder from "./components/QueryBuilder.svelte";
   import PersonDashboard from "./components/PersonDashboard.svelte";
   import MailDialog from "./components/MailDialog.svelte";
+  import RelatedPanel from "./components/RelatedPanel.svelte";
   import { newPairingCode, onSharedChange, sharingStatus, startSharing, stopSharing, type SharingInfo } from "./lib/lan";
   import TaxonomyManager from "./components/TaxonomyManager.svelte";
   import TemplateManager from "./components/TemplateManager.svelte";
@@ -61,7 +62,7 @@
   import { describeReport, loadSyncSettings, makeRemote, runSync, saveSyncSettings, syncTarget, type SyncSettings } from "./lib/sync";
   import { demoVault, starterVault } from "./lib/demo-vault";
   import userGuide from "../../../docs/user-guide.md?raw";
-  import { insertBlock } from "./lib/editor-commands";
+  import { insertBlock, insertText } from "./lib/editor-commands";
   import { chordDiagram, createRenderer, slug } from "./lib/render";
   import { folderAccessProblem, FsAccessStorage, fsAccessSupported, memoryCopyFromFiles, MemoryStorage } from "./lib/storage";
   import { Vault } from "./lib/vault.svelte";
@@ -82,7 +83,7 @@
   let content = $state("");
   applyPrefs();
   let mode = $state<Mode>(prefs.startMode === "auto" ? (narrow() ? "edit" : "split") : prefs.startMode);
-  let tab = $state<"files" | "tags" | "tasks" | "search">("files");
+  let tab = $state<"files" | "tags" | "tasks" | "search" | "related">("files");
   let query = $state("");
   let showNew = $state(false);
   let showQuery = $state(false);
@@ -682,6 +683,16 @@
     scheduleSave();
   }
 
+  /** Insert text at the cursor (or at the end of the note when the editor is hidden). */
+  function insertAtCursor(text: string) {
+    const v = editor?.getView();
+    // Never into the properties block (or before it): then at the end of the note.
+    const fmEnd = /^---\n[\s\S]*?\n---\n/.exec(content)?.[0].length ?? 0;
+    const head = v?.state.selection.main.head ?? 0;
+    if (v && mode !== "view" && head > fmEnd) return insertText(v, text);
+    void replaceContent(`${content.replace(/\s*$/, "")}\n\n${text.trim()}\n`);
+  }
+
   /** Apply a whole-document change coming from outside the editor. */
   async function replaceContent(text: string) {
     content = text;
@@ -1177,7 +1188,20 @@
       onDeleteFolder={(f) => (deleteFolder = f)}
       onNewFolder={(parent) => (newFolderIn = parent)}
       onOpenAttachment={(p) => (attachment = p)}
-    />
+    >
+      {#snippet related()}
+        <RelatedPanel
+          {vault}
+          {current}
+          {content}
+          onOpen={(p) => ((drawer = false), open(p))}
+          onInsert={insertAtCursor}
+          onEditCurrent={(next) => void replaceContent(next)}
+          {render}
+          onOpenSettings={() => (showSettings = true)}
+        />
+      {/snippet}
+    </Sidebar>
   </aside>
   <button class="scrim" aria-label="Close menu" onclick={() => (drawer = false)}></button>
 
