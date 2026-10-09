@@ -40,6 +40,8 @@
     onAddPerson: (p: Person) => Promise<void>;
     oneOnOneCode: string;
     oneOnOneTemplate: () => string | undefined;
+    /** Why the people list in _system/Settings.md cannot be read, if so. */
+    peopleProblem?: string | null;
     onCreate: (note: NewNote, cursor: number | null, kind: Kind) => void;
     onClose: () => void;
   }
@@ -56,6 +58,7 @@
     onAddPerson,
     oneOnOneCode,
     oneOnOneTemplate,
+    peopleProblem = null,
     onCreate,
     onClose,
   }: Props = $props();
@@ -317,6 +320,7 @@
         </label>
         <button type="button" class="new" onclick={() => ((addingPerson = true), (addError = ""))} title="Add a person">＋ New</button>
       </div>
+      {#if peopleProblem}<p class="warn">⚠ {peopleProblem}</p>{/if}
       {#if addingPerson}
         <div class="add-row">
           <!-- svelte-ignore a11y_autofocus -->

@@ -3,6 +3,7 @@ import { buildNoteRecord } from "../src/note-record";
 import { runQuery } from "../src/query";
 import { parseTaxonomy } from "../src/taxonomy";
 import { applyZeoliteSettings, DEFAULT_SETTINGS, writePeople } from "../src/obsidian";
+import { frontmatterError } from "../src/frontmatter";
 import { createJournalNote } from "../src/notes";
 import { appendSection, createOneOnOneNote, pastItemsSection, peopleOfMeetings, personDashboard, personTag } from "../src/meetings";
 
@@ -92,5 +93,24 @@ describe("journal past notes", () => {
     expect(decide).toEqual(["Holiday dates"]);
     expect(attn).toEqual(["Car service due"]);
     expect(appendSection(content, "Past notes", "again")).toBe(content);
+  });
+});
+
+describe("people in the settings note", () => {
+  const read = (fm: string) => applyZeoliteSettings(DEFAULT_SETTINGS, `---\n${fm}\n---\n# Zeolite settings\n`).people;
+  it("reads the usual and shorter forms", () => {
+    expect(read("one_on_one_people:\n  - name: Curt\n  - name: Anna Smith\n    email: anna@x.com\n  - Bob Lee <bob@x.com>\n  - Eve Roe, eve@x.com\n  - Dan")).toEqual([
+      { name: "Curt" },
+      { name: "Anna Smith", email: "anna@x.com" },
+      { name: "Bob Lee", email: "bob@x.com" },
+      { name: "Eve Roe", email: "eve@x.com" },
+      { name: "Dan" },
+    ]);
+  });
+  it("still finds people when the YAML is broken, and says why", () => {
+    const fm = "inbox_folder: Inbox\none_on_one_people:\n  - name: Curt\n  - name: Anna Smith, email: anna@x.com\n  - Bob Lee";
+    expect(frontmatterError(`---\n${fm}\n---\n`)).toMatch(/line \d+/);
+    expect(read(fm)).toEqual([{ name: "Curt" }, { name: "Anna Smith", email: "anna@x.com" }, { name: "Bob Lee" }]);
+    expect(frontmatterError("---\none_on_one_people:\n  - name: Curt\n---\n")).toBeNull();
   });
 });

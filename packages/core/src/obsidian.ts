@@ -83,13 +83,50 @@ export function readObsidianSettings(files: { templates?: string; dailyNotes?: s
   return s;
 }
 
+/** "Anna Smith <anna@x.com>", "Anna Smith, anna@x.com" or just "Anna Smith". */
+function personFromText(text: string): Person {
+  const t = text.trim();
+  const angle = /^(.*?)\s*<([^>]+@[^>]+)>$/.exec(t);
+  if (angle) return { name: angle[1]!.trim(), email: angle[2]!.trim() };
+  const comma = /^(.*?)\s*[,;]\s*(\S+@\S+)$/.exec(t);
+  if (comma) return { name: comma[1]!.trim(), email: comma[2]!.trim() };
+  return { name: t };
+}
+
+/**
+ * People under `one_on_one_people:` read line by line, for properties that a
+ * YAML parser rejects: "- name: Anna", "- Anna Smith <a@x.com>",
+ * "- name: Anna, email: a@x.com", "  email: a@x.com".
+ */
+export function loosePeople(raw: string): Person[] {
+  const lines = raw.split("\n");
+  const start = lines.findIndex((l) => /^one_on_one_people\s*:/.test(l));
+  if (start < 0) return [];
+  const items: string[] = [];
+  for (const line of lines.slice(start + 1)) {
+    if (/^\S/.test(line)) break;
+    const item = /^\s*-\s*(.*)$/.exec(line);
+    if (item) items.push(item[1]!);
+    else if (items.length && line.trim()) items[items.length - 1] += `, ${line.trim()}`;
+  }
+  const strip = (v: string) => v.trim().replace(/^["']|["']$/g, "").trim();
+  return readPeople(
+    items.map((it) => {
+      const name = /(?:^|,)\s*name\s*:\s*([^,]+)/i.exec(it)?.[1];
+      const email = /(?:^|,)\s*email\s*:\s*([^,\s]+)/i.exec(it)?.[1];
+      if (name) return email ? `${strip(name)} <${strip(email)}>` : strip(name);
+      return strip(it);
+    }),
+  );
+}
+
 /** People as written in the settings note: `- name: Anna`, `email: …`, or plain names. */
 function readPeople(list: unknown[]): Person[] {
   const out: Person[] = [];
   for (const item of list) {
     const p: Person | null =
       typeof item === "string"
-        ? { name: item.trim() }
+        ? personFromText(item)
         : item && typeof item === "object" && typeof (item as { name?: unknown }).name === "string"
           ? { name: String((item as { name: string }).name).trim(), email: typeof (item as { email?: unknown }).email === "string" ? String((item as { email: string }).email).trim() : undefined }
           : null;
@@ -118,6 +155,11 @@ export function applyZeoliteSettings(s: VaultSettings, note: string | undefined)
   const code = typeof data.one_on_one_code === "string" ? data.one_on_one_code.trim() : "";
   if (/^\d{2}\.\d{2}\.\d{2}$/.test(code)) out.oneOnOneCode = code;
   if (Array.isArray(data.one_on_one_people)) out.people = readPeople(data.one_on_one_people);
+  else if (!Object.keys(data).length) {
+    // Properties that are not valid YAML (often a hand edit): still find the people.
+    const loose = loosePeople(splitFrontmatter(note).raw);
+    if (loose.length) out.people = loose;
+  }
   return out;
 }
 

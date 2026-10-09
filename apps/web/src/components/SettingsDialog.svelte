@@ -188,6 +188,7 @@
       </label>
 
       <h4>One-on-one meetings</h4>
+      {#if vault.settingsProblem()}<p class="error">⚠ {vault.settingsProblem()} Open that note and fix its properties before saving settings here.</p>{/if}
       <label>ID prefix (PARA.Category.Sub-PARA) <input bind:value={oneOnOneCode} placeholder="02.02.01" /></label>
       <p class="hint">Template: <code>One-on-One</code> in the templates folder (created with the first meeting note; edit it to change the title or sections).</p>
       {#each people as p, i}

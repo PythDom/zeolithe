@@ -1,6 +1,7 @@
 import {
   buildNoteRecord,
   applyZeoliteSettings,
+  frontmatterError,
   peopleOfMeetings,
   writePeople,
   type Person,
@@ -141,6 +142,7 @@ export class Vault {
    * kept) and Zeolite's settings note.
    */
   async saveSettings(next: VaultSettings) {
+    this.refuseBrokenSettings();
     const out = writeVaultSettings(next, {
       app: await this.readOptional(".obsidian/app.json"),
       templates: await this.readOptional(".obsidian/templates.json"),
@@ -154,8 +156,22 @@ export class Vault {
     this.settings = { ...structuredClone(next), fromObsidian: true };
   }
 
+  /** Rewriting a settings note whose properties cannot be read would lose what is written there. */
+  private refuseBrokenSettings() {
+    const problem = this.settingsProblem();
+    if (problem) throw new Error(`Not saved: ${problem.replace(/ Fix it, or use ⚙ Settings\.$/, "")} Open it and fix its properties first.`);
+  }
+
+  /** Why _system/Settings.md's properties cannot be read, if they cannot (they are then ignored). */
+  settingsProblem(): string | null {
+    const note = this.contents.get(SETTINGS_PATH);
+    const e = note ? frontmatterError(note) : null;
+    return e ? `The properties of ${SETTINGS_PATH} are not valid (${e}): its folder settings are ignored, and people are read as well as possible.` : null;
+  }
+
   /** Save the list of people met in one-on-ones (in _system/Settings.md). */
   async savePeople(people: Person[]) {
+    this.refuseBrokenSettings();
     await this.save(SETTINGS_PATH, writePeople(this.contents.get(SETTINGS_PATH), people));
   }
 
@@ -379,7 +395,10 @@ export class Vault {
       for (const [path, blob] of images) this.assetUrls.set(path, URL.createObjectURL(blob));
       this.files = [...now].sort((a, b) => a.localeCompare(b));
       this.records = next;
-      if ([...changed, ...added, ...removed].includes(TAXONOMY_PATH)) this.refreshTaxonomy();
+      const touched = [...changed, ...added, ...removed];
+      if (touched.includes(TAXONOMY_PATH)) this.refreshTaxonomy();
+      // Settings changed by another device (sync, Wi-Fi sharing) or app: apply them now.
+      if (touched.includes(SETTINGS_PATH)) this.settings = applyZeoliteSettings(this.settings, this.contents.get(SETTINGS_PATH));
       return { changed, added, removed };
     });
   }

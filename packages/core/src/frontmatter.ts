@@ -25,6 +25,22 @@ export function splitFrontmatter(markdown: string): SplitNote {
   return { data, raw: m[1]!, body: markdown.slice(m[0].length), hasFrontmatter: true };
 }
 
+/** Why a note's properties cannot be read (invalid YAML), or null when they can. */
+export function frontmatterError(markdown: string): string | null {
+  const m = FM.exec(markdown);
+  if (!m) return null;
+  try {
+    const parsed = parse(m[1]!);
+    if (parsed !== null && parsed !== undefined && (typeof parsed !== "object" || Array.isArray(parsed))) return "the properties must be “name: value” lines";
+    return null;
+  } catch (e) {
+    const err = e as { linePos?: { line: number }[]; message?: string };
+    const line = err.linePos?.[0]?.line;
+    // Line in the note: the properties start after the opening ---.
+    return `${line ? `line ${line + 1}: ` : ""}${(err.message ?? "invalid YAML").split("\n")[0]}`;
+  }
+}
+
 export function serializeFrontmatter(data: Record<string, unknown>): string {
   // Short lists of scalars are written inline, like Obsidian: tags: [a, b]
   const doc = new Document(data);

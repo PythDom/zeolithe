@@ -434,6 +434,8 @@
     await v.load();
     vault = v;
     // Never for the demo vault: its notes must not end up in a real vault's server folder.
+    const settingsProblem = v.settingsProblem();
+    if (settingsProblem) status = `⚠ ${settingsProblem}`;
     syncSettings = readOnlyCopy || v === demo ? null : loadSyncSettings(v.name);
     sharing = null;
     sharingError = "";
@@ -1590,6 +1592,7 @@
     people={vault.meetingPeople()}
     onAddPerson={addPerson}
     oneOnOneCode={vault.settings.oneOnOneCode}
+    peopleProblem={vault.settingsProblem()}
     oneOnOneTemplate={() => (vault.exists(oneOnOneTemplatePath()) ? vault.read(oneOnOneTemplatePath()) : undefined)}
     onCreate={createFromDialog}
     onClose={() => (showNew = false)}
