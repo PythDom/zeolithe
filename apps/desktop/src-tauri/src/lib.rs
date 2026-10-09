@@ -95,6 +95,22 @@ struct ScanEntry {
 /// call: listing a vault file by file through the fs plugin is slow, and the
 /// app checks the folder every few seconds for changes made by other apps.
 /// Folders named in `ignore` (.obsidian, .trash…) are skipped.
+/// Open an e-mail draft (an .eml file marked "X-Unsent") in the default mail
+/// app: Outlook and Windows Mail open it as a new message ready to send.
+#[tauri::command]
+fn open_mail_draft(app: AppHandle, eml: String) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
+    let path = std::env::temp_dir().join(format!("Zeolite-mail-{stamp}.eml"));
+    std::fs::write(&path, eml).map_err(|e| e.to_string())?;
+    app.opener()
+        .open_path(path.to_string_lossy().to_string(), None::<&str>)
+        .map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 fn scan_vault(app: AppHandle, data: State<DataDir>, path: String, ignore: Vec<String>) -> Result<Vec<ScanEntry>, String> {
     if !vault_allowed(&app, &data, &path) {
@@ -167,7 +183,7 @@ pub fn run() {
         // Web links open in the default browser.
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_http::init())
-        .invoke_handler(tauri::generate_handler![allow_vault, scan_vault])
+        .invoke_handler(tauri::generate_handler![allow_vault, scan_vault, open_mail_draft])
         .run(tauri::generate_context!())
         .expect("error while running Zeolite");
 }

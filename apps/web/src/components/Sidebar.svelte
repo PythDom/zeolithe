@@ -9,6 +9,8 @@
     query: string;
     onOpen: (path: string, line?: number) => void;
     onQuery: () => void;
+    /** Open the per-person one-on-one dashboard. */
+    onDashboard: () => void;
     onTaxonomy: () => void;
     /** A note was dropped on a folder ("" = vault root). */
     onMoveNote: (path: string, folder: string) => void;
@@ -20,7 +22,7 @@
     /** Ctrl/Cmd+click or middle-click on a note: open it in a new tab. */
     onOpenNewTab?: (path: string) => void;
   }
-  let { vault, current, tab = $bindable(), query = $bindable(), onOpen, onQuery, onTaxonomy, onMoveNote, onDeleteFolder, onNewFolder, onOpenAttachment, onOpenNewTab }: Props = $props();
+  let { vault, current, tab = $bindable(), query = $bindable(), onOpen, onQuery, onDashboard, onTaxonomy, onMoveNote, onDeleteFolder, onNewFolder, onOpenAttachment, onOpenNewTab }: Props = $props();
 
   // Drag & drop of notes onto folders.
   const DRAG_TYPE = "application/x-zeolite-note";
@@ -97,7 +99,7 @@
   const openTasks = $derived(
     vault.notes
       .filter((r) => !isArchived(vault.taxonomy, r.path))
-      .flatMap((r) => r.tasks.filter((t) => t.status === "open").map((t) => ({ r, t })))
+      .flatMap((r) => r.tasks.filter((t) => t.status === "open" && t.text).map((t) => ({ r, t })))
       .sort((a, b) => (a.t.due ?? "9999") .localeCompare(b.t.due ?? "9999")),
   );
   const openAttn = $derived(vault.notes.flatMap((r) => r.attn.filter((a) => !a.resolved).map((a) => ({ r, a }))));
@@ -212,6 +214,7 @@
       {/if}
     {/each}
   {:else if tab === "tasks"}
+    <button class="build" onclick={onDashboard}>👥 One-on-one dashboard…</button>
     <h4>Open tasks ({openTasks.length})</h4>
     {#each openTasks as { r, t }}
       <button class="item" onclick={() => onOpen(r.path, t.line)}>

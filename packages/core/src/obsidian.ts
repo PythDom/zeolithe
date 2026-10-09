@@ -5,6 +5,7 @@
 import { DEFAULT_JOURNAL, ATTACHMENTS_FOLDER, INBOX_FOLDER, type JournalSettings } from "./notes";
 import { splitFrontmatter, withFrontmatter } from "./frontmatter";
 import { TEMPLATES_FOLDER } from "./templates";
+import { DEFAULT_ONE_ON_ONE_CODE, type Person } from "./meetings";
 
 export interface VaultSettings {
   templatesFolder: string;
@@ -23,6 +24,10 @@ export interface VaultSettings {
   inboxFolder: string;
   searchesFolder: string;
   exportsFolder: string;
+  /** ID prefix of one-on-one meeting notes (PARA.Category.Sub-PARA). */
+  oneOnOneCode: string;
+  /** People met in one-on-ones (direct reports), with an optional e-mail address. */
+  people: Person[];
 }
 
 export const DEFAULT_SETTINGS: VaultSettings = {
@@ -33,6 +38,8 @@ export const DEFAULT_SETTINGS: VaultSettings = {
   inboxFolder: INBOX_FOLDER,
   searchesFolder: "Searches",
   exportsFolder: "exports",
+  oneOnOneCode: DEFAULT_ONE_ON_ONE_CODE,
+  people: [],
 };
 
 /** Zeolite's vault settings note: plain properties, synced with the notes. */
@@ -76,6 +83,29 @@ export function readObsidianSettings(files: { templates?: string; dailyNotes?: s
   return s;
 }
 
+/** People as written in the settings note: `- name: Anna`, `email: …`, or plain names. */
+function readPeople(list: unknown[]): Person[] {
+  const out: Person[] = [];
+  for (const item of list) {
+    const p: Person | null =
+      typeof item === "string"
+        ? { name: item.trim() }
+        : item && typeof item === "object" && typeof (item as { name?: unknown }).name === "string"
+          ? { name: String((item as { name: string }).name).trim(), email: typeof (item as { email?: unknown }).email === "string" ? String((item as { email: string }).email).trim() : undefined }
+          : null;
+    if (p?.name && !out.some((x) => x.name.toLowerCase() === p.name.toLowerCase())) out.push(p.email ? p : { name: p.name });
+  }
+  return out;
+}
+
+/** Settings note with a new list of people (other properties kept). */
+export function writePeople(note: string | undefined, people: Person[]): string {
+  const props = { one_on_one_people: people.map((p) => (p.email ? { name: p.name, email: p.email } : { name: p.name })) };
+  return note
+    ? withFrontmatter(note, { ...splitFrontmatter(note).data, ...props })
+    : withFrontmatter("# Zeolite settings\n\nSettings of this vault, changed in Zeolite with ⚙ Settings. Obsidian keeps its own settings in `.obsidian/`.\n", props);
+}
+
 /** Take Zeolite's own folder settings from the settings note's properties. */
 export function applyZeoliteSettings(s: VaultSettings, note: string | undefined): VaultSettings {
   if (!note) return s;
@@ -85,6 +115,9 @@ export function applyZeoliteSettings(s: VaultSettings, note: string | undefined)
   out.inboxFolder = pick("inbox_folder") ?? out.inboxFolder;
   out.searchesFolder = pick("searches_folder") ?? out.searchesFolder;
   out.exportsFolder = pick("exports_folder") ?? out.exportsFolder;
+  const code = typeof data.one_on_one_code === "string" ? data.one_on_one_code.trim() : "";
+  if (/^\d{2}\.\d{2}\.\d{2}$/.test(code)) out.oneOnOneCode = code;
+  if (Array.isArray(data.one_on_one_people)) out.people = readPeople(data.one_on_one_people);
   return out;
 }
 
@@ -107,7 +140,13 @@ export function writeVaultSettings(
   daily.format = s.journal.format;
   if (s.journal.template) daily.template = s.journal.template.replace(/\.md$/i, "");
   else delete daily.template;
-  const props = { inbox_folder: s.inboxFolder, searches_folder: s.searchesFolder, exports_folder: s.exportsFolder };
+  const props = {
+    inbox_folder: s.inboxFolder,
+    searches_folder: s.searchesFolder,
+    exports_folder: s.exportsFolder,
+    one_on_one_code: s.oneOnOneCode,
+    one_on_one_people: s.people.map((p) => (p.email ? { name: p.name, email: p.email } : { name: p.name })),
+  };
   const note = current.note
     ? withFrontmatter(current.note, { ...splitFrontmatter(current.note).data, ...props })
     : withFrontmatter("# Zeolite settings\n\nSettings of this vault, changed in Zeolite with ⚙ Settings. Obsidian keeps its own settings in `.obsidian/`.\n", props);

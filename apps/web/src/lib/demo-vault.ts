@@ -106,6 +106,29 @@ created: ${created}
 
 Attn:: Confirm room booking [resolved:: ${day}]
 `,
+    [`02 Areas/02.02.01.001 ${plus(-7)} Anna Smith.md`]: `---
+id: 02.02.01.001
+tags: [Areas, SAS, One-on-One_Meetings, Anna_Smith]
+type: one-on-one
+person: Anna Smith
+created: ${created}
+---
+# ${plus(-7)} Anna Smith-DZ
+
+## Notes
+
+- Training plan for the new hires discussed.
+
+## Actions
+
+- [ ] Send the training plan to HR [owner:: Anna Smith] [due:: ${plus(2)}]
+- [x] Book the review room [done:: ${plus(-6)}]
+
+## Decisions
+
+Decide:: Promotion case for the next committee
+Attn:: Workload is high this quarter
+`,
     "_system/Templates/Journal.md": `---
 tags: [Journal]
 ---

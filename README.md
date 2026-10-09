@@ -113,7 +113,14 @@ Done:
 - Decisions: `Decide::` (decision required) and `Decision::` (taken, with
   `[decided:: date]`), from two toolbar buttons; listed in the Tasks tab and
   by `LIST Decide` / `LIST Decision` queries.
-- New-note dialog: PARA ID generation, Journal, Inbox and Free notes.
+- New-note dialog: PARA ID generation, Journal, Inbox and Free notes;
+  ＋ New adds a PARA, Category or Sub-PARA to the taxonomy on the spot.
+- One-on-one meeting notes (`02.02.01.NNN date Person`, own template,
+  person tag) with a live "Past meetings" section; new journal entries get
+  a "Past notes" section; 👥 per-person dashboard (actions, Attn points,
+  decisions).
+- ✉ Send a note by e-mail: Outlook draft (Windows app), mail app, or
+  formatted copy.
 - Rename or move a note: click its path at the top, or press F2. PARA
   notes keep their ID; links across the vault are updated.
 - Web links open in the default browser (in the Windows and Android apps

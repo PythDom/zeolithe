@@ -75,17 +75,51 @@ belongs, and **Archive** moves a note to `04 Archives` in one click.
 
 ## Creating notes
 
-**＋ New note** (Ctrl+N) offers four kinds of notes:
+**＋ New note** (Ctrl+N) offers five kinds of notes:
 
 | Kind | What it is |
 | ---- | ---------- |
 | PARA note | A numbered note `XX.YY.ZZ.NNN Title`: choose PARA, Category and Sub-PARA, Zeolite picks the next number. |
+| One-on-One | A meeting note with one of your direct reports, numbered `02.02.01.NNN` (see below). |
 | Journal | Today's note in `Journal/YYYY-MM-DD.md` (also 📓). |
 | Inbox | A quick note to sort later. |
 | Free note | Any name, any folder, no number. |
 
+**＋ New** next to PARA, Category and Sub-PARA adds a value to the
+taxonomy without leaving the dialog: type the tag (the code is proposed;
+for a PARA, optionally its folder) and press **Add**. A new PARA appears
+in the list once it has a Sub-PARA.
+
 A **template** is suggested when one fits; 📄 in the sidebar manages
 templates.
+
+**Journal:** a new entry ends with a **Past notes** section listing what
+is still open in the other entries: open actions, decisions to take, open
+Attn points. The lists are live: tick an old action there and it is ticked
+in its own entry.
+
+### One-on-one meetings
+
+1. **＋ New note → One-on-One**, choose the **Person** (**＋ New** adds
+   someone, with an optional e-mail address for ✉), **Create**.
+2. The note is named `02.02.01.NNN 2026-10-09 Anna Smith`, titled
+   `# 2026-10-09 Anna Smith-DZ`, and tagged with the taxonomy tags and
+   `#Anna_Smith`.
+3. It ends with **Past meetings**: open actions, decisions to take and
+   open Attn points from the other one-on-ones with the same person (live,
+   as for the journal).
+
+The layout comes from the template `_system/Templates/One-on-One.md`,
+written with the first meeting note: edit it to change the sections or the
+title (`{{date}}`, `{{person}}`, `{{persontag}}` are filled in). The ID
+prefix and the list of people (names, e-mails) are in **⚙ Settings → One-on-one
+meetings**.
+
+**👥 One-on-one dashboard** (top of the Tasks tab) shows, for each person:
+open actions, Attn points, decisions to take, recent decisions and
+meetings. It covers their one-on-ones and anything assigned to them with
+`[owner:: Name]` in any note. **Save as note** keeps it as a note in
+Searches.
 
 IDs never change by themselves. To change one on purpose, click the **ID
 badge** in the top bar: choose PARA, Category and Sub-PARA, and the
@@ -223,6 +257,19 @@ autoscroll for playing, and PDF export with aligned chords.
 
 **PDF** in the top bar (Ctrl+P) exports the note or its whole folder, with
 a clickable table of contents and page numbers.
+
+## Sending a note by e-mail
+
+**✉** in the top bar sends the note as it looks in the preview (query
+results included). The recipient is proposed for a one-on-one (the
+person's e-mail from Settings).
+
+- **Windows app: Create the message** opens a new formatted message in
+  Outlook (or Windows Mail): check it and press Send.
+- **Open in mail app** (Android, browser): the note as plain text. Very
+  long notes are cut: then use the next option.
+- **Copy formatted**: paste the note with its formatting into any mail
+  (Ctrl+V).
 
 ## Syncing your PC, phone and tablet
 

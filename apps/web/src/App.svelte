@@ -25,11 +25,23 @@
     withFrontmatter,
     type Instrument,
     type NewNote,
+    addEntry,
+    appendSection,
+    editTaxonomyNote,
+    pastItemsSection,
+    parseTaxonomy,
+    taxonomyTemplate,
+    ONE_ON_ONE_TEMPLATE,
+    TAXONOMY_PATH,
+    type Person,
+    type TaxonomyKind,
   } from "@zeolite/core";
   import { EditorView } from "@codemirror/view";
   import Editor from "./components/Editor.svelte";
   import NewNoteDialog from "./components/NewNoteDialog.svelte";
   import QueryBuilder from "./components/QueryBuilder.svelte";
+  import PersonDashboard from "./components/PersonDashboard.svelte";
+  import MailDialog from "./components/MailDialog.svelte";
   import TaxonomyManager from "./components/TaxonomyManager.svelte";
   import TemplateManager from "./components/TemplateManager.svelte";
   import ExportDialog from "./components/ExportDialog.svelte";
@@ -73,9 +85,11 @@
   let query = $state("");
   let showNew = $state(false);
   let showQuery = $state(false);
+  let showDashboard = $state(false);
   let showTaxonomy = $state(false);
   let showTemplates = $state(false);
   let showExport = $state(false);
+  let showMail = $state(false);
   let showRename = $state(false);
   let folderHelp = $state<string | null>(null);
   let readOnlyCopy = $state(false);
@@ -793,9 +807,57 @@
     const tpl =
       (settings.template && vault.exists(settings.template) ? settings.template : undefined) ??
       vault.templates().find((t) => templateName(t).toLowerCase() === "journal");
-    if (!tpl || vault.exists(note.path)) return create(note);
+    if (vault.exists(note.path)) return create(note);
+    if (!tpl) return create(withJournalPast(note));
     const applied = createFromTemplate(note, vault.read(tpl), { title: note.path.split("/").pop()!.replace(/\.md$/, "") });
-    await create(applied, applied.cursor);
+    await create(withJournalPast(applied), applied.cursor);
+  }
+
+  /** A new journal entry lists what is still open in the other entries. */
+  function withJournalPast<T extends NewNote>(note: T): T {
+    const folder = vault.settings.journal.folder.replace(/^\/+|\/+$/g, "");
+    const from = folder ? `"${folder.replace(/"/g, '\\"')}"` : "#Journal";
+    return { ...note, content: appendSection(note.content, "Past notes", pastItemsSection("Past notes", { from })) };
+  }
+
+  /** Proposed recipient: the note's `email` property, else the e-mail of its one-on-one person. */
+  function mailRecipient(): string {
+    const fm = record?.frontmatter ?? {};
+    if (typeof fm.email === "string") return fm.email;
+    const person = typeof fm.person === "string" ? fm.person.toLowerCase() : "";
+    return vault.meetingPeople().find((p) => p.name.toLowerCase() === person)?.email ?? "";
+  }
+
+  /** From the New note dialog. */
+  async function createFromDialog(note: NewNote, cursor: number | null, kind: string) {
+    if (vault.exists(note.path)) return create(note);
+    if (kind === "journal") return create(withJournalPast(note), cursor);
+    // The first one-on-one writes its template, so it can be adapted.
+    const tpl = oneOnOneTemplatePath();
+    if (kind === "oneonone" && !vault.exists(tpl)) await vault.save(tpl, ONE_ON_ONE_TEMPLATE).catch(() => undefined);
+    return create(note, cursor);
+  }
+
+  const oneOnOneTemplatePath = () => `${vault.settings.templatesFolder}/One-on-One.md`;
+
+  /** "＋ New" in the New note dialog: add a taxonomy entry, return its code. */
+  async function addTaxonomyEntry(kind: TaxonomyKind, entry: { code: string; tag: string; folder?: string }, para?: string): Promise<string> {
+    const current = vault.read(TAXONOMY_PATH);
+    let code = entry.code;
+    const edit = (t: Parameters<typeof addEntry>[0]) => {
+      const next = addEntry(t, kind, { code: entry.code || undefined, tag: entry.tag, folder: entry.folder }, para);
+      const list = kind === "para" ? next.paras : kind === "category" ? next.categories : (next.subParas[para!] ?? []);
+      code = list.find((e) => e.tag.toLowerCase() === entry.tag.replace(/^#/, "").toLowerCase())?.code ?? code;
+      return next;
+    };
+    const next = current ? editTaxonomyNote(current, edit) : taxonomyTemplate(edit(parseTaxonomy("")));
+    await vault.save(TAXONOMY_PATH, next);
+    status = `Added #${entry.tag.replace(/^#/, "")} (${code}) to the taxonomy`;
+    return code;
+  }
+
+  async function addPerson(p: Person) {
+    await vault.savePeople([...vault.settings.people.filter((x) => x.name.toLowerCase() !== p.name.toLowerCase()), p]);
   }
 
 
@@ -1038,6 +1100,7 @@
       bind:tab
       bind:query
       onOpen={open}
+      onDashboard={() => ((showDashboard = true), (drawer = false))}
       onOpenNewTab={(p) => newTab(p)}
       onQuery={() => (showQuery = true)}
       onTaxonomy={() => (showTaxonomy = true)}
@@ -1103,6 +1166,7 @@
         <button class="ghost" onclick={archive} title="Move to 04 Archives and tag #Archives">Archive</button>
       {/if}
       {#if current}<button class="pdf" onclick={async () => { await flush(); showExport = true; }} title="Export to PDF (Ctrl+P)">PDF</button>{/if}
+      {#if current}<button class="pdf" onclick={async () => { await flush(); showMail = true; }} title="Send this note by e-mail" aria-label="Send by e-mail">✉</button>{/if}
       {#if current}<button class="trash" onclick={async () => { await flush(); showDelete = true; }} title="Delete note (moves it to .trash)" aria-label="Delete note">🗑</button>{/if}
       {#if current}<button class="close" onclick={closeNote} title="Close this note (and its tab)" aria-label="Close note">✕</button>{/if}
       <div class="modes" role="radiogroup" aria-label="Mode">
@@ -1311,6 +1375,32 @@
   />
 {/if}
 
+{#if showMail && current}
+  <MailDialog
+    title={record?.headings.find((h) => h.level === 1)?.text ?? current.split("/").pop()!.replace(/\.md$/i, "")}
+    {html}
+    to={mailRecipient()}
+    suggestions={vault.meetingPeople().filter((p) => p.email).map((p) => p.email!)}
+    onClose={() => (showMail = false)}
+  />
+{/if}
+
+{#if showDashboard}
+  <PersonDashboard
+    people={vault.meetingPeople()}
+    initial={typeof record?.frontmatter.person === "string" ? record.frontmatter.person : undefined}
+    {render}
+    onOpenLink={(t, h) => ((showDashboard = false), openLink(t, h))}
+    onToggleTask={toggleTask}
+    onSave={(title, md) => {
+      showDashboard = false;
+      const note = createFreeNote(vault.settings.searchesFolder, title);
+      void create({ ...note, content: `${note.content}${md.replace(/^# .*\n+/, "")}\n` });
+    }}
+    onClose={() => (showDashboard = false)}
+  />
+{/if}
+
 {#if showSync}
   <SyncDialog
     vaultName={vault.name}
@@ -1396,7 +1486,12 @@
     readTemplate={(p) => vault.read(p)}
     journal={vault.settings.journal}
     inboxFolder={vault.settings.inboxFolder}
-    onCreate={create}
+    onAddTaxonomy={addTaxonomyEntry}
+    people={vault.meetingPeople()}
+    onAddPerson={addPerson}
+    oneOnOneCode={vault.settings.oneOnOneCode}
+    oneOnOneTemplate={() => (vault.exists(oneOnOneTemplatePath()) ? vault.read(oneOnOneTemplatePath()) : undefined)}
+    onCreate={createFromDialog}
     onClose={() => (showNew = false)}
   />
 {/if}

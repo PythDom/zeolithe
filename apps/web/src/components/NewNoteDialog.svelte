@@ -13,9 +13,13 @@
     templateName,
     nextId,
     numberablePara,
+    createOneOnOneNote,
+    suggestCode,
     type JournalSettings,
     type NewNote,
+    type Person,
     type Taxonomy,
+    type TaxonomyKind,
   } from "@zeolite/core";
 
   interface Props {
@@ -29,14 +33,36 @@
     /** Daily notes folder and format (from Obsidian's settings). */
     journal?: JournalSettings;
     readTemplate: (path: string) => string;
-    onCreate: (note: NewNote, cursor: number | null) => void;
+    /** Add a PARA, Category or Sub-PARA to the taxonomy note; resolves with its code. */
+    onAddTaxonomy: (kind: TaxonomyKind, entry: { code: string; tag: string; folder?: string }, para?: string) => Promise<string>;
+    /** One-on-ones: people, adding one, the ID prefix and the template text. */
+    people: Person[];
+    onAddPerson: (p: Person) => Promise<void>;
+    oneOnOneCode: string;
+    oneOnOneTemplate: () => string | undefined;
+    onCreate: (note: NewNote, cursor: number | null, kind: Kind) => void;
     onClose: () => void;
   }
-  let { taxonomy, existingIds, templates, readTemplate, journal, folders = [], inboxFolder = "Inbox", onCreate, onClose }: Props = $props();
+  let {
+    taxonomy,
+    existingIds,
+    templates,
+    readTemplate,
+    journal,
+    folders = [],
+    inboxFolder = "Inbox",
+    onAddTaxonomy,
+    people,
+    onAddPerson,
+    oneOnOneCode,
+    oneOnOneTemplate,
+    onCreate,
+    onClose,
+  }: Props = $props();
   let template = $state("");
   let templateTouched = $state(false);
 
-  type Kind = "para" | "journal" | "inbox" | "free";
+  type Kind = "para" | "oneonone" | "journal" | "inbox" | "free";
   let kind = $state<Kind>("para");
   let title = $state("");
   let folder = $state("");
@@ -45,6 +71,62 @@
   let sub = $state("");
   let category = $state("");
   let error = $state("");
+
+  // "＋ New" next to PARA, Category and Sub-PARA: adds an entry to the taxonomy.
+  let adding = $state<TaxonomyKind | null>(null);
+  let newCode = $state("");
+  let newTag = $state("");
+  let newFolder = $state("");
+  let addError = $state("");
+  function startAdd(k: TaxonomyKind) {
+    adding = k;
+    addError = "";
+    newTag = "";
+    newFolder = "";
+    try {
+      newCode = suggestCode(taxonomy, k, k === "sub" ? para : undefined);
+    } catch {
+      newCode = "";
+    }
+  }
+  async function addEntry() {
+    if (!adding) return;
+    addError = "";
+    try {
+      const k = adding;
+      const code = await onAddTaxonomy(k, { code: newCode.trim(), tag: newTag.trim(), folder: newFolder.trim() || undefined }, k === "sub" ? para : undefined);
+      if (k === "para") para = code;
+      else if (k === "category") category = code;
+      else sub = code;
+      adding = null;
+    } catch (e) {
+      addError = (e as Error).message;
+    }
+  }
+
+  // One-on-one: the person met.
+  let person = $state("");
+  let addingPerson = $state(false);
+  let personName = $state("");
+  let personEmail = $state("");
+  async function addPerson() {
+    addError = "";
+    const name = personName.trim();
+    if (!name) return;
+    if (people.some((p) => p.name.toLowerCase() === name.toLowerCase())) {
+      person = people.find((p) => p.name.toLowerCase() === name.toLowerCase())!.name;
+      addingPerson = false;
+      return;
+    }
+    try {
+      await onAddPerson({ name, email: personEmail.trim() || undefined });
+      person = name;
+      addingPerson = false;
+      personName = personEmail = "";
+    } catch (e) {
+      addError = (e as Error).message;
+    }
+  }
 
   $effect(() => {
     if (!para && paras[0]) para = paras[0].code;
@@ -87,6 +169,7 @@
     const last = lastTemplates()[kind];
     const typeNames: Record<Kind, string[]> = {
       para: ["PARA", "PARA note"],
+      oneonone: ["One-on-One"],
       journal: ["Journal", "Daily", "Daily note"],
       inbox: ["Inbox"],
       free: ["Free", "Free note", "Note", "Default"],
@@ -98,6 +181,11 @@
   });
 
   const previewId = $derived.by(() => {
+    if (kind === "oneonone") {
+      const [p, c, z] = oneOnOneCode.split(".");
+      if (!findPara(taxonomy, p ?? "") || !findCategory(taxonomy, c ?? "") || !findSubPara(taxonomy, p ?? "", z ?? "")) return `⚠ ${oneOnOneCode} is not in the taxonomy`;
+      return nextId(p!, c!, z!, existingIds);
+    }
     if (kind !== "para" || !para || !sub || !category) return "";
     try {
       return nextId(para, category, sub, existingIds);
@@ -110,6 +198,10 @@
     e.preventDefault();
     error = "";
     try {
+      if (kind === "oneonone") {
+        const n = createOneOnOneNote({ taxonomy, code: oneOnOneCode, person, existingIds, template: oneOnOneTemplate() });
+        return onCreate(n, n.cursor, kind);
+      }
       let note: NewNote;
       if (kind === "para") note = createParaNote({ taxonomy, para, category, sub, title, existingIds });
       else if (kind === "journal") note = createJournalNote(new Date(), journal);
@@ -129,7 +221,7 @@
         cursor = applied.cursor;
       }
       rememberTemplate(kind, template);
-      onCreate(note, cursor);
+      onCreate(note, cursor, kind);
     } catch (err) {
       error = (err as Error).message;
     }
@@ -142,12 +234,12 @@
   <form class="dialog" onsubmit={submit}>
     <h2>New note</h2>
     <div class="kinds" role="radiogroup">
-      {#each [["para", "PARA note"], ["journal", "Journal"], ["inbox", "Inbox"], ["free", "Free note"]] as [k, label]}
+      {#each [["para", "PARA note"], ["oneonone", "One-on-One"], ["journal", "Journal"], ["inbox", "Inbox"], ["free", "Free note"]] as [k, label]}
         <label class:active={kind === k}><input type="radio" bind:group={kind} value={k} onchange={() => (templateTouched = false)} />{label}</label>
       {/each}
     </div>
 
-    {#if templates.length}
+    {#if templates.length && kind !== "oneonone"}
       <div class="tpl" role="radiogroup" aria-label="Template">
         <span class="lbl">Template</span>
         <div class="tpl-list">
@@ -170,23 +262,76 @@
       {#if paras.length === 0}
         <p class="warn">The taxonomy note (_system/Taxonomy.md) defines no PARA with Sub-PARAs.</p>
       {:else}
-        <label>PARA
-          <select bind:value={para}>
-            {#each paras as p}<option value={p.code}>{p.code} · #{p.tag}</option>{/each}
-          </select>
-        </label>
-        <label>Category
-          <select bind:value={category}>
-            {#each taxonomy.categories as c}<option value={c.code}>{c.code} · #{c.tag}</option>{/each}
-          </select>
-        </label>
-        <label>Sub-PARA
-          <select bind:value={sub}>
-            {#each subs as s}<option value={s.code}>{s.code} · #{s.tag}</option>{/each}
-          </select>
-        </label>
+        {#snippet addRow(k: TaxonomyKind)}
+          {#if adding === k}
+            <div class="add-row">
+              <input class="code" bind:value={newCode} aria-label="Code" placeholder="00" maxlength="2" />
+              <!-- svelte-ignore a11y_autofocus -->
+              <input bind:value={newTag} aria-label="Tag" placeholder="#NewTag" autofocus onkeydown={(e) => e.key === "Enter" && (e.preventDefault(), addEntry())} />
+              {#if k === "para"}<input bind:value={newFolder} aria-label="Folder" placeholder="Folder (optional)" />{/if}
+              <button type="button" class="primary" disabled={!newTag.trim()} onclick={addEntry}>Add</button>
+              <button type="button" onclick={() => (adding = null)}>Cancel</button>
+            </div>
+          {/if}
+        {/snippet}
+        <div class="field">
+          <label>PARA
+            <select bind:value={para}>
+              {#each paras as p}<option value={p.code}>{p.code} · #{p.tag}</option>{/each}
+            </select>
+          </label>
+          <button type="button" class="new" onclick={() => startAdd("para")} title="Add a PARA to the taxonomy">＋ New</button>
+        </div>
+        {@render addRow("para")}
+        {#if adding === "para"}<p class="hint">A new PARA appears here once it has a Sub-PARA: add one below after creating it.</p>{/if}
+        <div class="field">
+          <label>Category
+            <select bind:value={category}>
+              {#each taxonomy.categories as c}<option value={c.code}>{c.code} · #{c.tag}</option>{/each}
+            </select>
+          </label>
+          <button type="button" class="new" onclick={() => startAdd("category")} title="Add a category to the taxonomy">＋ New</button>
+        </div>
+        {@render addRow("category")}
+        <div class="field">
+          <label>Sub-PARA
+            <select bind:value={sub}>
+              {#each subs as s}<option value={s.code}>{s.code} · #{s.tag}</option>{/each}
+            </select>
+          </label>
+          <button type="button" class="new" onclick={() => startAdd("sub")} title="Add a Sub-PARA to this PARA">＋ New</button>
+        </div>
+        {@render addRow("sub")}
+        {#if addError}<p class="warn">{addError}</p>{/if}
         <div class="id">ID <code>{previewId}</code> <small>prefix {idPrefix(para, category, sub)}</small></div>
       {/if}
+    {/if}
+
+    {#if kind === "oneonone"}
+      <div class="field">
+        <label>Person
+          <select bind:value={person}>
+            <option value="" disabled>Choose…</option>
+            {#each people as p}<option value={p.name}>{p.name}</option>{/each}
+          </select>
+        </label>
+        <button type="button" class="new" onclick={() => ((addingPerson = true), (addError = ""))} title="Add a person">＋ New</button>
+      </div>
+      {#if addingPerson}
+        <div class="add-row">
+          <!-- svelte-ignore a11y_autofocus -->
+          <input bind:value={personName} aria-label="Name" placeholder="First and last name" autofocus onkeydown={(e) => e.key === "Enter" && (e.preventDefault(), addPerson())} />
+          <input bind:value={personEmail} aria-label="E-mail" type="email" placeholder="E-mail (optional, for ✉)" onkeydown={(e) => e.key === "Enter" && (e.preventDefault(), addPerson())} />
+          <button type="button" class="primary" disabled={!personName.trim()} onclick={addPerson}>Add</button>
+          <button type="button" onclick={() => (addingPerson = false)}>Cancel</button>
+        </div>
+      {/if}
+      {#if addError}<p class="warn">{addError}</p>{/if}
+      <div class="id">ID <code>{previewId}</code> <small>prefix {oneOnOneCode}</small></div>
+      <p class="hint">
+        Note “{previewId.startsWith("⚠") ? oneOnOneCode : previewId} {new Date().toISOString().slice(0, 10)} {person || "…"}”, tagged #{person ? person.trim().replace(/\s+/g, "_") : "person"}, from the template
+        <code>One-on-One</code>. Its “Past meetings” section lists what is still open from earlier meetings with the same person.
+      </p>
     {/if}
 
     {#if kind === "free"}
@@ -194,18 +339,20 @@
       <datalist id="nn-folders">{#each folders as f}<option value={f}></option>{/each}</datalist>
     {/if}
 
-    {#if kind !== "journal"}
+    {#if kind === "oneonone"}
+      <!-- no title: date and person -->
+    {:else if kind !== "journal"}
       <!-- svelte-ignore a11y_autofocus -->
       <label>Title <input bind:value={title} autofocus placeholder="Note title" /></label>
     {:else}
-      <p class="hint">Opens or creates today's journal note{journal ? ` in ${journal.folder || "the vault root"}` : ""}.</p>
+      <p class="hint">Opens or creates today's journal note{journal ? ` in ${journal.folder || "the vault root"}` : ""}. A new entry gets a “Past notes” section with what is still open in earlier entries.</p>
     {/if}
 
 
     {#if error}<p class="warn">{error}</p>{/if}
     <div class="actions">
       <button type="button" onclick={onClose}>Cancel</button>
-      <button type="submit" class="primary">Create</button>
+      <button type="submit" class="primary" disabled={kind === "oneonone" && (!person || previewId.startsWith("⚠"))}>Create</button>
     </div>
   </form>
 </div>
@@ -254,8 +401,55 @@
   }
   .kinds {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
     gap: 4px;
+  }
+  .field {
+    display: flex;
+    gap: 6px;
+    align-items: flex-end;
+  }
+  .field label {
+    flex: 1;
+    min-width: 0;
+  }
+  .add-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px;
+    border: 1px dashed var(--accent);
+    border-radius: 6px;
+  }
+  .add-row input {
+    flex: 1;
+    min-width: 120px;
+  }
+  .add-row input.code {
+    flex: 0 0 52px;
+    min-width: 0;
+  }
+  .new,
+  .add-row button {
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--accent-strong);
+    font: inherit;
+    font-size: 13px;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .add-row button.primary {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: var(--on-accent);
+  }
+  .add-row button:disabled,
+  .actions button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
   .kinds label {
     align-items: center;

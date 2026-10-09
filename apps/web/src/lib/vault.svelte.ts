@@ -1,6 +1,9 @@
 import {
   buildNoteRecord,
   applyZeoliteSettings,
+  peopleOfMeetings,
+  writePeople,
+  type Person,
   writeVaultSettings,
   SETTINGS_PATH,
   conflictPath,
@@ -151,6 +154,18 @@ export class Vault {
     this.settings = { ...structuredClone(next), fromObsidian: true };
   }
 
+  /** Save the list of people met in one-on-ones (in _system/Settings.md). */
+  async savePeople(people: Person[]) {
+    await this.save(SETTINGS_PATH, writePeople(this.contents.get(SETTINGS_PATH), people));
+  }
+
+  /** People for one-on-ones: the saved list, plus anyone who already has a one-on-one note. */
+  meetingPeople(): Person[] {
+    const list = [...this.settings.people];
+    for (const name of peopleOfMeetings(this.notes)) if (!list.some((p) => p.name.toLowerCase() === name.toLowerCase())) list.push({ name });
+    return list.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
   /**
    * Rename a folder with everything in it (notes and attachments). Note names
    * do not change, so ordinary [[links]] keep working; links written with
@@ -280,6 +295,7 @@ export class Vault {
     this.records = next;
     if (!this.files.includes(path)) this.files = [...this.files, path].sort((a, b) => a.localeCompare(b));
     if (path === TAXONOMY_PATH) this.refreshTaxonomy();
+    if (path === SETTINGS_PATH) this.settings = applyZeoliteSettings(this.settings, content);
   }
 
   /** Files with their stamps, in one call when the storage can (Windows app), else list (+ stat). */
@@ -596,6 +612,7 @@ export class Vault {
       for (const a of r.attn) a.assignees.forEach((p) => s.add(p));
       for (const d of r.decisions) d.assignees.forEach((p) => s.add(p));
     }
+    for (const p of this.settings.people) s.add(p.name);
     return [...s].sort();
   }
 

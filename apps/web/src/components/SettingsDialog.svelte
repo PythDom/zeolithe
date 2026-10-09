@@ -27,6 +27,8 @@
   let inboxFolder = $state(start.inboxFolder);
   let searchesFolder = $state(start.searchesFolder);
   let exportsFolder = $state(start.exportsFolder);
+  let oneOnOneCode = $state(start.oneOnOneCode);
+  let people = $state(start.people.map((p) => ({ name: p.name, email: p.email ?? "" })));
 
   const paras = untrack(() => vault.taxonomy.paras.map((p) => ({ code: p.code, tag: p.tag, folder: p.folder ?? "" })));
   let paraFolders = $state<Record<string, string>>(Object.fromEntries(paras.map((p) => [p.code, p.folder])));
@@ -73,6 +75,15 @@
         inboxFolder: folder("Inbox folder", inboxFolder, true),
         searchesFolder: folder("Saved searches folder", searchesFolder, true),
         exportsFolder: folder("PDF exports folder", exportsFolder, true),
+        oneOnOneCode: (() => {
+          const c = oneOnOneCode.trim();
+          if (!/^\d{2}\.\d{2}\.\d{2}$/.test(c)) throw new Error(`One-on-one code: “${c}” must look like 02.02.01 (PARA.Category.Sub-PARA).`);
+          return c;
+        })(),
+        people: people
+          .map((p) => ({ name: p.name.trim(), email: p.email.trim() || undefined }))
+          .filter((p) => p.name)
+          .map((p) => (p.email ? p : { name: p.name })),
       };
       const changed = JSON.stringify({ ...next, fromObsidian: 0 }) !== JSON.stringify({ ...start, fromObsidian: 0 });
 
@@ -155,6 +166,18 @@
         </select>
       </label>
 
+      <h4>One-on-one meetings</h4>
+      <label>ID prefix (PARA.Category.Sub-PARA) <input bind:value={oneOnOneCode} placeholder="02.02.01" /></label>
+      <p class="hint">Template: <code>One-on-One</code> in the templates folder (created with the first meeting note; edit it to change the title or sections).</p>
+      {#each people as p, i}
+        <div class="row person">
+          <input bind:value={p.name} aria-label="Name" placeholder="Name" />
+          <input bind:value={p.email} aria-label="E-mail" type="email" placeholder="E-mail (for ✉)" />
+          <button type="button" class="remove" aria-label="Remove {p.name}" onclick={() => (people = people.filter((_, j) => j !== i))}>✕</button>
+        </div>
+      {/each}
+      <button type="button" class="add" onclick={() => (people = [...people, { name: "", email: "" }])}>＋ Add a person</button>
+
       <h4>Other folders</h4>
       <div class="row">
         <label>Templates <input bind:value={templatesFolder} /></label>
@@ -214,6 +237,24 @@
 </div>
 
 <style>
+  .person input {
+    flex: 1;
+    min-width: 0;
+  }
+  .remove,
+  .add {
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--fg);
+    font: inherit;
+    cursor: pointer;
+  }
+  .add {
+    align-self: flex-start;
+    color: var(--accent-strong);
+  }
   .backdrop {
     position: fixed;
     inset: 0;

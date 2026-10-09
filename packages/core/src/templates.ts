@@ -71,6 +71,9 @@ export interface TemplateVars {
   para?: string;
   category?: string;
   subpara?: string;
+  /** One-on-one notes: the person, and their tag. */
+  person?: string;
+  persontag?: string;
 }
 
 const CURSOR = "{{cursor}}";
@@ -84,6 +87,8 @@ export function renderTemplate(template: string, vars: TemplateVars = {}): { tex
     para: vars.para,
     category: vars.category,
     subpara: vars.subpara,
+    person: vars.person,
+    persontag: vars.persontag,
   };
   let text = template.replace(/\{\{\s*(\w+)\s*(?::([^}]*))?\}\}/g, (all, name: string, fmt: string | undefined) => {
     const key = name.toLowerCase();
