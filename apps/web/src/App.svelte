@@ -195,7 +195,9 @@
       /* not kept: asked again next time */
     }
   }
-  const canShare = () => vault !== demo && !readOnlyCopy && vault.storage instanceof TauriStorage;
+  /** Real vault folders in the Windows or Android app can be shared on the local network. */
+  const shareable = (v: Vault) => v !== demo && !readOnlyCopy && (v.storage instanceof TauriStorage || v.storage instanceof CapacitorStorage);
+  const canShare = () => shareable(vault);
 
   async function share(on: boolean, newCode = false) {
     sharingError = "";
@@ -210,7 +212,7 @@
         sharing = null;
         return;
       }
-      sharing = await startSharing((vault.storage as TauriStorage).root, vault.name, settings.code);
+      sharing = await startSharing((vault.storage as TauriStorage | CapacitorStorage).root, vault.name, settings.code);
     } catch (e) {
       sharing = null;
       sharingError = (e as Error).message;
@@ -219,7 +221,7 @@
 
   // Files written by a phone or tablet: show them now (the open note included).
   let sharedChangeTimer: ReturnType<typeof setTimeout> | undefined;
-  if (platform() === "tauri") {
+  if (platform() === "tauri" || platform() === "android") {
     void onSharedChange(() => {
       clearTimeout(sharedChangeTimer);
       sharedChangeTimer = setTimeout(() => void diskCheck(), 400);
@@ -435,7 +437,7 @@
     syncSettings = readOnlyCopy || v === demo ? null : loadSyncSettings(v.name);
     sharing = null;
     sharingError = "";
-    if (v.storage instanceof TauriStorage && v !== demo && !readOnlyCopy) {
+    if (shareable(v)) {
       const share0 = shareSettings(v.name);
       sharingCode = share0.code;
       if (share0.on) queueMicrotask(() => void share(true));

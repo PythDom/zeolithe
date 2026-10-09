@@ -431,27 +431,42 @@ Syncthing on that PC instead.
 | "does not allow this" | In `config.yml`, `permissions: CRUD`. |
 | Notes missing on a new device | Check that it uses exactly the same address, then press ⇅ Sync. |
 
-### Syncing directly with your PC over Wi-Fi
+### Syncing directly over Wi-Fi (no server)
 
-No server, no internet: a phone or tablet syncs with Zeolite on your PC
-when both are on the same Wi-Fi (or on the phone's hotspot).
+Two devices on the same Wi-Fi (or on a phone's hotspot) sync directly: one
+**shares** its vault, the other connects to it. No server, no internet.
 
-1. **On the PC** (Windows app): **⇅ → Share with a phone or tablet →
-   Share this vault**. Zeolite shows an **address** (e.g.
-   `192.168.1.20:47123`) and a **pairing code**. The first time, allow
-   Zeolite on **private networks** if Windows asks.
-2. **On the phone or tablet**: open the vault (a new device: an empty
-   folder, **Keep it empty**), **⇅ → PC on this Wi-Fi**, enter the address
-   and the code, **Save and sync**.
+**Which device shares?** Usually the **phone or tablet**: it needs no
+permission. A Windows PC can share too, but Windows Firewall then asks to
+allow Zeolite, which needs **administrator rights** (often not available
+on a work PC).
 
-The PC shares the vault whenever Zeolite is open there (**Stop sharing**
-ends it). Changes from the phone appear on the PC at once; if you were
-editing the same note, the other version is kept as a conflict copy.
-**New code** replaces the pairing code (paired devices then enter the new
-one). After 20 wrong codes, sharing stops until you start it again.
+1. **On the sharing device** (phone, tablet, or PC): open the vault, **⇅ →
+   Share this vault**. Zeolite shows the **address** (e.g.
+   `192.168.1.37:47123`; several if the device has more than one network)
+   and a **pairing code**.
+2. **On the other device**: open the vault (a new device: an empty folder,
+   **Keep it empty**), **⇅ → Another device on this Wi-Fi**, enter the
+   address exactly as shown and the code (dashes and case do not matter),
+   **Save and sync**.
 
-Company Wi-Fi networks often block device-to-device connections: use the
-phone's hotspot, or another sync method there.
+Keep Zeolite open on the sharing device while the other one syncs. It
+shares again whenever the vault is opened there (**Stop sharing** ends it).
+Changes arrive on the sharing device at once; if the same note was being
+edited there, the other version is kept as a conflict copy. **New code**
+replaces the pairing code. After 20 wrong codes, sharing stops until you
+start it again.
+
+**If the other device cannot connect:**
+
+- Check the address: the one shown by Zeolite on the sharing device (or
+  the Wi-Fi "IPv4 address" from `ipconfig` on a PC), with `:47123`.
+- Open `http://<address>:47123/zeolite/v1/info` in the other device's
+  browser: "Wrong pairing code" means the network is fine; no answer means
+  the network or a firewall blocks it.
+- A sharing Windows PC: allow Zeolite when Windows asks (administrator), or
+  share from the phone or tablet instead.
+- Company or guest Wi-Fi often keeps devices apart: use a phone's hotspot.
 
 ### Syncing through OneDrive
 

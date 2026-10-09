@@ -104,8 +104,8 @@ struct Sharing(Mutex<Option<lan::LanServer>>);
 
 #[derive(serde::Serialize)]
 struct SharingInfo {
-    /// This computer's address on the network (None if not connected).
-    ip: Option<String>,
+    /// This computer's addresses on the network, the most likely first (empty if not connected).
+    ips: Vec<String>,
     port: u16,
 }
 
@@ -117,15 +117,19 @@ fn lan_start(app: AppHandle, data: State<DataDir>, sharing: State<Sharing>, path
         return Err("This folder was not chosen in the folder dialog.".into());
     }
     let mut current = sharing.0.lock().map_err(|e| e.to_string())?;
+    let root = PathBuf::from(path.trim_end_matches(['/', '\\']));
+    // Already sharing this vault with this code (e.g. reopened): keep it.
+    if let Some(s) = current.as_ref().filter(|s| s.is_running() && s.root == root && s.token == token) {
+        return Ok(SharingInfo { ips: lan::local_addresses(), port: s.port });
+    }
     if let Some(old) = current.take() {
         old.stop();
     }
-    let root = PathBuf::from(path.trim_end_matches(['/', '\\']));
     let handle = app.clone();
     let server = lan::start(root, name, token, port, move |paths| {
         let _ = handle.emit("lan-changed", paths);
     })?;
-    let info = SharingInfo { ip: lan::local_ip(), port: server.port };
+    let info = SharingInfo { ips: lan::local_addresses(), port: server.port };
     *current = Some(server);
     Ok(info)
 }
@@ -142,7 +146,7 @@ fn lan_stop(sharing: State<Sharing>) -> Result<(), String> {
 #[tauri::command]
 fn lan_status(sharing: State<Sharing>) -> Result<Option<SharingInfo>, String> {
     let current = sharing.0.lock().map_err(|e| e.to_string())?;
-    Ok(current.as_ref().filter(|s| s.is_running()).map(|s| SharingInfo { ip: lan::local_ip(), port: s.port }))
+    Ok(current.as_ref().filter(|s| s.is_running()).map(|s| SharingInfo { ips: lan::local_addresses(), port: s.port }))
 }
 
 /// Open an e-mail draft (an .eml file marked "X-Unsent") in the default mail

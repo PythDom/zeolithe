@@ -8,7 +8,7 @@ fn main() {
     };
     let port = args.get(3).and_then(|p| p.parse().ok()).unwrap_or(47123);
     let server = zeolite_lib::lan::start(root.into(), "Test vault".into(), code.clone(), port, |paths| println!("changed: {paths:?}")).expect("start");
-    println!("sharing {root} on {:?}:{}", zeolite_lib::lan::local_ip(), server.port);
+    println!("sharing {root} on {:?}:{}", zeolite_lib::lan::local_addresses(), server.port);
     loop {
         std::thread::sleep(std::time::Duration::from_secs(3600));
     }

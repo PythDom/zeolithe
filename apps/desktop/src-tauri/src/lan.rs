@@ -28,16 +28,26 @@ const MAX_FAILURES: u32 = 20;
 const MAX_UPLOAD: u64 = 200 * 1024 * 1024;
 
 pub struct LanServer {
-    server: Arc<Server>,
+    server: Option<Arc<Server>>,
     thread: Option<JoinHandle<()>>,
     pub port: u16,
+    /// Folder and code shared (to tell whether a new request changes anything).
+    pub root: PathBuf,
+    pub token: String,
 }
 
 impl LanServer {
     pub fn stop(mut self) {
-        self.server.unblock();
-        if let Some(t) = self.thread.take() {
-            let _ = t.join();
+        if let Some(server) = self.server.take() {
+            server.unblock();
+            if let Some(t) = self.thread.take() {
+                let _ = t.join();
+            }
+            // tiny_http frees the port by connecting to its own listening address,
+            // 0.0.0.0, which Windows refuses: the port would stay taken until the app
+            // quits. Wake its accept loop ourselves through 127.0.0.1 instead.
+            drop(server);
+            let _ = std::net::TcpStream::connect_timeout(&std::net::SocketAddr::from(([127, 0, 0, 1], self.port)), std::time::Duration::from_millis(500));
         }
     }
 
@@ -52,8 +62,9 @@ pub fn start(root: PathBuf, name: String, token: String, port: u16, on_change: i
     if token.len() < 6 {
         return Err("The pairing code is too short.".into());
     }
-    let server = Arc::new(Server::http(("0.0.0.0", port)).map_err(|e| format!("Cannot start sharing on port {port}: {e}"))?);
+    let server = Arc::new(bind(port)?);
     let port = server.server_addr().to_ip().map(|a| a.port()).unwrap_or(port);
+    let (root_kept, token_kept) = (root.clone(), token.clone());
     let srv = server.clone();
     let failures = AtomicU32::new(0);
     let thread = std::thread::spawn(move || {
@@ -65,7 +76,32 @@ pub fn start(root: PathBuf, name: String, token: String, port: u16, on_change: i
             }
         }
     });
-    Ok(LanServer { server, thread: Some(thread), port })
+    Ok(LanServer { server: Some(server), thread: Some(thread), port, root: root_kept, token: token_kept })
+}
+
+/// Listen on `port`, waiting a little if it is still being released, then on
+/// the next few ports if another program keeps it (port 0: any free port).
+fn bind(port: u16) -> Result<Server, String> {
+    fn in_use(e: &(dyn std::error::Error + Send + Sync + 'static)) -> bool {
+        e.downcast_ref::<std::io::Error>().is_some_and(|io| io.kind() == std::io::ErrorKind::AddrInUse) || e.to_string().contains("10048")
+    }
+    let mut last = String::new();
+    for attempt in 0..10 {
+        match Server::http(("0.0.0.0", port)) {
+            Ok(s) => return Ok(s),
+            Err(e) if port != 0 && in_use(e.as_ref()) => {
+                last = e.to_string();
+                std::thread::sleep(std::time::Duration::from_millis(if attempt < 5 { 100 } else { 300 }));
+            }
+            Err(e) => return Err(format!("Cannot start sharing on port {port}: {e}")),
+        }
+    }
+    for other in port.saturating_add(1)..port.saturating_add(10) {
+        if let Ok(s) = Server::http(("0.0.0.0", other)) {
+            return Ok(s);
+        }
+    }
+    Err(format!("Cannot start sharing: port {port} and the next ones are in use ({last})."))
 }
 
 enum Handled {
@@ -219,8 +255,38 @@ fn handle(mut req: Request, root: &Path, name: &str, token: &str, failures: &Ato
     changed.map(Handled::Changed).unwrap_or(Handled::Done)
 }
 
-/// This computer's address on the local network (the interface used to reach
-/// the outside; no packet is sent).
+/// This computer's IPv4 addresses on local networks, the most likely first:
+/// Wi-Fi, then wired, then the rest (VPN and virtual adapters last, since a
+/// phone usually cannot reach them).
+pub fn local_addresses() -> Vec<String> {
+    let mut found: Vec<(u8, String)> = Vec::new();
+    for iface in if_addrs::get_if_addrs().unwrap_or_default() {
+        let std::net::IpAddr::V4(ip) = iface.ip() else { continue };
+        if ip.is_loopback() || ip.is_link_local() || ip.is_unspecified() {
+            continue;
+        }
+        let name = iface.name.to_lowercase();
+        let rank = if name.contains("wi-fi") || name.contains("wifi") || name.contains("wlan") || name.contains("wireless") {
+            0
+        } else if ["vethernet", "vmware", "virtualbox", "hyper-v", "wsl", "docker", "vpn", "tap", "tun", "zerotier", "loopback"].iter().any(|v| name.contains(v)) {
+            3
+        } else if ip.is_private() {
+            1
+        } else {
+            2
+        };
+        found.push((rank, ip.to_string()));
+    }
+    found.sort();
+    let mut out: Vec<String> = found.into_iter().map(|(_, ip)| ip).collect();
+    out.dedup();
+    if out.is_empty() {
+        out.extend(local_ip());
+    }
+    out
+}
+
+/// The address of the interface used to reach the outside (no packet is sent).
 pub fn local_ip() -> Option<String> {
     let socket = std::net::UdpSocket::bind("0.0.0.0:0").ok()?;
     socket.connect("192.0.2.1:9").ok()?;
@@ -286,5 +352,21 @@ mod tests {
         assert!(!srv.is_running());
         srv.stop();
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn restarts_on_the_same_port_and_moves_when_taken() {
+        let root = std::env::temp_dir();
+        let a = start(root.clone(), "T".into(), "CODE1234".into(), 47391, |_| {}).unwrap();
+        assert_eq!(a.port, 47391);
+        a.stop();
+        // Freed at once: the next start gets the same port.
+        let b = start(root.clone(), "T".into(), "CODE1234".into(), 47391, |_| {}).unwrap();
+        assert_eq!(b.port, 47391);
+        // Taken by someone else: the next free port is used.
+        let c = start(root.clone(), "T".into(), "CODE1234".into(), 47391, |_| {}).unwrap();
+        assert!(c.port > 47391 && c.port < 47401, "{}", c.port);
+        b.stop();
+        c.stop();
     }
 }

@@ -138,8 +138,9 @@ Done:
   (⇅ in the sidebar): two-way, only changed files (unchanged local files
   are not even re-read), conflicts kept as
   Syncthing-style copies, deletions to `.trash`. See [docs/sync.md](docs/sync.md).
-- Or sync directly with the PC over the local Wi-Fi: the Windows app shares
-  the open vault (address + pairing code), phones and tablets sync with it.
+- Or sync directly over the local Wi-Fi: one device shares the open vault
+  (address + pairing code) — the phone or tablet (no permission needed) or
+  the Windows app (firewall permission needed) — and the others sync with it.
 - Related tab: unlinked mentions (one-click links), related notes (shared
   words, plus meaning with a small on-device embedding model or a server),
   possible duplicates, suggested tags, search by meaning, notes with no

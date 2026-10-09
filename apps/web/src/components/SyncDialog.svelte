@@ -2,7 +2,7 @@
   import { onDestroy, untrack } from "svelte";
   import { makeRemote, type SyncSettings } from "../lib/sync";
   import { DEFAULT_CLIENT_ID, signedInAccount, signOut, startSignIn, type DeviceCode } from "../lib/onedrive";
-  import { openExternal } from "../lib/native";
+  import { openExternal, platform } from "../lib/native";
   import { formatCode, lanAddress, type SharingInfo } from "../lib/lan";
 
   interface Props {
@@ -20,6 +20,7 @@
     sharingError?: string;
     onShare?: (on: boolean, newCode?: boolean) => void;
   }
+  const isWindows = platform() === "tauri";
   let { vaultName, settings, last, onSave, onRemove, onClose, canShare = false, sharing = null, sharingCode = "", sharingError = "", onShare }: Props = $props();
 
   // svelte-ignore state_referenced_locally
@@ -121,7 +122,7 @@
     <div class="seg" role="radiogroup" aria-label="Sync with">
       <label class:active={kind === "webdav"}><input type="radio" bind:group={kind} value="webdav" />WebDAV server</label>
       <label class:active={kind === "onedrive"}><input type="radio" bind:group={kind} value="onedrive" />OneDrive</label>
-      <label class:active={kind === "lan"}><input type="radio" bind:group={kind} value="lan" />PC on this Wi-Fi</label>
+      <label class:active={kind === "lan"}><input type="radio" bind:group={kind} value="lan" />Another device on this Wi-Fi</label>
     </div>
 
     {#if kind === "webdav"}
@@ -140,11 +141,11 @@
         </label>
       </div>
     {:else if kind === "lan"}
-      <p class="hint">Syncs directly with Zeolite on a PC on the same Wi-Fi (or your phone's hotspot), no server or internet needed. On the PC: ⇅ → <b>Share with a phone or tablet</b> shows the address and the pairing code.</p>
+      <p class="hint">Syncs directly with Zeolite on another device on the same Wi-Fi (or a phone's hotspot), no server or internet needed. On that device (phone, tablet or PC): ⇅ → <b>Share this vault</b> shows the address and the pairing code.</p>
       <div class="row">
-        <label>PC address
+        <label>Address (as shown there)
           <!-- svelte-ignore a11y_autofocus -->
-          <input bind:value={url} placeholder="192.168.1.20:47123" inputmode="url" autocomplete="off" autofocus={!settings} />
+          <input bind:value={url} placeholder="address:47123" inputmode="url" autocomplete="off" autofocus={!settings} />
         </label>
         <label>Pairing code
           <input bind:value={password} placeholder="K7P4-QX9M" autocomplete="off" spellcheck="false" style="text-transform: uppercase" />
@@ -252,20 +253,38 @@ users:
 
     {#if canShare}
       <section class="share">
-        <h3>📶 Share with a phone or tablet</h3>
+        <h3>📶 Share with another device on this Wi-Fi</h3>
         {#if sharing}
-          <p>Sharing “{vaultName}” on this Wi-Fi. On the phone or tablet: ⇅ → <b>PC on this Wi-Fi</b>, then enter:</p>
+          <p>Sharing “{vaultName}”. On the other device: ⇅ → <b>Another device on this Wi-Fi</b>, then enter:</p>
           <div class="pair">
-            <div><span class="lbl">Address</span><b>{sharing.ip ?? "(not connected to a network)"}:{sharing.port}</b></div>
+            <div>
+              <span class="lbl">Address</span>
+              {#if sharing.ips.length}
+                <b>{sharing.ips[0]}:{sharing.port}</b>
+                {#if sharing.ips.length > 1}<span class="more">or {sharing.ips.slice(1).map((ip) => `${ip}:${sharing!.port}`).join(", ")}</span>{/if}
+              {:else}
+                <b>(not connected to a network)</b>
+              {/if}
+            </div>
             <div><span class="lbl">Pairing code</span><b class="mono">{formatCode(sharingCode)}</b></div>
           </div>
-          <p class="hint">Zeolite shares the vault whenever it is open on this PC. The first time, allow Zeolite on <b>private networks</b> if Windows asks. Changes from the phone appear here at once.</p>
+          <p class="hint">
+            Zeolite shares the vault whenever it is open here; keep it open while the other device syncs. To check the connection,
+            open <code>http://{sharing.ips[0] ?? "address"}:{sharing.port}/zeolite/v1/info</code> in the other device's browser:
+            “Wrong pairing code” means the network is fine.
+          </p>
+          {#if isWindows}
+            <p class="hint">Windows asks whether to allow Zeolite on networks: <b>Allow</b> needs administrator rights. Without them, share from the phone or tablet instead and connect this PC to it.</p>
+          {/if}
           <div class="actions">
             <button type="button" onclick={() => onShare?.(true, true)} title="Devices paired with the old code must enter the new one">New code</button>
             <button type="button" class="danger" onclick={() => onShare?.(false)}>Stop sharing</button>
           </div>
         {:else}
-          <p class="hint">Lets a phone or tablet on the same Wi-Fi sync directly with this PC: no server, no internet.</p>
+          <p class="hint">
+            Lets another device on the same Wi-Fi (or this phone's hotspot) sync directly with this one: no server, no internet.
+            {#if isWindows}A sharing PC needs Zeolite allowed in Windows Firewall (administrator rights); if you have none, share from the phone or tablet instead.{/if}
+          </p>
           <div class="actions"><button type="button" class="primary" onclick={() => onShare?.(true)}>Share this vault</button></div>
         {/if}
         {#if sharingError}<p class="error">⚠ {sharingError}</p>{/if}
@@ -310,6 +329,10 @@ users:
   .pair div {
     display: flex;
     flex-direction: column;
+  }
+  .pair .more {
+    color: var(--muted);
+    font-size: 12px;
   }
   .pair .lbl {
     color: var(--muted);
