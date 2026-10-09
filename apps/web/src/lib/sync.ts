@@ -6,13 +6,14 @@
  */
 import { conflictPath, hashBytes, isSyncedPath, planSync, type SyncAction, type SyncBase } from "@zeolite/core";
 import type { VaultStorage } from "./storage";
+import { LanClient } from "./lan";
 import { OneDriveClient } from "./onedrive";
 import { WebDavClient } from "./webdav";
 
 export interface SyncSettings {
   /** Missing in settings saved before OneDrive support: WebDAV. */
-  kind?: "webdav" | "onedrive";
-  /** WebDAV folder address and account. */
+  kind?: "webdav" | "onedrive" | "lan";
+  /** WebDAV folder address and account (lan: the PC's address, password = pairing code). */
   url: string;
   username: string;
   password: string;
@@ -37,11 +38,13 @@ export interface SyncRemote {
 }
 
 export function makeRemote(s: SyncSettings): SyncRemote {
-  return s.kind === "onedrive" ? new OneDriveClient(s.clientId ?? "", s.folder ?? "") : new WebDavClient(s.url, s.username, s.password);
+  if (s.kind === "onedrive") return new OneDriveClient(s.clientId ?? "", s.folder ?? "");
+  if (s.kind === "lan") return new LanClient(s.url, s.password);
+  return new WebDavClient(s.url, s.username, s.password);
 }
 
 /** Short description of where a vault syncs to. */
-export const syncTarget = (s: SyncSettings) => (s.kind === "onedrive" ? `OneDrive: ${s.folder}` : s.url);
+export const syncTarget = (s: SyncSettings) => (s.kind === "onedrive" ? `OneDrive: ${s.folder}` : s.kind === "lan" ? `the PC at ${s.url.replace(/^https?:\/\//, "")}` : s.url);
 
 const key = (vault: string) => `zeolite.sync.${vault}`;
 

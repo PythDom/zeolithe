@@ -1,8 +1,9 @@
 <script lang="ts">
-  import { onDestroy } from "svelte";
+  import { onDestroy, untrack } from "svelte";
   import { makeRemote, type SyncSettings } from "../lib/sync";
   import { DEFAULT_CLIENT_ID, signedInAccount, signOut, startSignIn, type DeviceCode } from "../lib/onedrive";
   import { openExternal } from "../lib/native";
+  import { formatCode, lanAddress, type SharingInfo } from "../lib/lan";
 
   interface Props {
     vaultName: string;
@@ -12,12 +13,18 @@
     onSave: (s: SyncSettings) => void;
     onRemove: () => void;
     onClose: () => void;
+    /** Windows app: share this vault with a phone or tablet on the local network. */
+    canShare?: boolean;
+    sharing?: SharingInfo | null;
+    sharingCode?: string;
+    sharingError?: string;
+    onShare?: (on: boolean, newCode?: boolean) => void;
   }
-  let { vaultName, settings, last, onSave, onRemove, onClose }: Props = $props();
+  let { vaultName, settings, last, onSave, onRemove, onClose, canShare = false, sharing = null, sharingCode = "", sharingError = "", onShare }: Props = $props();
 
   // svelte-ignore state_referenced_locally
   const init = settings ?? { url: "", username: "", password: "", every: 5 };
-  let kind = $state<"webdav" | "onedrive">(init.kind ?? "webdav");
+  let kind = $state<"webdav" | "onedrive" | "lan">(init.kind ?? "webdav");
   let url = $state(init.url);
   let username = $state(init.username);
   let password = $state(init.password);
@@ -70,8 +77,16 @@
   const current = (): SyncSettings =>
     kind === "onedrive"
       ? { kind, url: "", username: "", password: "", folder: folder.trim().replace(/^\/+|\/+$/g, ""), clientId: clientId.trim(), every }
-      : { kind, url: url.trim(), username: username.trim(), password, every };
-  const ready = $derived(kind === "onedrive" ? !!(account && folder.trim()) : !!url.trim());
+      : kind === "lan"
+        ? { kind, url: lanAddress(url), username: "", password: password.trim(), every }
+        : { kind, url: url.trim(), username: username.trim(), password, every };
+  const ready = $derived(kind === "onedrive" ? !!(account && folder.trim()) : kind === "lan" ? !!(url.trim() && password.trim()) : !!url.trim());
+  // Switching to the PC option: the WebDAV address is not a PC address.
+  let lastKind = untrack(() => kind);
+  $effect(() => {
+    if (kind !== lastKind && (kind === "lan" || lastKind === "lan")) (url = ""), (password = "");
+    lastKind = kind;
+  });
 
   async function check(): Promise<boolean> {
     testing = true;
@@ -100,12 +115,13 @@
   <form class="dialog" onsubmit={submit}>
     <h2>Sync</h2>
     <p class="intro">
-      Keeps “{vaultName}” in sync with a folder on your own WebDAV server or in OneDrive. Each device with Zeolite syncs with
-      the same folder. Changes made on both sides are kept as conflict copies, deletions go to <code>.trash</code>.
+      Keeps “{vaultName}” in sync with a folder on your own WebDAV server, in OneDrive, or directly with a PC on the same Wi-Fi.
+      Each device with Zeolite syncs with the same place. Changes made on both sides are kept as conflict copies, deletions go to <code>.trash</code>.
     </p>
     <div class="seg" role="radiogroup" aria-label="Sync with">
       <label class:active={kind === "webdav"}><input type="radio" bind:group={kind} value="webdav" />WebDAV server</label>
       <label class:active={kind === "onedrive"}><input type="radio" bind:group={kind} value="onedrive" />OneDrive</label>
+      <label class:active={kind === "lan"}><input type="radio" bind:group={kind} value="lan" />PC on this Wi-Fi</label>
     </div>
 
     {#if kind === "webdav"}
@@ -121,6 +137,17 @@
             <input type={showPassword ? "text" : "password"} bind:value={password} autocomplete="current-password" />
             <button type="button" class="eye" onclick={() => (showPassword = !showPassword)} aria-label={showPassword ? "Hide password" : "Show password"}>{showPassword ? "🙈" : "👁"}</button>
           </span>
+        </label>
+      </div>
+    {:else if kind === "lan"}
+      <p class="hint">Syncs directly with Zeolite on a PC on the same Wi-Fi (or your phone's hotspot), no server or internet needed. On the PC: ⇅ → <b>Share with a phone or tablet</b> shows the address and the pairing code.</p>
+      <div class="row">
+        <label>PC address
+          <!-- svelte-ignore a11y_autofocus -->
+          <input bind:value={url} placeholder="192.168.1.20:47123" inputmode="url" autocomplete="off" autofocus={!settings} />
+        </label>
+        <label>Pairing code
+          <input bind:value={password} placeholder="K7P4-QX9M" autocomplete="off" spellcheck="false" style="text-transform: uppercase" />
         </label>
       </div>
     {:else}
@@ -164,7 +191,9 @@
     {#if result}<p class={result.ok ? "ok" : "error"}>{result.ok ? "✓" : "⚠"} {result.text}</p>{/if}
     {#if last}<p class="hint">Last sync: {last}</p>{/if}
 
-    {#if kind === "webdav"}
+    {#if kind === "lan"}
+      <!-- no server to set up -->
+    {:else if kind === "webdav"}
       <details>
         <summary>Setting up the server (Docker)</summary>
         <p>On your Docker server, create a folder with these two files, then run <code>docker compose up -d</code>:</p>
@@ -221,6 +250,28 @@ users:
       </details>
     {/if}
 
+    {#if canShare}
+      <section class="share">
+        <h3>📶 Share with a phone or tablet</h3>
+        {#if sharing}
+          <p>Sharing “{vaultName}” on this Wi-Fi. On the phone or tablet: ⇅ → <b>PC on this Wi-Fi</b>, then enter:</p>
+          <div class="pair">
+            <div><span class="lbl">Address</span><b>{sharing.ip ?? "(not connected to a network)"}:{sharing.port}</b></div>
+            <div><span class="lbl">Pairing code</span><b class="mono">{formatCode(sharingCode)}</b></div>
+          </div>
+          <p class="hint">Zeolite shares the vault whenever it is open on this PC. The first time, allow Zeolite on <b>private networks</b> if Windows asks. Changes from the phone appear here at once.</p>
+          <div class="actions">
+            <button type="button" onclick={() => onShare?.(true, true)} title="Devices paired with the old code must enter the new one">New code</button>
+            <button type="button" class="danger" onclick={() => onShare?.(false)}>Stop sharing</button>
+          </div>
+        {:else}
+          <p class="hint">Lets a phone or tablet on the same Wi-Fi sync directly with this PC: no server, no internet.</p>
+          <div class="actions"><button type="button" class="primary" onclick={() => onShare?.(true)}>Share this vault</button></div>
+        {/if}
+        {#if sharingError}<p class="error">⚠ {sharingError}</p>{/if}
+      </section>
+    {/if}
+
     <div class="actions">
       {#if settings}<button type="button" class="danger" onclick={onRemove}>Stop syncing</button>{/if}
       <span class="spacer"></span>
@@ -232,6 +283,45 @@ users:
 </div>
 
 <style>
+  .share {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .share h3 {
+    margin: 0;
+    font-size: 15px;
+  }
+  .share p {
+    margin: 0;
+    font-size: 13.5px;
+  }
+  .pair {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 24px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: var(--accent-soft);
+  }
+  .pair div {
+    display: flex;
+    flex-direction: column;
+  }
+  .pair .lbl {
+    color: var(--muted);
+    font-size: 12px;
+  }
+  .pair b {
+    font-size: 20px;
+  }
+  .mono {
+    font-family: var(--mono);
+    letter-spacing: 0.08em;
+  }
   .backdrop {
     position: fixed;
     inset: 0;

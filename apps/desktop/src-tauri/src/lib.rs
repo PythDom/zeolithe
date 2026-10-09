@@ -2,8 +2,11 @@ use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
 use std::path::PathBuf;
+use std::sync::Mutex;
 
-use tauri::{ipc::CapabilityBuilder, AppHandle, Manager, State, WebviewWindowBuilder};
+pub mod lan;
+
+use tauri::{ipc::CapabilityBuilder, AppHandle, Emitter, Manager, State, WebviewWindowBuilder};
 use tauri_plugin_fs::FsExt;
 
 /// Where Zeolite keeps its own data (web storage: last vault, sync settings;
@@ -95,6 +98,53 @@ struct ScanEntry {
 /// call: listing a vault file by file through the fs plugin is slow, and the
 /// app checks the folder every few seconds for changes made by other apps.
 /// Folders named in `ignore` (.obsidian, .trash…) are skipped.
+/// The vault shared with a phone or tablet on the local network, if any.
+#[derive(Default)]
+struct Sharing(Mutex<Option<lan::LanServer>>);
+
+#[derive(serde::Serialize)]
+struct SharingInfo {
+    /// This computer's address on the network (None if not connected).
+    ip: Option<String>,
+    port: u16,
+}
+
+/// Share the open vault on the local network (Wi-Fi) with the pairing code
+/// `token`. Devices that write or delete files trigger a `lan-changed` event.
+#[tauri::command]
+fn lan_start(app: AppHandle, data: State<DataDir>, sharing: State<Sharing>, path: String, name: String, token: String, port: u16) -> Result<SharingInfo, String> {
+    if !vault_allowed(&app, &data, &path) {
+        return Err("This folder was not chosen in the folder dialog.".into());
+    }
+    let mut current = sharing.0.lock().map_err(|e| e.to_string())?;
+    if let Some(old) = current.take() {
+        old.stop();
+    }
+    let root = PathBuf::from(path.trim_end_matches(['/', '\\']));
+    let handle = app.clone();
+    let server = lan::start(root, name, token, port, move |paths| {
+        let _ = handle.emit("lan-changed", paths);
+    })?;
+    let info = SharingInfo { ip: lan::local_ip(), port: server.port };
+    *current = Some(server);
+    Ok(info)
+}
+
+#[tauri::command]
+fn lan_stop(sharing: State<Sharing>) -> Result<(), String> {
+    if let Some(server) = sharing.0.lock().map_err(|e| e.to_string())?.take() {
+        server.stop();
+    }
+    Ok(())
+}
+
+/// Address and port while sharing (None when stopped, e.g. after too many wrong codes).
+#[tauri::command]
+fn lan_status(sharing: State<Sharing>) -> Result<Option<SharingInfo>, String> {
+    let current = sharing.0.lock().map_err(|e| e.to_string())?;
+    Ok(current.as_ref().filter(|s| s.is_running()).map(|s| SharingInfo { ip: lan::local_ip(), port: s.port }))
+}
+
 /// Open an e-mail draft (an .eml file marked "X-Unsent") in the default mail
 /// app: Outlook and Windows Mail open it as a new message ready to send.
 #[tauri::command]
@@ -183,7 +233,8 @@ pub fn run() {
         // Web links open in the default browser.
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_http::init())
-        .invoke_handler(tauri::generate_handler![allow_vault, scan_vault, open_mail_draft])
+        .manage(Sharing::default())
+        .invoke_handler(tauri::generate_handler![allow_vault, scan_vault, open_mail_draft, lan_start, lan_stop, lan_status])
         .run(tauri::generate_context!())
         .expect("error while running Zeolite");
 }

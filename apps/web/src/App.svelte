@@ -42,6 +42,7 @@
   import QueryBuilder from "./components/QueryBuilder.svelte";
   import PersonDashboard from "./components/PersonDashboard.svelte";
   import MailDialog from "./components/MailDialog.svelte";
+  import { newPairingCode, onSharedChange, sharingStatus, startSharing, stopSharing, type SharingInfo } from "./lib/lan";
   import TaxonomyManager from "./components/TaxonomyManager.svelte";
   import TemplateManager from "./components/TemplateManager.svelte";
   import ExportDialog from "./components/ExportDialog.svelte";
@@ -170,6 +171,66 @@
   let syncError = $state(false);
   /** Question asked before deleting many files during a sync. */
   let syncAsk = $state<{ text: string; sample: string[]; answer: (yes: boolean) => void } | null>(null);
+
+  // --- Sharing this vault on the local network (Windows app) -----------------
+  let sharing = $state<SharingInfo | null>(null);
+  let sharingCode = $state("");
+  let sharingError = $state("");
+  const shareKey = (name: string) => `zeolite.lan.${name}`;
+  /** Sharing settings of a vault on this PC: its pairing code, and whether it is shared when opened. */
+  function shareSettings(name: string): { code: string; on: boolean } {
+    try {
+      const s = JSON.parse(localStorage.getItem(shareKey(name)) ?? "null") as { code: string; on: boolean } | null;
+      if (s?.code) return s;
+    } catch {
+      /* new settings below */
+    }
+    return { code: newPairingCode(), on: false };
+  }
+  function saveShareSettings(name: string, s: { code: string; on: boolean }) {
+    try {
+      localStorage.setItem(shareKey(name), JSON.stringify(s));
+    } catch {
+      /* not kept: asked again next time */
+    }
+  }
+  const canShare = () => vault !== demo && !readOnlyCopy && vault.storage instanceof TauriStorage;
+
+  async function share(on: boolean, newCode = false) {
+    sharingError = "";
+    const settings = shareSettings(vault.name);
+    if (newCode) settings.code = newPairingCode();
+    settings.on = on;
+    saveShareSettings(vault.name, settings);
+    sharingCode = settings.code;
+    try {
+      if (!on || !canShare()) {
+        await stopSharing();
+        sharing = null;
+        return;
+      }
+      sharing = await startSharing((vault.storage as TauriStorage).root, vault.name, settings.code);
+    } catch (e) {
+      sharing = null;
+      sharingError = (e as Error).message;
+    }
+  }
+
+  // Files written by a phone or tablet: show them now (the open note included).
+  let sharedChangeTimer: ReturnType<typeof setTimeout> | undefined;
+  if (platform() === "tauri") {
+    void onSharedChange(() => {
+      clearTimeout(sharedChangeTimer);
+      sharedChangeTimer = setTimeout(() => void diskCheck(), 400);
+    });
+    // Stopped by the server itself (too many wrong pairing codes): show it.
+    setInterval(async () => {
+      if (sharing && !(await sharingStatus().catch(() => null))) {
+        sharing = null;
+        sharingError = "Sharing stopped after too many wrong pairing codes. Start it again (a new code is safer).";
+      }
+    }, 15_000);
+  }
 
   async function syncNow() {
     if (!syncSettings || syncing || readOnlyCopy) return;
@@ -371,6 +432,14 @@
     vault = v;
     // Never for the demo vault: its notes must not end up in a real vault's server folder.
     syncSettings = readOnlyCopy || v === demo ? null : loadSyncSettings(v.name);
+    sharing = null;
+    sharingError = "";
+    if (v.storage instanceof TauriStorage && v !== demo && !readOnlyCopy) {
+      const share0 = shareSettings(v.name);
+      sharingCode = share0.code;
+      if (share0.on) queueMicrotask(() => void share(true));
+      else void stopSharing().catch(() => undefined);
+    }
     syncInfo = "";
     syncError = false;
     // An empty real folder: offer to set it up as a new vault.
@@ -1420,6 +1489,11 @@
       status = "Sync stopped on this device. Your files stay where they are.";
     }}
     onClose={() => (showSync = false)}
+    canShare={canShare()}
+    {sharing}
+    {sharingCode}
+    {sharingError}
+    onShare={share}
   />
 {/if}
 
