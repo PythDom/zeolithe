@@ -1,6 +1,22 @@
 import taxonomy from "../../../../docs/taxonomy.md?raw";
 import logo from "../../../../assets/logo/zeolite-icon.svg?raw";
-import { TAXONOMY_PATH, toIsoDate, toIsoMinute } from "@zeolite/core";
+import { SETTINGS_PATH, TAXONOMY_PATH, toIsoDate, toIsoMinute, writePeople, type Person } from "@zeolite/core";
+
+/** The vault settings note, with the people met in one-on-ones (managed in ⚙ Settings). */
+function settingsNote(people: Person[]): string {
+  return writePeople(
+    `# Zeolite settings
+
+Settings of this vault, shared by every device that syncs it. Change them in
+Zeolite with **⚙ Settings**; Obsidian keeps its own settings in \`.obsidian/\`.
+
+- \`one_on_one_people\`: the people you meet in one-on-ones (name, optional
+  e-mail for ✉). Add them in **＋ New note → One-on-One → ＋ New**, edit or
+  remove them in **⚙ Settings → One-on-one meetings**.
+`,
+    people,
+  );
+}
 
 /** A small in-memory vault so the app can be tried without opening a folder. */
 export function demoVault(now = new Date()): Record<string, string | Blob> {
@@ -9,6 +25,7 @@ export function demoVault(now = new Date()): Record<string, string | Blob> {
   const created = toIsoMinute(now);
   return {
     [TAXONOMY_PATH]: taxonomy,
+    [SETTINGS_PATH]: settingsNote([{ name: "Anna Smith", email: "anna.smith@example.com" }]),
     "attachments/zeolite-icon.svg": new Blob([logo], { type: "image/svg+xml" }),
     "Welcome.md": `---
 created: ${created}
@@ -255,6 +272,7 @@ export function starterVault(now = new Date()): Record<string, string> {
   for (const [path, content] of Object.entries(demo)) {
     if (typeof content === "string" && (path === TAXONOMY_PATH || path.startsWith("_system/Templates/"))) out[path] = content;
   }
+  out[SETTINGS_PATH] = settingsNote([]);
   out["Start here.md"] = `---
 created: ${toIsoMinute(now)}
 ---
