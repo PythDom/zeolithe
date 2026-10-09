@@ -102,7 +102,8 @@ export class Vault {
     }
   }
 
-  async load() {
+  /** Read the whole vault. `progress` is told how many notes are read so far. */
+  async load(progress?: (done: number, total: number) => void) {
     this.settings = readObsidianSettings({
       templates: await this.readOptional(".obsidian/templates.json"),
       dailyNotes: await this.readOptional(".obsidian/daily-notes.json"),
@@ -110,20 +111,35 @@ export class Vault {
     });
     const entries = await this.scanFiles();
     const files = entries.map((e) => e.path).sort((a, b) => a.localeCompare(b));
+    const notes = entries.filter((e) => e.path.toLowerCase().endsWith(".md"));
     const records = new Map<string, NoteRecord>();
     this.stamps.clear();
-    for (const { path, stamp } of entries) {
-      if (!path.toLowerCase().endsWith(".md")) continue;
-      const text = await this.storage.readText(path);
-      this.contents.set(path, text);
-      records.set(path, buildNoteRecord(path, text));
-      if (stamp) this.stamps.set(path, stamp);
-      else await this.stamp(path);
+    progress?.(0, notes.length);
+    // In batches, several reads at a time: much faster on a network drive
+    // (or a slow phone storage) than one note after the other.
+    const batch = this.storage.readTexts ? 200 : 16;
+    for (let i = 0; i < notes.length; i += batch) {
+      const part = notes.slice(i, i + batch);
+      const texts = this.storage.readTexts
+        ? await this.storage.readTexts(part.map((e) => e.path))
+        : await Promise.all(part.map((e) => this.storage.readText(e.path)));
+      for (const [k, { path, stamp }] of part.entries()) {
+        const text = texts[k];
+        if (text == null) throw new Error(`Cannot read “${path}”.`);
+        this.contents.set(path, text);
+        records.set(path, buildNoteRecord(path, text));
+        if (stamp) this.stamps.set(path, stamp);
+        else await this.stamp(path);
+      }
+      progress?.(Math.min(i + batch, notes.length), notes.length);
     }
     for (const u of this.assetUrls.values()) URL.revokeObjectURL(u);
     this.assetUrls.clear();
-    for (const path of files) {
-      if (IMAGE_EXT.test(path)) this.assetUrls.set(path, URL.createObjectURL(await this.storage.readBinary(path)));
+    const images = files.filter((path) => IMAGE_EXT.test(path));
+    for (let i = 0; i < images.length; i += 16) {
+      const part = images.slice(i, i + 16);
+      const blobs = await Promise.all(part.map((path) => this.storage.readBinary(path)));
+      part.forEach((path, k) => this.assetUrls.set(path, URL.createObjectURL(blobs[k])));
     }
     this.settings = applyZeoliteSettings(this.settings, this.contents.get(SETTINGS_PATH));
     this.files = files;

@@ -67,19 +67,15 @@ export class TauriStorage implements VaultStorage {
     return (await this.scan()).map((e) => e.path);
   }
 
+  /** One native call for every note: several are read at a time, which matters on a network drive. */
+  async readTexts(paths: string[]): Promise<(string | null)[]> {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return invoke<(string | null)[]>("read_notes", { path: this.root, files: paths });
+  }
+
   async listDirs(): Promise<string[]> {
-    const { readDir } = await import("@tauri-apps/plugin-fs");
-    const out: string[] = [];
-    const walk = async (rel: string) => {
-      for (const e of await readDir(rel ? this.abs(rel) : this.root)) {
-        if (!e.isDirectory || IGNORED_DIRS.has(e.name)) continue;
-        const p = rel ? `${rel}/${e.name}` : e.name;
-        out.push(p);
-        await walk(p);
-      }
-    };
-    await walk("");
-    return out;
+    const { invoke } = await import("@tauri-apps/api/core");
+    return invoke<string[]>("vault_dirs", { path: this.root, ignore: [...IGNORED_DIRS] });
   }
 
   async makeDir(path: string) {

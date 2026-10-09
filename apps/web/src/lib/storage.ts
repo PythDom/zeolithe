@@ -26,6 +26,8 @@ export interface VaultStorage {
   stat?(path: string): Promise<FileStamp>;
   /** Every file with its modification time and size, in one go (optional; faster than list + stat). */
   scan?(): Promise<ScanEntry[]>;
+  /** Many notes in one go (optional; null for a file that cannot be read). */
+  readTexts?(paths: string[]): Promise<(string | null)[]>;
   /** Open a file with its default app (optional: Windows app). */
   openFile?(path: string): Promise<void>;
 }

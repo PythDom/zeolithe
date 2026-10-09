@@ -201,6 +201,93 @@ fn scan_vault(app: AppHandle, data: State<DataDir>, path: String, ignore: Vec<St
     Ok(out)
 }
 
+/// A path inside the vault as the web side gives it ("folder/note.md"):
+/// nothing absolute, no `..`, no drive letter.
+fn inside_vault(root: &std::path::Path, rel: &str) -> Option<PathBuf> {
+    let parts: Vec<&str> = rel.split(['/', '\\']).collect();
+    if rel.is_empty() || rel.contains(':') || parts.iter().any(|p| p.is_empty() || *p == "." || *p == "..") {
+        return None;
+    }
+    Some(parts.iter().fold(root.to_path_buf(), |acc, p| acc.join(p)))
+}
+
+/// Read many notes in one call, several at a time: on a network drive each
+/// read waits for the server, so one call per note (and one at a time) made
+/// opening a large vault slow. Unreadable files come back as `None`.
+#[tauri::command]
+async fn read_notes(app: AppHandle, path: String, files: Vec<String>) -> Result<Vec<Option<String>>, String> {
+    let data = app.state::<DataDir>();
+    if !vault_allowed(&app, &data, &path) {
+        return Err("This folder was not chosen in the folder dialog.".into());
+    }
+    let root = PathBuf::from(path.trim_end_matches(['/', '\\']));
+    Ok(read_texts(&root, &files))
+}
+
+fn read_texts(root: &std::path::Path, files: &[String]) -> Vec<Option<String>> {
+    const THREADS: usize = 8;
+    let mut out: Vec<Option<String>> = vec![None; files.len()];
+    let chunk = files.len().div_ceil(THREADS).max(1);
+    std::thread::scope(|scope| {
+        for (names, slots) in files.chunks(chunk).zip(out.chunks_mut(chunk)) {
+            scope.spawn(move || {
+                for (name, slot) in names.iter().zip(slots.iter_mut()) {
+                    *slot = inside_vault(root, name).and_then(|p| std::fs::read(p).ok()).map(|bytes| {
+                        let text = String::from_utf8_lossy(&bytes);
+                        // Like the web's TextDecoder: no byte order mark.
+                        text.strip_prefix('\u{feff}').unwrap_or(&text).to_string()
+                    });
+                }
+            });
+        }
+    });
+    out
+}
+
+/// Every folder of the vault (empty ones included) in one call.
+#[tauri::command]
+fn vault_dirs(app: AppHandle, data: State<DataDir>, path: String, ignore: Vec<String>) -> Result<Vec<String>, String> {
+    if !vault_allowed(&app, &data, &path) {
+        return Err("This folder was not chosen in the folder dialog.".into());
+    }
+    let mut out = Vec::new();
+    let mut stack = vec![(PathBuf::from(path.trim_end_matches(['/', '\\'])), String::new())];
+    while let Some((dir, prefix)) = stack.pop() {
+        let Ok(entries) = std::fs::read_dir(&dir) else { continue };
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if ignore.contains(&name) || !entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+                continue;
+            }
+            let rel = if prefix.is_empty() { name } else { format!("{prefix}/{name}") };
+            out.push(rel.clone());
+            stack.push((entry.path(), rel));
+        }
+    }
+    out.sort();
+    Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reads_notes_and_refuses_paths_outside() {
+        let root = std::env::temp_dir().join(format!("zeolite-read-{}", std::process::id()));
+        std::fs::create_dir_all(root.join("sub")).unwrap();
+        std::fs::write(root.join("a.md"), "\u{feff}# A").unwrap();
+        std::fs::write(root.join("sub/b.md"), "# B").unwrap();
+        let files: Vec<String> = ["a.md", "sub/b.md", "missing.md", "../a.md", "C:/x.md", "/etc/passwd"].iter().map(|s| s.to_string()).collect();
+        let texts = read_texts(&root, &files);
+        assert_eq!(texts, vec![Some("# A".into()), Some("# B".into()), None, None, None, None]);
+        let many: Vec<String> = (0..50).map(|_| "sub/b.md".to_string()).collect();
+        assert!(read_texts(&root, &many).iter().all(|t| t.as_deref() == Some("# B")));
+        assert!(read_texts(&root, &[]).is_empty());
+        let _ = std::fs::remove_dir_all(&root);
+    }
+}
+
 /// Zeolite desktop shell: the shared web UI in a native window, with access
 /// to the vault folder the user picks. Chosen folders are remembered in
 /// `Zeolite-data`, so the last vault reopens directly.
@@ -238,7 +325,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_http::init())
         .manage(Sharing::default())
-        .invoke_handler(tauri::generate_handler![allow_vault, scan_vault, open_mail_draft, lan_start, lan_stop, lan_status])
+        .invoke_handler(tauri::generate_handler![allow_vault, scan_vault, read_notes, vault_dirs, open_mail_draft, lan_start, lan_stop, lan_status])
         .run(tauri::generate_context!())
         .expect("error while running Zeolite");
 }

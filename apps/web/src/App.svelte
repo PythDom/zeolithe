@@ -112,6 +112,8 @@
   if (shell === "web" && fsAccessSupported()) loadLastVault().then((h) => (lastVault = h));
   let drawer = $state(false);
   let status = $state("");
+  /** While a vault is being read: its name and how many notes are read (shown instead of the previous vault). */
+  let opening = $state<{ name: string; done: number; total: number } | null>(null);
   let editor = $state<ReturnType<typeof Editor>>();
   // Chord sheets: view-only transposition per note block, chosen fingerings.
   let transposed = $state<Record<string, number>>({});
@@ -431,7 +433,12 @@
     v.onConflict = (path, copy) => {
       status = `“${noteName(path)}” was changed elsewhere at the same time: the other version is kept as “${noteName(copy)}”`;
     };
-    await v.load();
+    if (v !== demo) opening = { name: v.name, done: 0, total: opening?.name === v.name ? opening.total : 0 };
+    try {
+      await v.load((done, total) => opening && (opening = { ...opening, done, total }));
+    } finally {
+      opening = null;
+    }
     vault = v;
     // Never for the demo vault: its notes must not end up in a real vault's server folder.
     const settingsProblem = v.settingsProblem();
@@ -1092,6 +1099,8 @@
   async function start() {
     const last = shell !== "web" ? lastVaultPath() : null;
     if (last) {
+      // Not the demo vault meanwhile: a vault on a network drive can take a while.
+      opening = { name: last.replace(/[\\/]+$/, "").split(/[\\/]/).pop() || last, done: 0, total: 0 };
       const storage = shell === "tauri" ? await TauriStorage.reopen(last) : await CapacitorStorage.reopen(last);
       if (storage) {
         try {
@@ -1100,6 +1109,7 @@
           // Fall back to the demo vault below.
         }
       }
+      opening = null;
     }
     await loadVault(demo);
   }
@@ -1133,6 +1143,19 @@
   if ((e.ctrlKey || e.metaKey) && e.key === "\\") { e.preventDefault(); toggleSidebar(); }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "e") { e.preventDefault(); mode = mode === "view" ? "edit" : "view"; }
 }} />
+
+{#if opening}
+  <div class="opening" role="status" aria-live="polite">
+    <img src={logo} alt="" width="56" height="56" />
+    <p>Opening <strong>{opening.name}</strong>…</p>
+    {#if opening.total}
+      <progress max={opening.total} value={opening.done}></progress>
+      <p class="muted">{opening.done} / {opening.total} notes</p>
+    {:else}
+      <p class="muted">Looking through the folder…</p>
+    {/if}
+  </div>
+{/if}
 
 <div class="app" class:drawer class:side-hidden={prefs.sidebarHidden} style="--sidebar-w: {prefs.sidebarWidth}px">
   <aside class="sidebar">
@@ -2040,6 +2063,33 @@
     background: var(--warn-soft);
     color: var(--fg);
     font-size: 13px;
+  }
+  .opening {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 16px;
+    background: var(--bg);
+    color: var(--fg);
+    text-align: center;
+  }
+  .opening p {
+    margin: 0;
+    font-size: 15px;
+    overflow-wrap: anywhere;
+  }
+  .opening .muted {
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .opening progress {
+    width: min(320px, 100%);
+    accent-color: var(--accent);
   }
   .backdrop {
     position: fixed;
