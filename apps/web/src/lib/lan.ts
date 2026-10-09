@@ -115,24 +115,36 @@ export class LanClient {
 
 // --- Sharing (Windows app) ----------------------------------------------------
 
+/** Tauri commands reject with the Rust error as plain text: make it an Error. */
+async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
+  const { invoke } = await import("@tauri-apps/api/core");
+  try {
+    return await invoke<T>(cmd, args);
+  } catch (e) {
+    throw new LanError(typeof e === "string" ? e : ((e as Error)?.message ?? String(e)));
+  }
+}
+
 export interface SharingInfo {
   ip: string | null;
   port: number;
 }
 
 export async function startSharing(vaultPath: string, name: string, code: string, port = LAN_PORT): Promise<SharingInfo> {
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<SharingInfo>("lan_start", { path: vaultPath, name, token: normaliseCode(code), port });
+  try {
+    return await call<SharingInfo>("lan_start", { path: vaultPath, name, token: normaliseCode(code), port });
+  } catch (e) {
+    if (/in use/i.test((e as Error).message)) throw new LanError(`Port ${port} is already used on this PC (another Zeolite window, or another program). Close it and try again.`);
+    throw e;
+  }
 }
 
 export async function stopSharing(): Promise<void> {
-  const { invoke } = await import("@tauri-apps/api/core");
-  await invoke("lan_stop");
+  await call("lan_stop");
 }
 
 export async function sharingStatus(): Promise<SharingInfo | null> {
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<SharingInfo | null>("lan_status");
+  return call<SharingInfo | null>("lan_status");
 }
 
 /** Called with the paths a device wrote or deleted. */

@@ -112,5 +112,10 @@ export async function copyFormatted(html: string, text: string): Promise<boolean
 /** Windows app: open the draft in the default mail app. */
 export async function openDraft(eml: string): Promise<void> {
   const { invoke } = await import("@tauri-apps/api/core");
-  await invoke("open_mail_draft", { eml });
+  try {
+    await invoke("open_mail_draft", { eml });
+  } catch (e) {
+    // Tauri rejects with the Rust error as plain text.
+    throw new Error(typeof e === "string" ? e : ((e as Error)?.message ?? String(e)));
+  }
 }
