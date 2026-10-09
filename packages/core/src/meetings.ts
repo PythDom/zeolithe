@@ -157,7 +157,7 @@ export function personDashboard(person: string): string {
   return [
     `# ${person}`,
     "",
-    "Open items from the one-on-one meetings with this person, and items assigned to them (`[owner:: …]`) in any note.",
+    "Open items from our one-on-one meetings, and any other assigned items from other discussions.",
     "",
     "## Open actions",
     "",
