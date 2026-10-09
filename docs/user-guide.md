@@ -453,7 +453,9 @@ on a work PC).
 Keep Zeolite open on the sharing device while the other one syncs. It
 shares again whenever the vault is opened there (**Stop sharing** ends it).
 Changes arrive on the sharing device at once; if the same note was being
-edited there, the other version is kept as a conflict copy. **New code**
+edited there, the other version is kept as a conflict copy. Notes deleted
+on one device go to the `.trash` folder of the other, so nothing is lost.
+**New code**
 replaces the pairing code. After 20 wrong codes, sharing stops until you
 start it again.
 

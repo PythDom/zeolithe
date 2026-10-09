@@ -157,6 +157,40 @@ fn version(meta: &std::fs::Metadata) -> String {
     format!("{mtime}-{}", meta.len())
 }
 
+/// Deleted from another device: kept in `.trash/deleted by sync <UTC date time>/`,
+/// like the deletions a syncing device receives, so nothing is lost.
+fn move_to_trash(root: &Path, path: &str) -> std::io::Result<()> {
+    let secs = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+    let mut target = root.join(".trash").join(format!("deleted by sync {}", utc_stamp(secs))).join(path);
+    if let Some(dir) = target.parent() {
+        std::fs::create_dir_all(dir)?;
+    }
+    // The same note deleted twice within a second: keep both.
+    let mut n = 1;
+    while target.exists() {
+        n += 1;
+        target.set_file_name(format!("{} {n}", Path::new(path).file_name().and_then(|f| f.to_str()).unwrap_or("file")));
+    }
+    std::fs::rename(root.join(path), &target)
+}
+
+/// "2026-10-09 17-05-03" (UTC), from seconds since 1970.
+fn utc_stamp(secs: u64) -> String {
+    let days = (secs / 86_400) as i64;
+    let rem = secs % 86_400;
+    // Civil date from days since 1970-01-01 (Howard Hinnant's algorithm).
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = yoe + era * 400 + if m <= 2 { 1 } else { 0 };
+    format!("{y:04}-{m:02}-{d:02} {:02}-{:02}-{:02}", rem / 3600, rem % 3600 / 60, rem % 60)
+}
+
 fn list(root: &Path) -> serde_json::Map<String, serde_json::Value> {
     let mut out = serde_json::Map::new();
     let mut stack = vec![(root.to_path_buf(), String::new())];
@@ -237,14 +271,19 @@ fn handle(mut req: Request, root: &Path, name: &str, token: &str, failures: &Ato
                             }
                         }
                     }
-                    Method::Delete => match std::fs::remove_file(&full) {
-                        Ok(_) => {
-                            changed = Some(path);
+                    Method::Delete => {
+                        if !full.is_file() {
                             cors(Response::from_data(Vec::new()).with_status_code(204))
+                        } else {
+                            match move_to_trash(root, &path) {
+                                Ok(()) => {
+                                    changed = Some(path);
+                                    cors(Response::from_data(Vec::new()).with_status_code(204))
+                                }
+                                Err(e) => error(500, &e.to_string()),
+                            }
                         }
-                        Err(e) if e.kind() == std::io::ErrorKind::NotFound => cors(Response::from_data(Vec::new()).with_status_code(204)),
-                        Err(e) => error(500, &e.to_string()),
-                    },
+                    }
                     _ => error(405, "Method not allowed."),
                 }
             }
@@ -337,6 +376,12 @@ mod tests {
         assert_eq!(rx.recv().unwrap(), vec!["New folder/b é.md".to_string()]);
         assert_eq!(call(port, "DELETE", "/zeolite/v1/file?path=Notes%2Fa.md", "CODE1234", b"").0, 204);
         assert!(!root.join("Notes/a.md").exists());
+        // Kept in the trash, which the list leaves out.
+        let trash: Vec<_> = std::fs::read_dir(root.join(".trash")).unwrap().flatten().collect();
+        assert_eq!(trash.len(), 1);
+        assert!(trash[0].file_name().to_string_lossy().starts_with("deleted by sync "));
+        assert_eq!(std::fs::read_to_string(trash[0].path().join("Notes/a.md")).unwrap(), "# A");
+        assert!(!call(port, "GET", "/zeolite/v1/list", "CODE1234", b"").1.contains("trash"));
         assert_eq!(call(port, "DELETE", "/zeolite/v1/file?path=Notes%2Fa.md", "CODE1234", b"").0, 204);
 
         // Outside the synced files.
@@ -352,6 +397,13 @@ mod tests {
         assert!(!srv.is_running());
         srv.stop();
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn stamps_dates_in_utc() {
+        assert_eq!(utc_stamp(0), "1970-01-01 00-00-00");
+        assert_eq!(utc_stamp(1_791_568_424), "2026-10-09 17-53-44");
+        assert_eq!(utc_stamp(951_782_400), "2000-02-29 00-00-00");
     }
 
     #[test]

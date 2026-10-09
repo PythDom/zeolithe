@@ -314,7 +314,11 @@ public class LanServer {
                 return;
             }
             case "DELETE": {
-                if (file.isFile() && !file.delete()) {
+                if (!file.isFile()) {
+                    respond(out, 204, null, new byte[0]);
+                    return;
+                }
+                if (!moveToTrash(path)) {
                     error(out, 500, "Cannot delete the file.");
                     return;
                 }
@@ -344,6 +348,21 @@ public class LanServer {
             return path;
         }
         return null;
+    }
+
+    /**
+     * Deleted from another device: kept in ".trash/deleted by sync <UTC date time>/",
+     * like the deletions a syncing device receives, so nothing is lost.
+     */
+    private boolean moveToTrash(String path) {
+        java.text.SimpleDateFormat fmt = new java.text.SimpleDateFormat("yyyy-MM-dd HH-mm-ss", Locale.ROOT);
+        fmt.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
+        File target = new File(new File(new File(root, ".trash"), "deleted by sync " + fmt.format(new java.util.Date())), path);
+        File dir = target.getParentFile();
+        if (dir != null && !dir.isDirectory() && !dir.mkdirs()) return false;
+        // The same note deleted twice within a second: keep both.
+        for (int n = 2; target.exists(); n++) target = new File(dir, new File(path).getName() + " " + n);
+        return new File(root, path).renameTo(target);
     }
 
     static String version(File f) {
