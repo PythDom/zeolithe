@@ -135,6 +135,8 @@ numbers a free note the same way. **Archive** moves a note to
   or onto "vault root" below the list.
 - **New folder:** 📁＋ New folder at the top of the Files list, or ＋ next to
   a folder for a sub-folder. `Projects/2026` creates both levels.
+- **Collapse all / Expand all** (next to New folder) folds or opens every
+  folder at once; Zeolite remembers which folders are folded.
 - **Delete a folder:** 🗑 next to its name; everything goes to `.trash`.
 - Links to a note are **updated automatically** when it is renamed or moved.
 

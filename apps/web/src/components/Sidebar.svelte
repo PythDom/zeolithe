@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Snippet } from "svelte";
+  import { untrack, type Snippet } from "svelte";
   import { isArchived, TAXONOMY_PATH, toIsoDate } from "@zeolite/core";
   import type { Vault } from "../lib/vault.svelte";
 
@@ -74,7 +74,38 @@
   const fileName = (path: string) => path.split("/").pop()!;
   const fileIcon = (path: string) =>
     /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i.test(path) ? "🖼" : /\.pdf$/i.test(path) ? "📕" : /\.(docx?|odt|rtf|txt)$/i.test(path) ? "📄" : /\.(xlsx?|ods|csv)$/i.test(path) ? "📊" : /\.(pptx?|odp)$/i.test(path) ? "📽" : "📎";
-  let collapsed = $state<Record<string, boolean>>({});
+  // Collapsed folders, remembered per vault on this device.
+  const collapsedKey = () => `zeolite.collapsed.${vault.name}`;
+  function loadCollapsed(): Record<string, boolean> {
+    try {
+      return JSON.parse(localStorage.getItem(collapsedKey()) ?? "{}") as Record<string, boolean>;
+    } catch {
+      return {};
+    }
+  }
+  let collapsed = $state<Record<string, boolean>>(loadCollapsed());
+  let collapsedFor = untrack(() => vault.name);
+  $effect(() => {
+    // Another vault opened: its own folders.
+    if (vault.name !== collapsedFor) {
+      collapsedFor = vault.name;
+      collapsed = loadCollapsed();
+      return;
+    }
+    const json = JSON.stringify(collapsed);
+    try {
+      localStorage.setItem(collapsedKey(), json);
+    } catch {
+      // Not remembered.
+    }
+  });
+  const folderNames = $derived(folders.map(([d]) => d).filter(Boolean));
+  const allCollapsed = $derived(folderNames.length > 0 && folderNames.every((d) => collapsed[d]));
+  /** Collapse every folder, or open them all when they are all collapsed. */
+  function toggleAll() {
+    const close = !allCollapsed;
+    collapsed = Object.fromEntries(folderNames.map((d) => [d, close]));
+  }
 
   // Tags grouped by taxonomy role.
   const tagGroups = $derived.by(() => {
@@ -146,7 +177,12 @@
   {/if}
 
   {#if tab === "files"}
-    <button class="build" onclick={() => onNewFolder("")}>📁＋ New folder…</button>
+    <div class="files-tools">
+      <button class="build" onclick={() => onNewFolder("")}>📁＋ New folder…</button>
+      {#if folderNames.length}
+        <button class="build all" onclick={toggleAll} title={allCollapsed ? "Open all folders" : "Collapse all folders"}>{allCollapsed ? "▾ Expand all" : "▸ Collapse all"}</button>
+      {/if}
+    </div>
     {#each folders as [dir, { notes: files, others }]}
       {#if dir}
         <div
@@ -484,6 +520,20 @@
     background: var(--bg);
     color: var(--fg);
     font: inherit;
+  }
+  .files-tools {
+    display: flex;
+    gap: 6px;
+  }
+  .files-tools .build {
+    flex: 1;
+    width: auto;
+    min-width: 0;
+    white-space: nowrap;
+  }
+  .files-tools .build.all {
+    flex: 0 0 auto;
+    padding: 7px 10px;
   }
   .build {
     width: 100%;
