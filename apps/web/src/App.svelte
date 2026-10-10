@@ -50,6 +50,7 @@
   import RenameDialog from "./components/RenameDialog.svelte";
   import DeleteDialog from "./components/DeleteDialog.svelte";
   import ChangeIdDialog from "./components/ChangeIdDialog.svelte";
+  import FilingDialog from "./components/FilingDialog.svelte";
   import Preview from "./components/Preview.svelte";
   import Sidebar from "./components/Sidebar.svelte";
   import Toolbar from "./components/Toolbar.svelte";
@@ -98,6 +99,8 @@
   let folderInput = $state<HTMLInputElement>();
   let showDelete = $state(false);
   let showChangeId = $state(false);
+  /** Importing notes, or numbering the notes without ID. */
+  let filing = $state<"import" | "number" | null>(null);
   let deleteFolder = $state<string | null>(null);
   /** Parent of the folder being created ("" = vault root), null when the dialog is closed. */
   let newFolderIn = $state<string | null>(null);
@@ -1214,6 +1217,7 @@
       onMoveNote={moveNote}
       onDeleteFolder={(f) => (deleteFolder = f)}
       onNewFolder={(parent) => (newFolderIn = parent)}
+      onFiling={(mode) => flush().then(() => ((filing = mode), (drawer = false)))}
       onOpenAttachment={(p) => (attachment = p)}
     >
       {#snippet related()}
@@ -1423,6 +1427,28 @@
     }}
     onSetupTaxonomy={() => ((showChangeId = false), (showTaxonomy = true))}
     onClose={() => (showChangeId = false)}
+  />
+{/if}
+
+{#if filing}
+  <FilingDialog
+    {vault}
+    mode={filing}
+    onMoved={async (from, to) => {
+      renameInHistory(from, to);
+      if (current === from) {
+        current = null;
+        await open(to, undefined, false);
+      }
+    }}
+    onDone={async (summary, first) => {
+      const mode = filing;
+      filing = null;
+      if (mode === "import" && first) await open(first);
+      status = summary;
+    }}
+    onSetupTaxonomy={() => ((filing = null), (showTaxonomy = true))}
+    onClose={() => (filing = null)}
   />
 {/if}
 

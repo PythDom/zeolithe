@@ -19,3 +19,4 @@ export * from "./obsidian";
 export * from "./sync";
 export * from "./meetings";
 export * from "./related";
+export * from "./filing";

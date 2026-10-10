@@ -296,6 +296,35 @@ Numbers follow `PARA.Category.Sub-PARA.Sequence`, defined in
 notes end up with the same ID (for instance after a sync), Zeolite warns
 you and offers to renumber the newer one.
 
+### Importing notes and numbering many at once
+
+**Files → 📥 Import…** copies `.md` files into the vault (pick files, or a
+whole folder on PC). Images and PDFs picked with them go to the
+attachments folder, and links to them follow if one had to be renamed.
+The original files are not touched.
+
+**Files → 🔢 Number…** lists the notes that have no ID yet (outside the
+journal, templates, saved searches and `_system`), for instance notes
+written in Obsidian or synced from elsewhere.
+
+Both open the same review screen, one row per note:
+
+- **Title**, editable (an imported "Untitled" takes its first heading).
+- **Number it** / **Inbox, no ID** / **Don't import** (or **Leave as is**).
+- **PARA, Category, Sub-PARA** and the **number** (next free one in that
+  series, counting the other notes of the batch; type one to choose it).
+- **✨ Suggestion**: the PARA / Category / Sub-PARA most of the note's
+  closest numbered notes share (by words, and by meaning when the AI index
+  is on), with how many agree and which notes. Clear majorities are
+  pre-selected; weak ones are only pre-filled ("weak: check it").
+- The resulting name and folder; clashes are flagged before anything is
+  written.
+
+Tick several rows and use the bar at the top to apply one filing to all of
+them. **Put numbered notes in their PARA folder** is on by default. Nothing
+changes until you click **Import** or **Number**; links to renumbered
+notes are updated, as with Change ID.
+
 ## Chord sheets
 
 Put songs in a ` ```chords ` block, with chords above the lyrics or inline

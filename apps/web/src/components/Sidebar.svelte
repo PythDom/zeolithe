@@ -20,12 +20,14 @@
     onDeleteFolder: (folder: string) => void;
     /** Create a folder inside `parent` ("" = vault root). */
     onNewFolder: (parent: string) => void;
+    /** Import .md files, or number the notes without ID (several at once). */
+    onFiling?: (mode: "import" | "number") => void;
     /** An attachment (image, PDF…) was clicked in the Files list. */
     onOpenAttachment: (path: string) => void;
     /** Ctrl/Cmd+click or middle-click on a note: open it in a new tab. */
     onOpenNewTab?: (path: string) => void;
   }
-  let { vault, current, tab = $bindable(), query = $bindable(), related, onOpen, onQuery, onDashboard, onTaxonomy, onMoveNote, onDeleteFolder, onNewFolder, onOpenAttachment, onOpenNewTab }: Props = $props();
+  let { vault, current, tab = $bindable(), query = $bindable(), related, onOpen, onQuery, onDashboard, onTaxonomy, onMoveNote, onDeleteFolder, onNewFolder, onFiling, onOpenAttachment, onOpenNewTab }: Props = $props();
 
   // Drag & drop of notes onto folders.
   const DRAG_TYPE = "application/x-zeolite-note";
@@ -183,6 +185,12 @@
         <button class="build all" onclick={toggleAll} title={allCollapsed ? "Open all folders" : "Collapse all folders"}>{allCollapsed ? "▾ Expand all" : "▸ Collapse all"}</button>
       {/if}
     </div>
+    {#if onFiling}
+      <div class="files-tools">
+        <button class="build" onclick={() => onFiling("import")} title="Copy .md files into the vault, with an ID and PARA folder">📥 Import…</button>
+        <button class="build" onclick={() => onFiling("number")} title="Give an ID to the notes that have none">🔢 Number…</button>
+      </div>
+    {/if}
     {#each folders as [dir, { notes: files, others }]}
       {#if dir}
         <div
