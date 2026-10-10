@@ -258,8 +258,12 @@ The **Related** tab (left panel) shows, for the open note:
   **notes with no links**.
 
 **Meaning** (⚙ Settings → AI, per device): *On this device* downloads a
-small multilingual model once (about 120 MB, from huggingface.co); it runs
-on the device and nothing leaves it. *From the AI server* asks your server
+small model once (from huggingface.co); it runs on the device and nothing
+leaves it. Choose the model under **Model on this device**: Multilingual E5
+small (120 MB, the default, French and English), Multilingual MiniLM
+(faster), Multilingual E5 base (better, 280 MB), MiniLM (English only,
+23 MB), BGE-M3 (best, 570 MB), or any other Transformers.js model by its
+Hugging Face ID. Changing the model re-indexes the vault. *From the AI server* asks your server
 instead (useful when a work PC blocks the download). The index is kept per
 device in `.zeolite/` and only changed sections are re-read.
 

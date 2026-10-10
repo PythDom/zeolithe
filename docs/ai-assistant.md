@@ -177,3 +177,8 @@ Effort: 2–4 weeks, mostly device testing.
   Xenova/multilingual-e5-small (q8) from huggingface.co, nothing bundled;
   embeddings can come from the server instead. Index in
   `.zeolite/embeddings.json` (per device, not synced).
+- 2026-10-10: fixed the runtime URL (`transformers.min.js`, self-contained;
+  `transformers.web.min.js` imports "onnxruntime-web" by name and cannot
+  load in a browser). The on-device model can be chosen in Settings (five
+  listed, or any Hugging Face ID); E5 models get the query/passage
+  prefixes, BGE models CLS pooling; q8 weights, else full ones.

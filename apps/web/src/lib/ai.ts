@@ -6,7 +6,7 @@
  *
  * The on-device model is downloaded on first use (about 120 MB, from
  * huggingface.co, with the runtime from cdn.jsdelivr.net) and cached by the
- * web view: nothing is bundled in the app.
+ * web view: nothing is bundled in the app. The model can be chosen.
  */
 import { hashBytes, nearest, noteChunks, type Chunk, type NoteRecord, type VectorEntry } from "@zeolite/core";
 import type { VaultStorage } from "./storage";
@@ -20,7 +20,20 @@ export interface AiSettings {
   chatModel: string;
   embedModel: string;
   apiKey: string;
+  /** On this device: a Hugging Face model with ONNX weights (see DEVICE_MODELS). */
+  deviceModel: string;
 }
+
+/** Models offered for "On this device" (any Transformers.js model ID can also be typed). */
+export const DEVICE_MODELS = [
+  { id: "Xenova/multilingual-e5-small", label: "Multilingual E5 small: French, English and more (120 MB, recommended)" },
+  { id: "Xenova/paraphrase-multilingual-MiniLM-L12-v2", label: "Multilingual MiniLM: French, English and more, faster (120 MB)" },
+  { id: "Xenova/multilingual-e5-base", label: "Multilingual E5 base: better results, slower (280 MB)" },
+  { id: "Xenova/all-MiniLM-L6-v2", label: "MiniLM: English only, very fast (23 MB)" },
+  { id: "Xenova/bge-m3", label: "BGE-M3: best results, long sections, slow (570 MB)" },
+] as const;
+
+export const DEFAULT_DEVICE_MODEL = DEVICE_MODELS[0].id;
 
 export const DEFAULT_AI: AiSettings = {
   embeddings: "off",
@@ -29,6 +42,7 @@ export const DEFAULT_AI: AiSettings = {
   chatModel: "llama3.2",
   embedModel: "nomic-embed-text",
   apiKey: "",
+  deviceModel: DEFAULT_DEVICE_MODEL,
 };
 
 const KEY = "zeolite.ai";
@@ -112,52 +126,79 @@ export interface Embedder {
   embed(texts: string[], kind: "query" | "passage"): Promise<number[][]>;
 }
 
-/** On this device: multilingual E5 (French and English), quantized, via Transformers.js. */
-const DEVICE_MODEL = "Xenova/multilingual-e5-small";
-const TRANSFORMERS_URL = "https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.1/dist/transformers.web.min.js";
+/**
+ * The self-contained browser build (onnxruntime included; its wasm comes from
+ * the same CDN). Not `transformers.web.min.js`: that one is for bundlers and
+ * imports "onnxruntime-web" by name, which a browser cannot resolve.
+ */
+const TRANSFORMERS_URL = "https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.1/dist/transformers.min.js";
+
+/** How a model expects its input and turns token vectors into one vector. */
+export function deviceModelStyle(model: string): { prefixes: boolean; pooling: "mean" | "cls" } {
+  const m = model.toLowerCase();
+  return { prefixes: /(^|[/-])e5-/.test(m), pooling: /bge/.test(m) ? "cls" : "mean" };
+}
 
 type Extractor = (texts: string[], opts: { pooling: string; normalize: boolean }) => Promise<{ tolist(): number[][] }>;
-let extractor: Promise<Extractor> | null = null;
+interface Runtime {
+  pipeline: (task: string, model: string, opts: Record<string, unknown>) => Promise<Extractor>;
+  env: { backends: { onnx: { wasm?: { proxy?: boolean } } } };
+}
+let runtime: Promise<Runtime> | null = null;
+const extractors = new Map<string, Promise<Extractor>>();
 
-export function deviceEmbedder(onProgress?: (text: string) => void): Embedder {
-  const load = () => {
-    extractor ??= (async () => {
-      onProgress?.("Loading the AI runtime…");
-      let mod: {
-        pipeline: (task: string, model: string, opts: Record<string, unknown>) => Promise<Extractor>;
-        env: { backends: { onnx: { wasm?: { proxy?: boolean } } } };
-      };
-      try {
-        mod = await import(/* @vite-ignore */ TRANSFORMERS_URL);
-      } catch {
-        extractor = null;
-        throw new AiError("Cannot download the AI runtime (cdn.jsdelivr.net). Check the network, or use embeddings from your server (⚙ Settings → AI).");
-      }
+const reason = (e: unknown) => (e instanceof Error ? e.message : String(e));
+
+function loadRuntime(): Promise<Runtime> {
+  runtime ??= (async () => {
+    try {
+      const mod = (await import(/* @vite-ignore */ TRANSFORMERS_URL)) as Runtime;
       // Run the model off the main thread, so the app stays responsive while indexing.
       if (mod.env.backends.onnx.wasm) mod.env.backends.onnx.wasm.proxy = true;
-      try {
-        return await mod.pipeline("feature-extraction", DEVICE_MODEL, {
-          dtype: "q8",
-          progress_callback: (p: { status?: string; progress?: number; file?: string }) => {
-            if (p.status === "progress" && typeof p.progress === "number") onProgress?.(`Downloading the model (once): ${Math.round(p.progress)}%`);
-          },
-        });
-      } catch (e) {
-        extractor = null;
-        throw new AiError(`Cannot load the model from huggingface.co (${(e as Error).message}). Check the network, or use embeddings from your server.`);
-      }
-    })();
-    return extractor;
+      return mod;
+    } catch (e) {
+      runtime = null;
+      throw new AiError(`Cannot load the AI runtime from cdn.jsdelivr.net (${reason(e)}). Check the network, or use embeddings from your server (⚙ Settings → AI).`);
+    }
+  })();
+  return runtime;
+}
+
+export function deviceEmbedder(model: string = DEFAULT_DEVICE_MODEL, onProgress?: (text: string) => void): Embedder {
+  model = model.trim() || DEFAULT_DEVICE_MODEL;
+  const style = deviceModelStyle(model);
+  const load = () => {
+    let ex = extractors.get(model);
+    if (!ex) {
+      ex = (async () => {
+        onProgress?.("Loading the AI runtime…");
+        const mod = await loadRuntime();
+        const progress_callback = (p: { status?: string; progress?: number }) => {
+          if (p.status === "progress" && typeof p.progress === "number") onProgress?.(`Downloading ${model} (once): ${Math.round(p.progress)}%`);
+        };
+        try {
+          return await mod.pipeline("feature-extraction", model, { dtype: "q8", progress_callback });
+        } catch (first) {
+          // Not every model has 8-bit weights: try the full ones.
+          try {
+            return await mod.pipeline("feature-extraction", model, { progress_callback });
+          } catch {
+            throw new AiError(`Cannot load the model “${model}” from huggingface.co (${reason(first)}). Check the model name and the network, or use embeddings from your server.`);
+          }
+        }
+      })();
+      ex.catch(() => extractors.delete(model));
+      extractors.set(model, ex);
+    }
+    return ex;
   };
   return {
-    id: `device:${DEVICE_MODEL}`,
+    id: `device:${model}`,
     async embed(texts, kind) {
       const ex = await load();
       // E5 models expect these prefixes.
-      const out = await ex(
-        texts.map((t) => `${kind === "query" ? "query" : "passage"}: ${t}`),
-        { pooling: "mean", normalize: true },
-      );
+      const input = style.prefixes ? texts.map((t) => `${kind === "query" ? "query" : "passage"}: ${t}`) : texts;
+      const out = await ex(input, { pooling: style.pooling, normalize: true });
       return out.tolist();
     },
   };
@@ -180,7 +221,7 @@ export function serverEmbedder(s: AiSettings): Embedder {
 }
 
 export function embedderFor(s: AiSettings, onProgress?: (t: string) => void): Embedder | null {
-  if (s.embeddings === "device") return deviceEmbedder(onProgress);
+  if (s.embeddings === "device") return deviceEmbedder(s.deviceModel, onProgress);
   if (s.embeddings === "server" && hasServer(s)) return serverEmbedder(s);
   return null;
 }

@@ -4,7 +4,7 @@
   import { prefs, savePrefs, type Prefs } from "../lib/features.svelte";
   import type { Vault } from "../lib/vault.svelte";
   import { ai as aiState, setAiSettings } from "../lib/ai-state.svelte";
-  import { testServer, type AiSettings } from "../lib/ai";
+  import { DEFAULT_DEVICE_MODEL, DEVICE_MODELS, testServer, type AiSettings } from "../lib/ai";
 
   interface Props {
     vault: Vault;
@@ -41,6 +41,10 @@
   let device = $state<Prefs>({ ...prefs });
   let aiSettings = $state<AiSettings>(untrack(() => ({ ...aiState.settings })));
   let aiTest = $state<{ ok: boolean; text: string } | null>(null);
+  /** The on-device model: one of the list, or "other" with its ID typed in. */
+  const listed = (id: string) => DEVICE_MODELS.some((m) => m.id === id);
+  let modelChoice = $state(untrack(() => (listed(aiSettings.deviceModel) ? aiSettings.deviceModel : "other")));
+  let otherModel = $state(untrack(() => (listed(aiSettings.deviceModel) ? "" : aiSettings.deviceModel)));
   let aiTesting = $state(false);
   async function testAi() {
     aiTesting = true;
@@ -125,7 +129,8 @@
         savePrefs({ ...device });
         done.push("device preferences saved");
       }
-      const nextAi = { ...$state.snapshot(aiSettings), serverUrl: aiSettings.serverUrl.trim() } as AiSettings;
+      const deviceModel = modelChoice === "other" ? otherModel.trim() || DEFAULT_DEVICE_MODEL : modelChoice;
+      const nextAi = { ...$state.snapshot(aiSettings), serverUrl: aiSettings.serverUrl.trim(), deviceModel } as AiSettings;
       if (JSON.stringify(nextAi) !== JSON.stringify(aiState.settings)) {
         if (nextAi.embeddings === "server" && !nextAi.serverUrl) throw new Error("AI: meaning “from the server” needs a server address.");
         setAiSettings(nextAi);
@@ -253,10 +258,23 @@
       <label>Related notes and search by meaning
         <select bind:value={aiSettings.embeddings}>
           <option value="off">Off (related notes by shared words only)</option>
-          <option value="device">On this device (downloads a 120 MB model once)</option>
+          <option value="device">On this device (downloads a model once)</option>
           <option value="server">From the AI server below</option>
         </select>
       </label>
+      {#if aiSettings.embeddings === "device"}
+        <label>Model on this device
+          <select bind:value={modelChoice}>
+            {#each DEVICE_MODELS as m (m.id)}<option value={m.id}>{m.label}</option>{/each}
+            <option value="other">Other Hugging Face model…</option>
+          </select>
+        </label>
+        {#if modelChoice === "other"}
+          <label>Model ID <input bind:value={otherModel} placeholder="Xenova/bge-small-en-v1.5" spellcheck="false" autocomplete="off" /></label>
+          <p class="hint">A feature-extraction model with ONNX weights, made for Transformers.js (the “Xenova/” and “onnx-community/” models on huggingface.co).</p>
+        {/if}
+        <p class="hint">Downloaded once, then kept on this device. Changing the model re-indexes the vault.</p>
+      {/if}
       <div class="row">
         <label>AI server (optional) <input bind:value={aiSettings.serverUrl} placeholder="http://192.168.1.20:11434" inputmode="url" /></label>
         <label>Type
