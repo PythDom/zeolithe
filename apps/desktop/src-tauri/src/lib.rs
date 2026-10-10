@@ -268,6 +268,69 @@ fn vault_dirs(app: AppHandle, data: State<DataDir>, path: String, ignore: Vec<St
     Ok(out)
 }
 
+/// Where on-device AI models can be put by hand (`Zeolite-data/models`,
+/// next to the portable exe): for a PC that cannot download them.
+fn models_root(data: &DataDir) -> PathBuf {
+    data.0.join("models")
+}
+
+/// Model folders chosen in the folder dialog (kept in `Zeolite-data/models.json`).
+fn chosen_model_folders(data: &DataDir) -> Vec<String> {
+    std::fs::read_to_string(data.0.join("models.json"))
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default()
+}
+
+fn model_folder_allowed(data: &DataDir, folder: &str) -> bool {
+    let path = std::path::Path::new(folder.trim_end_matches(['/', '\\']));
+    if path.components().any(|c| matches!(c, std::path::Component::ParentDir)) {
+        return false;
+    }
+    path.starts_with(models_root(data)) || chosen_model_folders(data).iter().any(|p| std::path::Path::new(p) == path)
+}
+
+/// The folder for models put there by hand (created if needed).
+#[tauri::command]
+fn models_dir(data: State<DataDir>) -> Result<String, String> {
+    let dir = models_root(&data);
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir.to_string_lossy().to_string())
+}
+
+/// Remember a model folder just chosen in the folder dialog, so that it can
+/// still be read after a restart.
+#[tauri::command]
+fn allow_model_folder(app: AppHandle, data: State<DataDir>, path: String) -> Result<(), String> {
+    let root = path.trim_end_matches(['/', '\\']).to_string();
+    if model_folder_allowed(&data, &root) {
+        return Ok(());
+    }
+    if !app.fs_scope().is_allowed(&path) {
+        return Err("This folder was not chosen in the folder dialog.".into());
+    }
+    let mut list = chosen_model_folders(&data);
+    list.push(root);
+    let json = serde_json::to_string_pretty(&list).map_err(|e| e.to_string())?;
+    std::fs::write(data.0.join("models.json"), json).map_err(|e| e.to_string())
+}
+
+/// One file of a model folder ("config.json", "onnx/model_quantized.onnx"),
+/// as raw bytes. A missing file is the error "not found".
+#[tauri::command]
+fn read_model_file(data: State<DataDir>, folder: String, file: String) -> Result<tauri::ipc::Response, String> {
+    if !model_folder_allowed(&data, &folder) {
+        return Err("This model folder was not chosen in the folder dialog.".into());
+    }
+    let root = PathBuf::from(folder.trim_end_matches(['/', '\\']));
+    let path = inside_vault(&root, &file).ok_or("not found")?;
+    match std::fs::read(path) {
+        Ok(bytes) => Ok(tauri::ipc::Response::new(bytes)),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Err("not found".into()),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -285,6 +348,21 @@ mod tests {
         assert!(read_texts(&root, &many).iter().all(|t| t.as_deref() == Some("# B")));
         assert!(read_texts(&root, &[]).is_empty());
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn model_folders_must_be_chosen_or_in_the_models_folder() {
+        let base = std::env::temp_dir().join(format!("zeolite-models-{}", std::process::id()));
+        std::fs::create_dir_all(&base).unwrap();
+        let data = DataDir(base.clone());
+        let inside = base.join("models").join("multilingual-e5-small");
+        assert!(model_folder_allowed(&data, &inside.to_string_lossy()));
+        assert!(!model_folder_allowed(&data, &base.join("models").join("..").join("x").to_string_lossy()));
+        assert!(!model_folder_allowed(&data, "/somewhere/else"));
+        std::fs::write(base.join("models.json"), r#"["/somewhere/else"]"#).unwrap();
+        assert!(model_folder_allowed(&data, "/somewhere/else/"));
+        assert!(!model_folder_allowed(&data, "/somewhere/else/sub"));
+        let _ = std::fs::remove_dir_all(&base);
     }
 }
 
@@ -325,7 +403,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_http::init())
         .manage(Sharing::default())
-        .invoke_handler(tauri::generate_handler![allow_vault, scan_vault, read_notes, vault_dirs, open_mail_draft, lan_start, lan_stop, lan_status])
+        .invoke_handler(tauri::generate_handler![allow_vault, scan_vault, read_notes, vault_dirs, models_dir, allow_model_folder, read_model_file, open_mail_draft, lan_start, lan_stop, lan_status])
         .run(tauri::generate_context!())
         .expect("error while running Zeolite");
 }

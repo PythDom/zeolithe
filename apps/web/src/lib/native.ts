@@ -384,3 +384,48 @@ export class CapacitorStorage implements VaultStorage {
     }
   }
 }
+
+// --- On-device AI models from a folder (for a PC or phone that cannot download them)
+
+const tauriError = (e: unknown) => (typeof e === "string" ? e : ((e as Error)?.message ?? String(e)));
+
+/** Where models can be put by hand: `Zeolite-data/models` next to the Windows exe (null elsewhere). */
+export async function modelsDir(): Promise<string | null> {
+  if (platform() !== "tauri") return null;
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<string>("models_dir").catch(() => null);
+}
+
+/** Windows app: choose a model folder (null when cancelled). */
+export async function pickModelFolder(): Promise<string | null> {
+  const { open } = await import("@tauri-apps/plugin-dialog");
+  const dir = await open({ directory: true, title: "Choose the model folder (with config.json)", defaultPath: (await modelsDir()) ?? undefined });
+  if (typeof dir !== "string") return null;
+  const { invoke } = await import("@tauri-apps/api/core");
+  try {
+    await invoke("allow_model_folder", { path: dir });
+  } catch (e) {
+    throw new Error(tauriError(e));
+  }
+  return dir;
+}
+
+/** One file of a model folder ("onnx/model_quantized.onnx"); null when it is not there. */
+export async function readModelFile(folder: string, file: string): Promise<ArrayBuffer | null> {
+  if (platform() === "tauri") {
+    const { invoke } = await import("@tauri-apps/api/core");
+    try {
+      return await invoke<ArrayBuffer>("read_model_file", { folder, file });
+    } catch (e) {
+      if (tauriError(e) === "not found") return null;
+      throw new Error(tauriError(e));
+    }
+  }
+  if (platform() === "android") {
+    // Served by the web view straight from the storage (all-files access).
+    const { Capacitor } = await import("@capacitor/core");
+    const res = await fetch(Capacitor.convertFileSrc(`${folder.replace(/\/+$/, "")}/${file}`)).catch(() => null);
+    return res?.ok ? res.arrayBuffer() : null;
+  }
+  return null;
+}

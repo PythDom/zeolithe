@@ -5,8 +5,9 @@
   interface Props {
     onChoose: (path: string) => void;
     onClose: () => void;
+    title?: string;
   }
-  let { onChoose, onClose }: Props = $props();
+  let { onChoose, onClose, title = "Choose your vault folder" }: Props = $props();
 
   let access = $state<boolean | null>(null);
   let path = $state(ANDROID_ROOT);
@@ -53,9 +54,9 @@
 </script>
 
 <div class="backdrop" role="presentation">
-  <div class="dialog" role="dialog" aria-label="Choose your vault folder">
+  <div class="dialog" role="dialog" aria-label={title}>
     <header>
-      <h2>Choose your vault folder</h2>
+      <h2>{title}</h2>
       <button class="ghost" aria-label="Close" onclick={onClose}>✕</button>
     </header>
 

@@ -182,3 +182,9 @@ Effort: 2–4 weeks, mostly device testing.
   load in a browser). The on-device model can be chosen in Settings (five
   listed, or any Hugging Face ID); E5 models get the query/passage
   prefixes, BGE models CLS pooling; q8 weights, else full ones.
+- 2026-10-10: the runtime ships with the Windows and Android apps (`ai/`:
+  `transformers.min.js` (taken with `npm pack` at build time) and the onnxruntime asyncify wasm, about
+  27 MB; the single-file builds still use the CDN). The model can be read
+  from a folder instead of downloaded (Settings → AI → Get the model), via
+  Transformers.js `env.fetch`; on Windows only folders chosen in the dialog
+  or under `Zeolite-data/models` can be read.

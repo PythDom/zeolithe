@@ -263,7 +263,17 @@ leaves it. Choose the model under **Model on this device**: Multilingual E5
 small (120 MB, the default, French and English), Multilingual MiniLM
 (faster), Multilingual E5 base (better, 280 MB), MiniLM (English only,
 23 MB), BGE-M3 (best, 570 MB), or any other Transformers.js model by its
-Hugging Face ID. Changing the model re-indexes the vault. *From the AI server* asks your server
+Hugging Face ID. Changing the model re-indexes the vault.
+
+*No download on this computer?* (Windows and Android apps.) Under **Get
+the model**, choose **From a folder on this device**. On any computer that
+can, open the model's files on huggingface.co (the link is in Settings) and
+download `config.json`, `tokenizer.json`, `tokenizer_config.json` and
+`onnx/model_quantized.onnx` (keep the `onnx` subfolder). Copy them into one
+folder, e.g. `Zeolite-data\models\multilingual-e5-small` next to the
+portable exe, and pick it with **Choose…**. Select the same model in the
+list. Zeolite then never contacts huggingface.co, and the AI engine itself
+ships with the app, so no internet is needed at all. *From the AI server* asks your server
 instead (useful when a work PC blocks the download). The index is kept per
 device in `.zeolite/` and only changed sections are re-read.
 

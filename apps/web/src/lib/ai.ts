@@ -4,11 +4,14 @@
  * user's own server (Ollama or any OpenAI-compatible API) for summaries,
  * reviews and questions about the notes. Settings are per device.
  *
- * The on-device model is downloaded on first use (about 120 MB, from
- * huggingface.co, with the runtime from cdn.jsdelivr.net) and cached by the
- * web view: nothing is bundled in the app. The model can be chosen.
+ * The on-device model (chosen in Settings) is downloaded on first use from
+ * huggingface.co and cached by the web view, or read from a folder the user
+ * filled by hand (for a PC that cannot download it). The runtime ships with
+ * the Windows and Android apps (`ai/`, see vite.config.ts); the single-file
+ * builds load it from cdn.jsdelivr.net.
  */
 import { hashBytes, nearest, noteChunks, type Chunk, type NoteRecord, type VectorEntry } from "@zeolite/core";
+import { readModelFile } from "./native";
 import type { VaultStorage } from "./storage";
 
 export interface AiSettings {
@@ -22,6 +25,8 @@ export interface AiSettings {
   apiKey: string;
   /** On this device: a Hugging Face model with ONNX weights (see DEVICE_MODELS). */
   deviceModel: string;
+  /** On this device: read the model from this folder instead of downloading it ("" = download). */
+  modelFolder: string;
 }
 
 /** Models offered for "On this device" (any Transformers.js model ID can also be typed). */
@@ -43,7 +48,11 @@ export const DEFAULT_AI: AiSettings = {
   embedModel: "nomic-embed-text",
   apiKey: "",
   deviceModel: DEFAULT_DEVICE_MODEL,
+  modelFolder: "",
 };
+
+/** Files a model folder needs (the 8-bit weights, or the full ones `onnx/model.onnx`). */
+export const MODEL_FILES = ["config.json", "tokenizer.json", "tokenizer_config.json", "onnx/model_quantized.onnx"];
 
 const KEY = "zeolite.ai";
 
@@ -127,11 +136,13 @@ export interface Embedder {
 }
 
 /**
- * The self-contained browser build (onnxruntime included; its wasm comes from
- * the same CDN). Not `transformers.web.min.js`: that one is for bundlers and
- * imports "onnxruntime-web" by name, which a browser cannot resolve.
+ * The self-contained browser build (onnxruntime included). Not
+ * `transformers.web.min.js`: that one is for bundlers and imports
+ * "onnxruntime-web" by name, which a browser cannot resolve.
  */
 const TRANSFORMERS_URL = "https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.1/dist/transformers.min.js";
+/** The same runtime shipped with the apps, with the onnxruntime wasm it needs. */
+const LOCAL_RUNTIME = "ai/";
 
 /** How a model expects its input and turns token vectors into one vector. */
 export function deviceModelStyle(model: string): { prefixes: boolean; pooling: "mean" | "cls" } {
@@ -140,55 +151,119 @@ export function deviceModelStyle(model: string): { prefixes: boolean; pooling: "
 }
 
 type Extractor = (texts: string[], opts: { pooling: string; normalize: boolean }) => Promise<{ tolist(): number[][] }>;
+type Fetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 interface Runtime {
   pipeline: (task: string, model: string, opts: Record<string, unknown>) => Promise<Extractor>;
-  env: { backends: { onnx: { wasm?: { proxy?: boolean } } } };
+  env: {
+    allowLocalModels: boolean;
+    allowRemoteModels: boolean;
+    localModelPath: string;
+    useBrowserCache: boolean;
+    fetch: Fetch;
+    backends: { onnx: { wasm?: { proxy?: boolean; wasmPaths?: unknown } } };
+  };
 }
 let runtime: Promise<Runtime> | null = null;
 const extractors = new Map<string, Promise<Extractor>>();
 
 const reason = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
+/** Reads one file of a model folder ("onnx/model_quantized.onnx"); null when it is not there. */
+export type ModelFiles = (file: string) => Promise<ArrayBuffer | null>;
+
+/** Model files read from a folder are asked for under this path (answered by `env.fetch` below). */
+const FOLDER_PATH = "/zeolite-model-folder/";
+const FOLDER_MODEL = "zeolite/folder";
+let folderFiles: ModelFiles | null = null;
+
+async function importRuntime(): Promise<Runtime> {
+  try {
+    const base = new URL(LOCAL_RUNTIME, document.baseURI);
+    const mod = (await import(/* @vite-ignore */ new URL("transformers.min.js", base).href)) as Runtime;
+    if (mod.env.backends.onnx.wasm) {
+      mod.env.backends.onnx.wasm.wasmPaths = {
+        mjs: new URL("ort-wasm-simd-threaded.asyncify.mjs", base).href,
+        wasm: new URL("ort-wasm-simd-threaded.asyncify.wasm", base).href,
+      };
+    }
+    return mod;
+  } catch {
+    // Not shipped (single-file build): from the CDN, with its wasm.
+    return (await import(/* @vite-ignore */ TRANSFORMERS_URL)) as Runtime;
+  }
+}
+
 function loadRuntime(): Promise<Runtime> {
   runtime ??= (async () => {
     try {
-      const mod = (await import(/* @vite-ignore */ TRANSFORMERS_URL)) as Runtime;
+      const mod = await importRuntime();
       // Run the model off the main thread, so the app stays responsive while indexing.
       if (mod.env.backends.onnx.wasm) mod.env.backends.onnx.wasm.proxy = true;
+      const download = mod.env.fetch ?? ((input, init) => fetch(input, init));
+      mod.env.fetch = async (input, init) => {
+        const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+        const at = url.indexOf(`${FOLDER_PATH}${FOLDER_MODEL}/`);
+        if (at < 0 || !folderFiles) return download(input, init);
+        const file = decodeURIComponent(url.slice(at + FOLDER_PATH.length + FOLDER_MODEL.length + 1).split("?")[0]);
+        const data = await folderFiles(file);
+        if (!data) return new Response("Not found", { status: 404, statusText: "Not Found" });
+        const type = file.endsWith(".json") ? "application/json" : "application/octet-stream";
+        return new Response(data, { status: 200, headers: { "Content-Type": type, "Content-Length": String(data.byteLength) } });
+      };
       return mod;
     } catch (e) {
       runtime = null;
-      throw new AiError(`Cannot load the AI runtime from cdn.jsdelivr.net (${reason(e)}). Check the network, or use embeddings from your server (⚙ Settings → AI).`);
+      throw new AiError(`Cannot load the AI runtime (${reason(e)}). Use embeddings from your server instead (⚙ Settings → AI).`);
     }
   })();
   return runtime;
 }
 
-export function deviceEmbedder(model: string = DEFAULT_DEVICE_MODEL, onProgress?: (text: string) => void): Embedder {
+/**
+ * On this device. `files` reads the model from a folder; without it, the
+ * model is downloaded from huggingface.co once.
+ */
+export function deviceEmbedder(model: string = DEFAULT_DEVICE_MODEL, onProgress?: (text: string) => void, files?: ModelFiles, folderName = "the folder"): Embedder {
   model = model.trim() || DEFAULT_DEVICE_MODEL;
   const style = deviceModelStyle(model);
+  const key = files ? `folder:${folderName}:${model}` : model;
   const load = () => {
-    let ex = extractors.get(model);
+    let ex = extractors.get(key);
     if (!ex) {
       ex = (async () => {
         onProgress?.("Loading the AI runtime…");
         const mod = await loadRuntime();
         const progress_callback = (p: { status?: string; progress?: number }) => {
-          if (p.status === "progress" && typeof p.progress === "number") onProgress?.(`Downloading ${model} (once): ${Math.round(p.progress)}%`);
+          if (p.status === "progress" && typeof p.progress === "number") onProgress?.(files ? `Reading the model: ${Math.round(p.progress)}%` : `Downloading ${model} (once): ${Math.round(p.progress)}%`);
         };
+        // From a folder: never the network, and no second copy in the browser cache.
+        folderFiles = files ?? null;
+        mod.env.allowLocalModels = !!files;
+        mod.env.allowRemoteModels = !files;
+        mod.env.localModelPath = FOLDER_PATH;
+        mod.env.useBrowserCache = !files;
+        const id = files ? FOLDER_MODEL : model;
         try {
-          return await mod.pipeline("feature-extraction", model, { dtype: "q8", progress_callback });
+          return await mod.pipeline("feature-extraction", id, { dtype: "q8", progress_callback });
         } catch (first) {
           // Not every model has 8-bit weights: try the full ones.
           try {
-            return await mod.pipeline("feature-extraction", model, { progress_callback });
+            return await mod.pipeline("feature-extraction", id, { dtype: "fp32", progress_callback });
           } catch {
-            throw new AiError(`Cannot load the model “${model}” from huggingface.co (${reason(first)}). Check the model name and the network, or use embeddings from your server.`);
+            if (files) {
+              const missing = (await Promise.all(MODEL_FILES.slice(0, 3).map(async (f) => ((await files(f).catch(() => null)) ? null : f)))).filter(Boolean);
+              throw new AiError(
+                missing.length
+                  ? `The model folder ${folderName} has no ${missing.join(", ")}. It needs the files ${MODEL_FILES.join(", ")} from the model's page on huggingface.co.`
+                  : `Cannot read the model in ${folderName} (${reason(first)}). It needs ${MODEL_FILES.join(", ")} (or onnx/model.onnx).`,
+              );
+            }
+            throw new AiError(`Cannot load the model “${model}” from huggingface.co (${reason(first)}). Check the model name and the network, choose a model folder, or use embeddings from your server.`);
           }
         }
       })();
-      ex.catch(() => extractors.delete(model));
-      extractors.set(model, ex);
+      ex.catch(() => extractors.delete(key));
+      extractors.set(key, ex);
     }
     return ex;
   };
@@ -221,7 +296,10 @@ export function serverEmbedder(s: AiSettings): Embedder {
 }
 
 export function embedderFor(s: AiSettings, onProgress?: (t: string) => void): Embedder | null {
-  if (s.embeddings === "device") return deviceEmbedder(s.deviceModel, onProgress);
+  if (s.embeddings === "device") {
+    const folder = s.modelFolder.trim();
+    return deviceEmbedder(s.deviceModel, onProgress, folder ? (file) => readModelFile(folder, file) : undefined, folder);
+  }
   if (s.embeddings === "server" && hasServer(s)) return serverEmbedder(s);
   return null;
 }

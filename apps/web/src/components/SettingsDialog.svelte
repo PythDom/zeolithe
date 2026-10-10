@@ -4,7 +4,9 @@
   import { prefs, savePrefs, type Prefs } from "../lib/features.svelte";
   import type { Vault } from "../lib/vault.svelte";
   import { ai as aiState, setAiSettings } from "../lib/ai-state.svelte";
-  import { DEFAULT_DEVICE_MODEL, DEVICE_MODELS, testServer, type AiSettings } from "../lib/ai";
+  import { DEFAULT_DEVICE_MODEL, DEVICE_MODELS, MODEL_FILES, testServer, type AiSettings } from "../lib/ai";
+  import { modelsDir, pickModelFolder, platform } from "../lib/native";
+  import AndroidFolderDialog from "./AndroidFolderDialog.svelte";
 
   interface Props {
     vault: Vault;
@@ -45,6 +47,23 @@
   const listed = (id: string) => DEVICE_MODELS.some((m) => m.id === id);
   let modelChoice = $state(untrack(() => (listed(aiSettings.deviceModel) ? aiSettings.deviceModel : "other")));
   let otherModel = $state(untrack(() => (listed(aiSettings.deviceModel) ? "" : aiSettings.deviceModel)));
+  /** Read the model from a folder (native apps only: they can read any folder). */
+  const canUseFolder = platform() !== "web";
+  let fromFolder = $state(untrack(() => !!aiSettings.modelFolder));
+  let androidModelPicker = $state(false);
+  let modelsHome = $state<string | null>(null);
+  if (platform() === "tauri") modelsDir().then((d) => (modelsHome = d));
+  const chosenModel = $derived(modelChoice === "other" ? otherModel.trim() || DEFAULT_DEVICE_MODEL : modelChoice);
+  const modelLeaf = $derived(chosenModel.split("/").pop());
+  async function chooseModelFolder() {
+    if (platform() === "android") return (androidModelPicker = true);
+    try {
+      const dir = await pickModelFolder();
+      if (dir) aiSettings.modelFolder = dir;
+    } catch (e) {
+      error = (e as Error).message;
+    }
+  }
   let aiTesting = $state(false);
   async function testAi() {
     aiTesting = true;
@@ -130,7 +149,9 @@
         done.push("device preferences saved");
       }
       const deviceModel = modelChoice === "other" ? otherModel.trim() || DEFAULT_DEVICE_MODEL : modelChoice;
-      const nextAi = { ...$state.snapshot(aiSettings), serverUrl: aiSettings.serverUrl.trim(), deviceModel } as AiSettings;
+      const modelFolder = fromFolder && canUseFolder ? aiSettings.modelFolder.trim() : "";
+      if (fromFolder && canUseFolder && aiSettings.embeddings === "device" && !modelFolder) throw new Error("AI: choose the model folder, or let Zeolite download the model.");
+      const nextAi = { ...$state.snapshot(aiSettings), serverUrl: aiSettings.serverUrl.trim(), deviceModel, modelFolder } as AiSettings;
       if (JSON.stringify(nextAi) !== JSON.stringify(aiState.settings)) {
         if (nextAi.embeddings === "server" && !nextAi.serverUrl) throw new Error("AI: meaning “from the server” needs a server address.");
         setAiSettings(nextAi);
@@ -273,7 +294,30 @@
           <label>Model ID <input bind:value={otherModel} placeholder="Xenova/bge-small-en-v1.5" spellcheck="false" autocomplete="off" /></label>
           <p class="hint">A feature-extraction model with ONNX weights, made for Transformers.js (the “Xenova/” and “onnx-community/” models on huggingface.co).</p>
         {/if}
-        <p class="hint">Downloaded once, then kept on this device. Changing the model re-indexes the vault.</p>
+        {#if canUseFolder}
+          <label>Get the model
+            <select bind:value={fromFolder}>
+              <option value={false}>Download it from huggingface.co (once)</option>
+              <option value={true}>From a folder on this device (no download)</option>
+            </select>
+          </label>
+        {/if}
+        {#if fromFolder && canUseFolder}
+          <div class="row folder-row">
+            <label>Model folder <input bind:value={aiSettings.modelFolder} placeholder={platform() === "android" ? "/storage/emulated/0/Download/" + modelLeaf : "…\\Zeolite-data\\models\\" + modelLeaf} spellcheck="false" autocomplete="off" readonly={platform() === "tauri"} /></label>
+            <button type="button" onclick={chooseModelFolder}>Choose…</button>
+          </div>
+          <div class="hint">
+            For a computer that cannot download the model: on any computer, open
+            <a href={`https://huggingface.co/${chosenModel}/tree/main`} target="_blank" rel="noreferrer">the model's files on huggingface.co</a>
+            and download {#each MODEL_FILES as f, i (f)}<code>{f}</code>{i < MODEL_FILES.length - 2 ? ", " : i === MODEL_FILES.length - 2 ? " and " : ""}{/each}
+            (keep the <code>onnx</code> subfolder; <code>onnx/model.onnx</code> also works for models without 8-bit weights). Copy them into one
+            folder on this device{#if modelsHome}, e.g. <code>{`${modelsHome}\\${modelLeaf}`}</code>{/if}, then choose that folder here.
+            Choose the matching model in the list above.
+          </div>
+        {:else}
+          <p class="hint">Downloaded once, then kept on this device. Changing the model re-indexes the vault.</p>
+        {/if}
       {/if}
       <div class="row">
         <label>AI server (optional) <input bind:value={aiSettings.serverUrl} placeholder="http://192.168.1.20:11434" inputmode="url" /></label>
@@ -310,7 +354,24 @@
   </div>
 </div>
 
+{#if androidModelPicker}
+  <AndroidFolderDialog
+    title="Choose the model folder"
+    onChoose={(path) => {
+      aiSettings.modelFolder = path;
+      androidModelPicker = false;
+    }}
+    onClose={() => (androidModelPicker = false)}
+  />
+{/if}
+
 <style>
+  .folder-row {
+    align-items: end;
+  }
+  .folder-row button {
+    padding: 6px 10px;
+  }
   .ai-test {
     align-items: center;
   }
