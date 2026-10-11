@@ -214,17 +214,26 @@ export async function chat(s: AiSettings, messages: ChatMessage[]): Promise<stri
     // Thinking models (Qwen3…) first reason at length: much slower, and not wanted here.
     let r: Reply;
     try {
-      r = (await post(s, "/api/chat", { model: s.chatModel, messages, stream: false, think: false })) as Reply;
+      r = (await post(s, "/api/chat", { model: ollamaModel(s.chatModel), messages, stream: false, think: false })) as Reply;
     } catch (e) {
       // Older Ollama, a proxy (Open WebUI) or a model that refuses the option: ask without it.
       if (!(e instanceof ServerError)) throw e;
-      r = (await post(s, "/api/chat", { model: s.chatModel, messages, stream: false })) as Reply;
+      r = (await post(s, "/api/chat", { model: ollamaModel(s.chatModel), messages, stream: false })) as Reply;
     }
     return withoutThinking(r.message?.content ?? "");
   }
   const r = (await post(s, "/v1/chat/completions", { model: s.chatModel, messages })) as { choices?: { message?: { content?: string } }[] };
   return withoutThinking(r.choices?.[0]?.message?.content ?? "");
 }
+
+/**
+ * The model name as Ollama lists it: a name without a tag means ":latest".
+ * Ollama accepts both, but Open WebUI's /ollama proxy only knows the full name.
+ */
+export const ollamaModel = (name: string) => {
+  const n = name.trim();
+  return n && !n.includes(":") ? `${n}:latest` : n;
+};
 
 const pullHint = (s: AiSettings, model: string) => (s.serverKind === "ollama" ? ` Install it on the server: ollama pull ${model}` : "");
 
@@ -417,10 +426,10 @@ export function deviceEmbedder(model: string = DEFAULT_DEVICE_MODEL, onProgress?
 
 export function serverEmbedder(s: AiSettings): Embedder {
   return {
-    id: `server:${base(s)}:${s.embedModel}`,
+    id: `server:${base(s)}:${s.serverKind === "ollama" ? ollamaModel(s.embedModel) : s.embedModel}`,
     async embed(texts) {
       if (s.serverKind === "ollama") {
-        const r = (await post(s, "/api/embed", { model: s.embedModel, input: texts })) as { embeddings?: number[][] };
+        const r = (await post(s, "/api/embed", { model: ollamaModel(s.embedModel), input: texts })) as { embeddings?: number[][] };
         if (!r.embeddings?.length) throw new AiError(`The server returned no embeddings: is “${s.embedModel}” an embedding model (e.g. nomic-embed-text, bge-m3)?`);
         return r.embeddings;
       }
