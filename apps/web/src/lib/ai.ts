@@ -70,6 +70,56 @@ export function saveAi(s: AiSettings) {
   } catch {
     // Not kept.
   }
+  if (s.serverUrl.trim()) rememberServer(serverOf(s));
+}
+
+// --- Servers used on this device, kept so that switching back needs no retyping.
+
+export interface SavedServer {
+  serverUrl: string;
+  serverKind: AiSettings["serverKind"];
+  apiKey: string;
+  chatModel: string;
+  embedModel: string;
+}
+
+const SERVERS_KEY = "zeolite.ai.servers";
+
+export const serverOf = (s: AiSettings | SavedServer): SavedServer => ({
+  serverUrl: s.serverUrl.trim().replace(/\/+$/, ""),
+  serverKind: s.serverKind,
+  apiKey: s.apiKey.trim(),
+  chatModel: s.chatModel.trim(),
+  embedModel: s.embedModel.trim(),
+});
+
+export function savedServers(): SavedServer[] {
+  try {
+    const list = JSON.parse(localStorage.getItem(SERVERS_KEY) ?? "[]") as SavedServer[];
+    return Array.isArray(list) ? list.filter((x) => x && typeof x.serverUrl === "string" && x.serverUrl) : [];
+  } catch {
+    return [];
+  }
+}
+
+const sameServer = (a: SavedServer, b: SavedServer) => a.serverUrl === b.serverUrl && a.serverKind === b.serverKind;
+
+/** Keep a server's details (latest first); the same address and type replaces the older entry. */
+export function rememberServer(server: SavedServer) {
+  const s = serverOf(server);
+  try {
+    localStorage.setItem(SERVERS_KEY, JSON.stringify([s, ...savedServers().filter((x) => !sameServer(x, s))].slice(0, 10)));
+  } catch {
+    // Not kept.
+  }
+}
+
+export function forgetServer(server: SavedServer) {
+  try {
+    localStorage.setItem(SERVERS_KEY, JSON.stringify(savedServers().filter((x) => !sameServer(x, serverOf(server)))));
+  } catch {
+    // Not kept.
+  }
 }
 
 export const hasServer = (s: AiSettings) => !!s.serverUrl.trim();
@@ -83,16 +133,31 @@ class ServerError extends AiError {}
 
 const base = (s: AiSettings) => s.serverUrl.trim().replace(/\/+$/, "");
 
-async function post(s: AiSettings, path: string, body: unknown): Promise<unknown> {
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
+/** The server did not answer at all: switched off, another network, wrong address, or blocked. */
+export class UnreachableError extends AiError {}
+
+function unreachable(s: AiSettings): UnreachableError {
+  const direct = s.serverKind === "ollama" && !/\/ollama$/.test(base(s));
+  return new UnreachableError(
+    `AI server unreachable at ${base(s)}: is it switched on, and is this device on the same network? ` +
+      `If it is, check the address${direct ? ", and that Ollama allows Zeolite (OLLAMA_ORIGINS=*)" : ""}.`,
+  );
+}
+
+async function request(s: AiSettings, path: string, body?: unknown, timeoutMs?: number): Promise<unknown> {
+  const headers: Record<string, string> = {};
+  if (body !== undefined) headers["Content-Type"] = "application/json";
   if (s.apiKey.trim()) headers.Authorization = `Bearer ${s.apiKey.trim()}`;
   let res: Response;
   try {
-    res = await fetch(`${base(s)}${path}`, { method: "POST", headers, body: JSON.stringify(body) });
+    res = await fetch(`${base(s)}${path}`, {
+      method: body === undefined ? "GET" : "POST",
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+      signal: timeoutMs ? AbortSignal.timeout(timeoutMs) : undefined,
+    });
   } catch {
-    throw new AiError(
-      `Cannot reach the AI server at ${base(s)}. Check the address and network.${s.serverKind === "ollama" ? " Ollama must allow requests from Zeolite: start it with OLLAMA_ORIGINS=* (see the guide)." : ""}`,
-    );
+    throw unreachable(s);
   }
   if (!res.ok) {
     let detail = `${res.status} ${res.statusText}`;
@@ -104,9 +169,32 @@ async function post(s: AiSettings, path: string, body: unknown): Promise<unknown
     } catch {
       /* keep the status */
     }
-    throw new ServerError(`AI server (${path}, model “${(body as { model?: string }).model ?? "?"}”): ${detail}`);
+    if (res.status === 401 || res.status === 403) throw new ServerError(`AI server: access refused (${detail}). Check the API key.`);
+    const model = (body as { model?: string } | undefined)?.model;
+    throw new ServerError(`AI server (${path}${model ? `, model “${model}”` : ""}): ${detail}`);
   }
   return res.json();
+}
+
+const post = (s: AiSettings, path: string, body: unknown) => request(s, path, body);
+
+/** Models installed on the server (Ollama, Open WebUI's /ollama, or an OpenAI-compatible API). */
+export async function listModels(s: AiSettings): Promise<string[]> {
+  if (s.serverKind === "ollama") {
+    const r = (await request(s, "/api/tags", undefined, 8000)) as { models?: { name?: string; model?: string }[] };
+    return (r.models ?? []).map((m) => m.name ?? m.model ?? "").filter(Boolean).sort();
+  }
+  const r = (await request(s, "/v1/models", undefined, 8000)) as { data?: { id?: string }[] };
+  return (r.data ?? []).map((m) => m.id ?? "").filter(Boolean).sort();
+}
+
+/** Likely an embedding model, from its name (to list those first for "Embedding model"). */
+export const looksLikeEmbedding = (name: string) => /embed|bge|e5|minilm|gte|nomic|arctic|mxbai/i.test(name);
+
+/** Ollama names without a tag mean ":latest". */
+export function hasModel(installed: string[], name: string): boolean {
+  const n = name.trim();
+  return installed.some((m) => m === n || m === `${n}:latest` || (n.endsWith(":latest") && m === n.slice(0, -7)));
 }
 
 export interface ChatMessage {
@@ -138,10 +226,40 @@ export async function chat(s: AiSettings, messages: ChatMessage[]): Promise<stri
   return withoutThinking(r.choices?.[0]?.message?.content ?? "");
 }
 
-/** Check the server and model with a tiny request. */
+const pullHint = (s: AiSettings, model: string) => (s.serverKind === "ollama" ? ` Install it on the server: ollama pull ${model}` : "");
+
+/**
+ * Check the server: reachable, models installed, a tiny answer from the chat
+ * model and, when meaning comes from the server, from the embedding model.
+ */
 export async function testServer(s: AiSettings): Promise<string> {
+  let installed: string[] | null = null;
+  try {
+    installed = await listModels(s);
+  } catch (e) {
+    if (e instanceof UnreachableError) throw e;
+    // Some servers do not list their models: try the models directly.
+  }
+  const useEmbed = s.embeddings === "server";
+  if (installed?.length) {
+    const missing = [s.chatModel, ...(useEmbed ? [s.embedModel] : [])].filter((m) => m.trim() && !hasModel(installed!, m));
+    if (missing.length) {
+      throw new AiError(
+        `Connected, but ${missing.map((m) => `“${m}”`).join(" and ")} ${missing.length > 1 ? "are" : "is"} not on the server (it has: ${installed.join(", ")}).${pullHint(s, missing[0]!)}`,
+      );
+    }
+  }
   const answer = await chat(s, [{ role: "user", content: "Reply with the single word: OK" }]);
-  return answer ? `Connected to ${s.chatModel}.` : "Connected, but the model gave an empty answer.";
+  const parts = [answer ? `Connected to ${s.chatModel}` : `Connected, but ${s.chatModel} gave an empty answer`];
+  if (useEmbed) {
+    try {
+      const [v] = await serverEmbedder(s).embed(["test"], "query");
+      parts.push(`meaning with ${s.embedModel} (${v?.length ?? 0} dimensions)`);
+    } catch (e) {
+      throw new AiError(`${parts[0]}, but the embedding model failed: ${(e as Error).message}${pullHint(s, s.embedModel)}`);
+    }
+  }
+  return `${parts.join("; ")}.`;
 }
 
 // ---------------------------------------------------------------------------

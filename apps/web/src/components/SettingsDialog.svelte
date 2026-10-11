@@ -4,7 +4,7 @@
   import { prefs, savePrefs, type Prefs } from "../lib/features.svelte";
   import type { Vault } from "../lib/vault.svelte";
   import { ai as aiState, setAiSettings } from "../lib/ai-state.svelte";
-  import { DEFAULT_DEVICE_MODEL, DEVICE_MODELS, MODEL_FILES, testServer, type AiSettings } from "../lib/ai";
+  import { DEFAULT_DEVICE_MODEL, DEVICE_MODELS, forgetServer, hasModel, listModels, looksLikeEmbedding, MODEL_FILES, savedServers, serverOf, testServer, type AiSettings, type SavedServer } from "../lib/ai";
   import { modelsDir, pickModelFolder, platform } from "../lib/native";
   import AndroidFolderDialog from "./AndroidFolderDialog.svelte";
 
@@ -74,6 +74,61 @@
       aiTest = { ok: false, text: (e as Error).message };
     }
     aiTesting = false;
+    void loadModels();
+  }
+
+  // Models installed on the server, offered in the model fields (typing stays possible).
+  let models = $state<string[] | null>(null);
+  let modelsFor = "";
+  let modelsError = $state("");
+  async function loadModels() {
+    const s = $state.snapshot(aiSettings) as AiSettings;
+    if (!s.serverUrl.trim()) return;
+    modelsFor = `${s.serverUrl}|${s.serverKind}|${s.apiKey}`;
+    modelsError = "";
+    try {
+      models = await listModels(s);
+    } catch (e) {
+      models = null;
+      modelsError = (e as Error).message;
+    }
+  }
+  // When the server, its type or the key change (after a pause in typing).
+  $effect(() => {
+    const key = `${aiSettings.serverUrl}|${aiSettings.serverKind}|${aiSettings.apiKey}`;
+    if (!aiSettings.serverUrl.trim() || key === modelsFor) return;
+    // What was listed belongs to the previous server.
+    untrack(() => {
+      models = null;
+      modelsError = "";
+    });
+    const t = setTimeout(() => void loadModels(), 800);
+    return () => clearTimeout(t);
+  });
+  // Chat models first without the embedding ones (all of them if that leaves none).
+  const chatModels = $derived.by(() => {
+    const chat = (models ?? []).filter((m) => !looksLikeEmbedding(m));
+    return chat.length ? chat : (models ?? []);
+  });
+  const embedModels = $derived([...(models ?? []).filter(looksLikeEmbedding), ...(models ?? []).filter((m) => !looksLikeEmbedding(m))]);
+  const missingChat = $derived(!!models?.length && !!aiSettings.chatModel.trim() && !hasModel(models, aiSettings.chatModel));
+  const missingEmbed = $derived(!!models?.length && aiSettings.embeddings === "server" && !!aiSettings.embedModel.trim() && !hasModel(models, aiSettings.embedModel));
+
+  // Servers used before on this device: switch back without retyping.
+  let servers = $state<SavedServer[]>(savedServers());
+  const serverLabel = (x: SavedServer) => `${x.serverUrl} (${x.serverKind === "ollama" ? "Ollama" : "OpenAI-compatible"}${x.apiKey ? ", key saved" : ""})`;
+  const currentServer = $derived(servers.findIndex((x) => x.serverUrl === serverOf(aiSettings).serverUrl && x.serverKind === aiSettings.serverKind));
+  function useServer(i: number) {
+    const x = servers[i];
+    if (!x) return;
+    Object.assign(aiSettings, { serverUrl: x.serverUrl, serverKind: x.serverKind, apiKey: x.apiKey, chatModel: x.chatModel, embedModel: x.embedModel });
+    aiTest = null;
+  }
+  function forgetCurrent() {
+    const x = servers[currentServer];
+    if (!x) return;
+    forgetServer(x);
+    servers = savedServers();
   }
 
   let error = $state("");
@@ -319,6 +374,17 @@
           <p class="hint">Downloaded once, then kept on this device. Changing the model re-indexes the vault.</p>
         {/if}
       {/if}
+      {#if servers.length}
+        <div class="row saved-servers">
+          <label>Saved servers
+            <select value={currentServer} onchange={(e) => useServer(Number(e.currentTarget.value))}>
+              {#if currentServer < 0}<option value={-1}>{aiSettings.serverUrl.trim() ? "New server (saved when you click Save)" : "Choose a saved server…"}</option>{/if}
+              {#each servers as x, i (x.serverUrl + x.serverKind)}<option value={i}>{serverLabel(x)}</option>{/each}
+            </select>
+          </label>
+          {#if currentServer >= 0}<button type="button" class="secondary" onclick={forgetCurrent} title="Remove this server and its key from this device">Forget</button>{/if}
+        </div>
+      {/if}
       <div class="row">
         <label>AI server (optional) <input bind:value={aiSettings.serverUrl} placeholder="http://192.168.1.20:11434" inputmode="url" /></label>
         <label>Type
@@ -330,10 +396,22 @@
       </div>
       {#if aiSettings.serverUrl.trim()}
         <div class="row">
-          <label>Chat model <input bind:value={aiSettings.chatModel} placeholder="llama3.2" /></label>
-          <label>Embedding model <input bind:value={aiSettings.embedModel} placeholder="nomic-embed-text" /></label>
+          <label>Chat model <input bind:value={aiSettings.chatModel} placeholder="llama3.2" list="ai-chat-models" autocomplete="off" spellcheck="false" /></label>
+          <label>Embedding model <input bind:value={aiSettings.embedModel} placeholder="nomic-embed-text" list="ai-embed-models" autocomplete="off" spellcheck="false" /></label>
         </div>
+        <datalist id="ai-chat-models">{#each chatModels as m (m)}<option value={m}></option>{/each}</datalist>
+        <datalist id="ai-embed-models">{#each embedModels as m (m)}<option value={m}></option>{/each}</datalist>
         <label>API key (if the server needs one) <input bind:value={aiSettings.apiKey} type="password" autocomplete="off" /></label>
+        {#if models}
+          <p class="hint">
+            {models.length ? `On the server: ${models.join(", ")}. Click a model field to pick one.` : "The server lists no models."}
+            <button type="button" class="link" onclick={loadModels}>↻ Refresh</button>
+          </p>
+        {:else if modelsError}
+          <p class="hint">Models not listed: {modelsError}</p>
+        {/if}
+        {#if missingChat}<p class="error">⚠ “{aiSettings.chatModel}” is not on the server.{aiSettings.serverKind === "ollama" ? ` Install it there (ollama pull ${aiSettings.chatModel}) or pick one from the list.` : ""}</p>{/if}
+        {#if missingEmbed}<p class="error">⚠ “{aiSettings.embedModel}” is not on the server: meaning “from the AI server” will fail.{aiSettings.serverKind === "ollama" ? ` Install it (ollama pull ${aiSettings.embedModel}), pick another, or choose “On this device”.` : ""}</p>{/if}
         <div class="row ai-test">
           <button type="button" onclick={testAi} disabled={aiTesting}>{aiTesting ? "Testing…" : "Test the server"}</button>
           {#if aiTest}<span class={aiTest.ok ? "ok" : "error"}>{aiTest.ok ? "✓" : "⚠"} {aiTest.text}</span>{/if}
@@ -342,7 +420,8 @@
       <p class="hint">
         The server (e.g. Ollama on your Docker server) summarises and reviews notes and answers questions about them, in the
         <b>Related</b> tab. Notes are sent only to that server. Ollama must allow Zeolite: start it with
-        <code>OLLAMA_ORIGINS=*</code>.
+        <code>OLLAMA_ORIGINS=*</code>. Through Open WebUI: <code>http://server:3000/ollama</code>, type Ollama, and an Open WebUI API key.
+        Each server saved here is remembered on this device, key included.
       </p>
     </section>
 
@@ -366,6 +445,20 @@
 {/if}
 
 <style>
+  .saved-servers {
+    align-items: end;
+  }
+  .saved-servers button {
+    padding: 6px 10px;
+  }
+  button.link {
+    border: none;
+    background: none;
+    padding: 0 4px;
+    color: var(--accent-strong);
+    font: inherit;
+    cursor: pointer;
+  }
   .folder-row {
     align-items: end;
   }

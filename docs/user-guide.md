@@ -291,9 +291,19 @@ the server**.
 
 "Thinking" models such as Qwen3 work too: Zeolite asks them to answer
 without their long reasoning (faster), and hides any `<think>` text. With
-Open WebUI, Zeolite talks to Ollama itself (port 11434), not to Open WebUI:
-Ollama's port must be published and `OLLAMA_ORIGINS=*` set on the Ollama
-container.
+Open WebUI, either publish Ollama's port (11434, with `OLLAMA_ORIGINS=*`)
+or go through Open WebUI: server `http://<server>:3000/ollama`, type
+Ollama, and an Open WebUI API key (Admin Panel → Settings → Authentication
+→ Enable API Key; then your Settings → Account → API keys).
+
+The model fields offer the models installed on the server, and warn when a
+typed model is not there. **Test the server** checks the chat model and,
+when meaning comes from the server, the embedding model. Every server you
+save is remembered on the device (address, type, key, models): pick it
+again under **Saved servers** instead of retyping; **Forget** removes it.
+Away from home, when the server cannot be reached, Zeolite says so and
+related notes carry on with shared words and the meaning index built
+before.
 
 ## Numbering and taxonomy
 

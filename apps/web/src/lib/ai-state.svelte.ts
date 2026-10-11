@@ -3,7 +3,7 @@
  * meaning index and its progress. The index is brought up to date when the
  * Related panel or a search by meaning needs it, not in the background.
  */
-import { embedderFor, EmbeddingIndex, loadAi, saveAi, type AiSettings } from "./ai";
+import { embedderFor, EmbeddingIndex, loadAi, saveAi, UnreachableError, type AiSettings } from "./ai";
 import type { Vault } from "./vault.svelte";
 
 export const ai = $state({
@@ -54,7 +54,8 @@ export function refreshIndex(vault: Vault): Promise<void> {
       indexedRecords = records;
       if (n) ai.version++;
     } catch (e) {
-      ai.error = (e as Error).message;
+      // Away from home, the server is out of reach: related notes carry on with shared words.
+      ai.error = e instanceof UnreachableError ? `${(e as Error).message} Meanwhile, related notes use shared words and what was indexed before.` : (e as Error).message;
     } finally {
       ai.status = "";
       running = null;
