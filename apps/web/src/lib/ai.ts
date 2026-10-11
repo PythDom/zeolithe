@@ -75,6 +75,8 @@ export function saveAi(s: AiSettings) {
 export const hasServer = (s: AiSettings) => !!s.serverUrl.trim();
 
 export class AiError extends Error {}
+/** The server answered with an error (as opposed to not answering at all). */
+class ServerError extends AiError {}
 
 // ---------------------------------------------------------------------------
 // Server (Ollama / OpenAI-compatible)
@@ -95,12 +97,14 @@ async function post(s: AiSettings, path: string, body: unknown): Promise<unknown
   if (!res.ok) {
     let detail = `${res.status} ${res.statusText}`;
     try {
-      const j = (await res.json()) as { error?: string | { message?: string } };
-      detail = typeof j.error === "string" ? j.error : (j.error?.message ?? detail);
+      // Ollama: {error}; OpenAI: {error: {message}}; Open WebUI (FastAPI): {detail} or {detail: [{msg}]}.
+      const j = (await res.json()) as { error?: string | { message?: string }; detail?: string | { msg?: string }[]; message?: string };
+      const fromDetail = typeof j.detail === "string" ? j.detail : Array.isArray(j.detail) ? j.detail.map((d) => d.msg).filter(Boolean).join("; ") : "";
+      detail = (typeof j.error === "string" ? j.error : j.error?.message) || fromDetail || j.message || detail;
     } catch {
       /* keep the status */
     }
-    throw new AiError(`AI server: ${detail}`);
+    throw new ServerError(`AI server (${path}, model “${(body as { model?: string }).model ?? "?"}”): ${detail}`);
   }
   return res.json();
 }
@@ -124,8 +128,8 @@ export async function chat(s: AiSettings, messages: ChatMessage[]): Promise<stri
     try {
       r = (await post(s, "/api/chat", { model: s.chatModel, messages, stream: false, think: false })) as Reply;
     } catch (e) {
-      // Older Ollama, or a model that refuses the option: ask without it.
-      if (!/think/i.test((e as Error).message)) throw e;
+      // Older Ollama, a proxy (Open WebUI) or a model that refuses the option: ask without it.
+      if (!(e instanceof ServerError)) throw e;
       r = (await post(s, "/api/chat", { model: s.chatModel, messages, stream: false })) as Reply;
     }
     return withoutThinking(r.message?.content ?? "");
