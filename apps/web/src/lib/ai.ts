@@ -110,14 +110,28 @@ export interface ChatMessage {
   content: string;
 }
 
+/** The answer without a "thinking" model's reasoning (Qwen3, DeepSeek-R1…: `<think>…</think>`). */
+export function withoutThinking(text: string): string {
+  return text.replace(/<think>[\s\S]*?(<\/think>|$)/gi, "").trim();
+}
+
 export async function chat(s: AiSettings, messages: ChatMessage[]): Promise<string> {
   if (!hasServer(s)) throw new AiError("No AI server: set one in ⚙ Settings → AI.");
   if (s.serverKind === "ollama") {
-    const r = (await post(s, "/api/chat", { model: s.chatModel, messages, stream: false })) as { message?: { content?: string } };
-    return r.message?.content?.trim() ?? "";
+    type Reply = { message?: { content?: string } };
+    // Thinking models (Qwen3…) first reason at length: much slower, and not wanted here.
+    let r: Reply;
+    try {
+      r = (await post(s, "/api/chat", { model: s.chatModel, messages, stream: false, think: false })) as Reply;
+    } catch (e) {
+      // Older Ollama, or a model that refuses the option: ask without it.
+      if (!/think/i.test((e as Error).message)) throw e;
+      r = (await post(s, "/api/chat", { model: s.chatModel, messages, stream: false })) as Reply;
+    }
+    return withoutThinking(r.message?.content ?? "");
   }
   const r = (await post(s, "/v1/chat/completions", { model: s.chatModel, messages })) as { choices?: { message?: { content?: string } }[] };
-  return r.choices?.[0]?.message?.content?.trim() ?? "";
+  return withoutThinking(r.choices?.[0]?.message?.content ?? "");
 }
 
 /** Check the server and model with a tiny request. */

@@ -289,6 +289,12 @@ To run Ollama on the Docker server: `docker run -d -p 11434:11434 -e
 (meaning). In Zeolite: server `http://<server>:11434`, type Ollama, **Test
 the server**.
 
+"Thinking" models such as Qwen3 work too: Zeolite asks them to answer
+without their long reasoning (faster), and hides any `<think>` text. With
+Open WebUI, Zeolite talks to Ollama itself (port 11434), not to Open WebUI:
+Ollama's port must be published and `OLLAMA_ORIGINS=*` set on the Ollama
+container.
+
 ## Numbering and taxonomy
 
 Numbers follow `PARA.Category.Sub-PARA.Sequence`, defined in
