@@ -14,11 +14,16 @@ A zeolite is a mineral. Its name, given in 1756 by the Swedish chemist
 Axel Cronstedt, comes from the Greek *zeō* (to boil) and *lithos* (stone):
 when he heated the crystal, it released steam, as if the stone were boiling.
 
+That boiling stone is also a picture of a busy mind: a head simmering with
+ideas, letting off steam. Zeolite is there to catch that steam before it
+vanishes, every thought, action and decision written down as it rises.
+
 Zeolites are made of a regular framework of tiny cavities, which catch and
 sort molecules by size; they are used as filters and “molecular sieves”.
 That is the idea behind the app: a solid, orderly structure where every note
-finds its place, and where you can sort and filter what you collect. The
-logo is a rough crystal, like a stone just picked up.
+finds its place, and where you can sort and filter what you collect, so that
+the ideas boiling up find a home instead of evaporating. The logo is a rough
+crystal, like a stone just picked up.
 
 ## The PARA method
 
