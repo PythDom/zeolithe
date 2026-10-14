@@ -301,6 +301,22 @@ body {
   background: none;
   color: var(--muted);
 }
+/* Follow-up items: fupi:: (back on the next one-on-one agenda until resolved) */
+.markdown .linefield-fupi {
+  background: var(--accent-soft, var(--panel));
+  color: var(--accent-strong);
+}
+.markdown .linefield-fupi::before {
+  content: "↻ ";
+}
+.markdown li.fupi-row {
+  list-style: none;
+  margin-left: -18px;
+}
+.markdown li.fupi-resolved {
+  color: var(--muted);
+  text-decoration: line-through;
+}
 /* Decisions: Decide:: (to take) and Decision:: (taken) */
 .markdown .field-decide,
 .markdown .field-decision {

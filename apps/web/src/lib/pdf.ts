@@ -540,7 +540,7 @@ class Builder {
     } catch (e) {
       return this.bar({ text: `Dataview query error: ${(e as Error).message}`, color: C.danger }, C.danger);
     }
-    const noun = res.kind === "task" ? "task" : res.kind === "attn" ? "Attn point" : res.kind === "decision" ? "decision" : "note";
+    const noun = res.kind === "task" ? "task" : res.kind === "attn" ? "Attn point" : res.kind === "fupi" ? "follow-up item" : res.kind === "decision" ? "decision" : "note";
     const parts: Node[] = [{ text: `DATAVIEW · ${res.count} ${noun.toUpperCase()}${res.count === 1 ? "" : "S"}`, style: "label" }];
     for (const g of res.groups) {
       if (g.key !== undefined) parts.push({ text: g.key === null ? "(none)" : this.valueRuns(g.key), bold: true, margin: [0, 6, 0, 2] });
@@ -564,6 +564,11 @@ class Builder {
         } else if (r.attn) {
           parts.push({
             text: [{ text: "Attn: ", bold: true, color: C.warn }, { text: r.attn.text }, { text: `  · ${r.name}`, color: C.muted, fontSize: 9 }],
+            margin: [0, 1, 0, 1],
+          });
+        } else if (r.fupi) {
+          parts.push({
+            text: [{ text: "Follow-up: ", bold: true, color: C.accent }, { text: r.fupi.text }, { text: `  · ${r.name}`, color: C.muted, fontSize: 9 }],
             margin: [0, 1, 0, 1],
           });
         } else if (r.decision) {

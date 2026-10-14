@@ -7,7 +7,7 @@ describe("Obsidian settings", () => {
   it("uses defaults without .obsidian files", () => {
     const s = readObsidianSettings({});
     expect(s).toMatchObject({ templatesFolder: "_system/Templates", attachments: "attachments", fromObsidian: false });
-    expect(s.journal).toEqual({ folder: "Journal", format: "YYYY-MM-DD" });
+    expect(s.journal).toEqual({ folder: "Journal", format: "YYYY-MM-DD", period: "month" });
   });
   it("reads templates, daily notes and attachment settings", () => {
     const s = readObsidianSettings({
@@ -16,7 +16,7 @@ describe("Obsidian settings", () => {
       app: '{"attachmentFolderPath":"./assets"}',
     });
     expect(s.templatesFolder).toBe("Templates");
-    expect(s.journal).toEqual({ folder: "Journal/Daily", format: "YYYY/MM/YYYY-MM-DD dddd", template: "Templates/Daily.md" });
+    expect(s.journal).toEqual({ folder: "Journal/Daily", format: "YYYY/MM/YYYY-MM-DD dddd", template: "Templates/Daily.md", period: "month" });
     expect(attachmentFolder(s, "01 Projets/x.md")).toBe("01 Projets/assets");
     expect(attachmentFolder(readObsidianSettings({ app: '{"attachmentFolderPath":"/"}' }), "a/b.md")).toBe("");
     expect(attachmentFolder(readObsidianSettings({ app: '{"attachmentFolderPath":"./"}' }), "a/b.md")).toBe("a");

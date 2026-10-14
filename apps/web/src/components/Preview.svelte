@@ -3,7 +3,7 @@
   interface Props {
     html: string;
     onOpenLink: (target: string, heading: string) => void;
-    onToggleTask: (line: number, path?: string) => void;
+    onToggleTask: (line: number, path?: string, kind?: string) => void;
     onTag: (tag: string) => void;
     /** Chord-sheet buttons: transpose, fingerings, diagrams. */
     onChordAction?: (action: string, block: number, chord: string, instrument: string) => void;
@@ -68,10 +68,10 @@
       onChordAction(act.dataset.act, Number(act.dataset.block ?? 0), act.dataset.chord ?? "", instrument);
       return;
     }
-    const box = el.closest<HTMLInputElement>("input.task-box");
+    const box = el.closest<HTMLInputElement>("input.task-box, input.point-box");
     if (box) {
       e.preventDefault();
-      onToggleTask(Number(box.dataset.line), box.dataset.path);
+      onToggleTask(Number(box.dataset.line), box.dataset.path, box.dataset.kind);
       return;
     }
     const link = el.closest<HTMLAnchorElement>("a.wikilink");

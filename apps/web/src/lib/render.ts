@@ -336,6 +336,12 @@ export function createRenderer(ctx: RenderContext, depth = 0, parents: string[] 
       const a = row.attn;
       return `<li class="attn-row${a.resolved ? " attn-resolved" : ""}"><span class="linefield linefield-attn">Attn</span> ${md.renderInline(a.text)} <span class="query-src">· ${noteLink(row.path, row.name)}</span></li>`;
     }
+    if (row.fupi) {
+      // Follow-up items: ticking one resolves it in its own note ([resolved:: date]).
+      const f = row.fupi;
+      const box = `<input type="checkbox" class="point-box" data-kind="fupi" data-path="${esc(row.path)}" data-line="${f.line}" title="${f.resolved ? "Reopen" : "Followed up: mark as resolved"}"${f.resolved ? " checked" : ""}>`;
+      return `<li class="fupi-row${f.resolved ? " fupi-resolved" : ""}">${box} <span class="linefield linefield-fupi">fupi</span> ${md.renderInline(f.text)} <span class="query-src">· ${noteLink(row.path, row.name)}</span></li>`;
+    }
     if (row.decision) {
       const d = row.decision;
       const key = d.required ? "Decide" : "Decision";
@@ -369,7 +375,7 @@ export function createRenderer(ctx: RenderContext, depth = 0, parents: string[] 
         return title + content;
       })
       .join("");
-    const noun = res.kind === "task" ? "task" : res.kind === "attn" ? "Attn point" : res.kind === "decision" ? "decision" : "note";
+    const noun = res.kind === "task" ? "task" : res.kind === "attn" ? "Attn point" : res.kind === "fupi" ? "follow-up item" : res.kind === "decision" ? "decision" : "note";
     const empty = res.count === 0 ? `<p class="query-empty">No matching ${noun}s.</p>` : groups;
     return `<div class="query"><div class="query-title">Dataview · ${res.count} ${noun}${res.count === 1 ? "" : "s"}</div>${empty}</div>`;
   }

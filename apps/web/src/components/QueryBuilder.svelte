@@ -14,7 +14,7 @@
     onInsert?: (block: string) => void;
     onSave: (title: string, block: string) => void;
     onOpenLink: (target: string, heading: string) => void;
-    onToggleTask: (line: number, path?: string) => void;
+    onToggleTask: (line: number, path?: string, kind?: string) => void;
     onClose: () => void;
   }
   let { taxonomy, tags, people, folders, render, onInsert, onSave, onOpenLink, onToggleTask, onClose }: Props = $props();

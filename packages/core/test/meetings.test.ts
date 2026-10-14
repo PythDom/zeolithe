@@ -44,7 +44,8 @@ describe("one-on-one notes", () => {
 
     // The queries list what is still open in Anna's other meetings only.
     const notes = [...past, buildNoteRecord(n.path, n.content)];
-    const [tasks, decide, attn] = blocks(n.content).map((src) => rows(runQuery(src, notes, day(9), n.path)));
+    // The first query of the template lists the follow-up items; then the Past meetings section.
+    const [, tasks, decide, attn] = blocks(n.content).map((src) => rows(runQuery(src, notes, day(9), n.path)));
     expect(tasks).toEqual(["Send the training plan"]);
     expect(decide).toEqual(["Promotion case"]);
     expect(attn).toEqual(["Workload is high"]);

@@ -118,7 +118,15 @@ export function parseTasks(markdown: string): Task[] {
 }
 
 export function parseAttnLine(text: string, line = 0): AttnPoint | null {
-  const field = parseInlineFields(text).find((f) => f.key.toLowerCase() === "attn");
+  return parsePointLine(text, "attn", line);
+}
+
+/**
+ * A point written as a field (`Attn:: …`, `fupi:: …`) on its own or inside a
+ * line (`[fupi:: …]`), with its own `[resolved:: date]`.
+ */
+function parsePointLine(text: string, key: string, line: number): AttnPoint | null {
+  const field = parseInlineFields(text).find((f) => f.key.toLowerCase() === key);
   if (!field) return null;
   const resolved = getField(text, "resolved")?.value;
   return {
@@ -129,6 +137,26 @@ export function parseAttnLine(text: string, line = 0): AttnPoint | null {
     resolved: resolved || undefined,
     assignees: extractAssignees(text, field.value),
   };
+}
+
+/**
+ * Follow-up items (`fupi:: …`): agenda points to bring up again at the next
+ * one-on-one, until resolved. Same shape as Attn points.
+ */
+export type FollowUp = AttnPoint;
+
+export function parseFupiLine(text: string, line = 0): FollowUp | null {
+  return parsePointLine(text, "fupi", line);
+}
+
+export function parseFollowUps(markdown: string): FollowUp[] {
+  const out: FollowUp[] = [];
+  for (const l of scanLines(markdown)) {
+    if (l.inCode) continue;
+    const f = parseFupiLine(l.text, l.index);
+    if (f) out.push(f);
+  }
+  return out;
 }
 
 export function parseAttnPoints(markdown: string): AttnPoint[] {
@@ -213,11 +241,36 @@ export function makeAttn(line: string): string {
   return `${indent}Attn:: ${line.slice(indent.length)}`;
 }
 
-/** Add or remove [resolved:: date] on an Attn line. */
+/** Add or remove [resolved:: date] on an Attn line (or a follow-up item). */
 export function toggleAttnResolved(line: string, today: Date = new Date()): string {
-  const a = parseAttnLine(line);
+  const a = parseAttnLine(line) ?? parseFupiLine(line);
   if (!a) return line;
   return a.resolved ? removeBracketField(line, "resolved") : setBracketField(line, "resolved", toIsoDate(today));
+}
+
+/** Add or remove [resolved:: date] on a follow-up item. */
+export function toggleFupiResolved(line: string, today: Date = new Date()): string {
+  const f = parseFupiLine(line);
+  if (!f) return line;
+  return f.resolved ? removeBracketField(line, "resolved") : setBracketField(line, "resolved", toIsoDate(today));
+}
+
+/**
+ * Mark a line as a follow-up item (`fupi:: text`, keeping its list marker;
+ * a task loses its checkbox), or remove the mark when it has one.
+ */
+export function toggleFupi(line: string): string {
+  const field = parseInlineFields(line).find((f) => f.key.toLowerCase() === "fupi");
+  if (field) {
+    if (field.bracketed) return line.slice(0, field.start) + field.value + line.slice(field.end);
+    return (line.slice(0, field.start) + line.slice(field.start).replace(/^fupi::\s*/i, "")).replace(/\s+$/, "");
+  }
+  const tm = TASK.exec(line);
+  if (tm) return `${tm[1]}- fupi:: ${tm[5]}`;
+  const lm = LIST.exec(line);
+  if (lm) return `${lm[1]}${lm[2]} fupi:: ${lm[3]}`;
+  const indent = /^\s*/.exec(line)![0];
+  return `${indent}- fupi:: ${line.slice(indent.length)}`;
 }
 
 /**

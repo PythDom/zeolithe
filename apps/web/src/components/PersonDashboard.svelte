@@ -8,7 +8,7 @@
     initial?: string;
     render: (markdown: string) => string;
     onOpenLink: (target: string, heading: string) => void;
-    onToggleTask: (line: number, path?: string) => void;
+    onToggleTask: (line: number, path?: string, kind?: string) => void;
     /** Save the dashboard of a person as a note (live queries). */
     onSave: (title: string, markdown: string) => void;
     onClose: () => void;

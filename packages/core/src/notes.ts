@@ -47,11 +47,15 @@ export function createParaNote(req: ParaNoteRequest): NewNote {
 export interface JournalSettings {
   /** Folder of daily notes (Obsidian's Daily Notes "folder"). */
   folder: string;
-  /** File name format with moment tokens (Obsidian's Daily Notes "format"). */
+  /** File name format with moment tokens (Obsidian's Daily Notes "format"); daily notes only. */
   format: string;
+  /** Obsidian's Daily Notes template (daily notes only). */
+  template?: string;
+  /** One note per month (`2026-10`, a heading per day) or per day. */
+  period?: "month" | "day";
 }
 
-export const DEFAULT_JOURNAL: JournalSettings = { folder: JOURNAL_FOLDER, format: "YYYY-MM-DD" };
+export const DEFAULT_JOURNAL: JournalSettings = { folder: JOURNAL_FOLDER, format: "YYYY-MM-DD", period: "month" };
 
 /** `Journal/2026-10-02.md` by default; folder and format follow Obsidian's Daily Notes settings. */
 export function createJournalNote(date: Date = new Date(), settings: JournalSettings = DEFAULT_JOURNAL): NewNote {

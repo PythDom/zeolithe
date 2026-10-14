@@ -349,7 +349,11 @@
       <!-- svelte-ignore a11y_autofocus -->
       <label>Title <input bind:value={title} autofocus placeholder="Note title" /></label>
     {:else}
-      <p class="hint">Opens or creates today's journal note{journal ? ` in ${journal.folder || "the vault root"}` : ""}. A new entry gets a “Past notes” section with what is still open in earlier entries.</p>
+      {#if (journal?.period ?? "month") === "month"}
+        <p class="hint">Opens or creates this month's journal note{journal ? ` in ${journal.folder || "the vault root"}` : ""}; <b>＋ Today</b> above the note adds today's heading.</p>
+      {:else}
+        <p class="hint">Opens or creates today's journal note{journal ? ` in ${journal.folder || "the vault root"}` : ""}. A new entry gets a “Past notes” section with what is still open in earlier entries.</p>
+      {/if}
     {/if}
 
 

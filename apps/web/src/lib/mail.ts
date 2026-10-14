@@ -26,7 +26,7 @@ export function mailHtml(html: string, title: string): string {
     "code{background:#f0f3f3;padding:0 3px}pre{background:#f0f3f3;padding:8px}",
     "blockquote{border-left:3px solid #0f6f69;margin:0;padding-left:10px;color:#4a5856}",
     ".field,.linefield{background:#f0f3f3;border-radius:4px;padding:0 4px;font-size:12px}",
-    "ul{padding-left:22px}li.task,li.attn-row,li.decision-row{list-style:none;margin-left:-18px}",
+    "ul{padding-left:22px}li.task,li.attn-row,li.fupi-row,li.decision-row{list-style:none;margin-left:-18px}",
     "p.attn{border-left:3px solid #b45309;background:#fef3c7;padding:4px 8px}",
     "p.decide,p.decision{border-left:3px solid #6d28d9;padding:4px 8px}p.decide{background:#ede9fe}",
     ".query{border:1px solid #dde4e3;border-radius:6px;padding:4px 10px}.query-title{font-size:11px;color:#64716f;text-transform:uppercase}",

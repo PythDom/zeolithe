@@ -81,7 +81,7 @@ belongs, and **Archive** moves a note to `04 Archives` in one click.
 | ---- | ---------- |
 | PARA note | A numbered note `XX.YY.ZZ.NNN Title`: choose PARA, Category and Sub-PARA, Zeolite picks the next number. |
 | One-on-One | A meeting note with one of your direct reports, numbered `02.02.01.NNN` (see below). |
-| Journal | Today's note in `Journal/YYYY-MM-DD.md` (also 📓). |
+| Journal | This month's note `Journal/2026-10.md` (also 📓); or one note per day, see below. |
 | Inbox | A quick note to sort later. |
 | Free note | Any name, any folder, no number. |
 
@@ -91,12 +91,21 @@ for a PARA, optionally its folder) and press **Add**. A new PARA appears
 in the list once it has a Sub-PARA.
 
 A **template** is suggested when one fits; 📄 in the sidebar manages
-templates.
+templates. A generic **Meeting** template (`# Title, date`, Participants,
+Agenda, Notes) is added to the templates folder the first time you open
+**＋ New note**: pick it for any meeting note.
 
-**Journal:** a new entry ends with a **Past notes** section listing what
-is still open in the other entries: open actions, decisions to take, open
-Attn points. The lists are live: tick an old action there and it is ticked
-in its own entry.
+**Journal:** one note per month, `Journal/2026-10.md`, titled
+`# October 2026`. 📓 opens this month's note (creating it); **＋ Today**,
+above the note, adds today's heading (`## Wednesday 14 October 2026`) on
+demand and puts the cursor under it; if today's heading is already there,
+it goes to it. At the bottom, **Open in the journal** lists, live, the
+open actions, open Attn points and all decisions (to take and taken) of the
+whole journal. The month title and the day heading come from the templates
+`Journal month` and `Journal entry` (written on first use, then editable;
+`{{date:MMMM YYYY}}`, `{{date:dddd D MMMM YYYY}}`). Prefer one note per
+day (Obsidian's daily notes)? **⚙ Settings → Journal → One note per: Day**;
+each daily note then ends with a **Past notes** section.
 
 ### One-on-one meetings
 
@@ -105,9 +114,20 @@ in its own entry.
 2. The note is named `02.02.01.NNN 2026-10-09 Anna Smith`, titled
    `# 2026-10-09 Anna Smith-DZ`, and tagged with the taxonomy tags and
    `#Anna_Smith`.
-3. It ends with **Past meetings**: open actions, decisions to take and
+3. **Agenda → Follow-up items** lists, live, the follow-up items of earlier
+   one-on-ones with the same person that are not resolved yet; then
+   **New topics** and **Notes**.
+4. It ends with **Past meetings**: open actions, decisions to take and
    open Attn points from the other one-on-ones with the same person (live,
    as for the journal).
+
+**Follow-up items:** put the cursor on a line (or select several) and click
+**↻ Follow-up** in the toolbar: the line becomes `- fupi:: …` (click again
+to remove the mark). It then appears in the agenda of every next one-on-one
+with that person until resolved: tick it in the agenda (it gets
+`[resolved:: date]` in its own note), or use **⚠ Attn ▾ → Resolve / reopen**
+on the line itself. The agenda is a plain Dataview query
+(`LIST fupi WHERE fupi AND !resolved …`), so it works in Obsidian too.
 
 The layout comes from the template `_system/Templates/One-on-One.md`,
 written with the first meeting note: edit it to change the sections or the

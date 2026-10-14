@@ -20,6 +20,18 @@
     upsertStaticToc,
     createFreeNote,
     createJournalNote,
+    addJournalEntry,
+    createMonthNote,
+    isMonthly,
+    isMonthNote,
+    JOURNAL_ENTRY_TEMPLATE,
+    JOURNAL_ENTRY_TEMPLATE_NAME,
+    JOURNAL_MONTH_TEMPLATE,
+    JOURNAL_MONTH_TEMPLATE_NAME,
+    MEETING_TEMPLATE,
+    monthNotePath,
+    ONE_ON_ONE_TEMPLATE_V1,
+    toggleFupiResolved,
     transposeChordBlock,
     splitFrontmatter,
     withFrontmatter,
@@ -779,18 +791,19 @@
     requestAnimationFrame(go);
   }
 
-  async function toggleTask(line: number, path?: string) {
+  /** Tick a task, or (kind "fupi") resolve a follow-up item, in this note or another one shown in query results. */
+  async function toggleTask(line: number, path?: string, kind?: string) {
+    const toggle = (l: string) => (kind === "fupi" ? toggleFupiResolved(l) : toggleTaskDone(l));
     if (path && path !== current) {
-      // A task shown in query results from another note.
       const other = vault.read(path).split("\n");
       if (other[line] === undefined) return;
-      other[line] = toggleTaskDone(other[line]!);
+      other[line] = toggle(other[line]!);
       await vault.save(path, other.join("\n"));
       return;
     }
     const lines = content.split("\n");
     if (lines[line] === undefined) return;
-    lines[line] = toggleTaskDone(lines[line]!);
+    lines[line] = toggle(lines[line]!);
     await replaceContent(lines.join("\n"));
   }
 
@@ -894,8 +907,25 @@
     }
   }
 
+  /** A built-in template, written to the templates folder the first time (then editable there). */
+  async function builtInTemplate(name: string, text: string): Promise<string> {
+    const path = `${vault.settings.templatesFolder}/${name}.md`;
+    if (vault.exists(path)) return vault.read(path);
+    await vault.save(path, text).catch(() => undefined);
+    return text;
+  }
+
   async function journal() {
     const settings = vault.settings.journal;
+    if (isMonthly(settings)) {
+      // One note per month: open it (created from its template, with the open items at the bottom).
+      const path = monthNotePath(new Date(), settings);
+      if (vault.exists(path)) return create({ path, content: "" });
+      const tpl = await builtInTemplate(JOURNAL_MONTH_TEMPLATE_NAME, JOURNAL_MONTH_TEMPLATE);
+      await builtInTemplate(JOURNAL_ENTRY_TEMPLATE_NAME, JOURNAL_ENTRY_TEMPLATE);
+      const note = createMonthNote(new Date(), settings, tpl);
+      return create(note, note.cursor);
+    }
     const note = createJournalNote(new Date(), settings);
     // Obsidian's Daily Notes template if set, else a template named "Journal".
     const tpl =
@@ -905,6 +935,17 @@
     if (!tpl) return create(withJournalPast(note));
     const applied = createFromTemplate(note, vault.read(tpl), { title: note.path.split("/").pop()!.replace(/\.md$/, "") });
     await create(withJournalPast(applied), applied.cursor);
+  }
+
+  /** Today's heading in the month note (once; the cursor goes under it). */
+  async function addTodayEntry() {
+    if (!current) return;
+    await flush();
+    const tpl = await builtInTemplate(JOURNAL_ENTRY_TEMPLATE_NAME, JOURNAL_ENTRY_TEMPLATE);
+    const r = addJournalEntry(content, new Date(), tpl);
+    if (r.text !== content) await replaceContent(r.text);
+    if (mode === "view") mode = "split";
+    queueMicrotask(() => goToOffset(r.cursor));
   }
 
   /** A new journal entry lists what is still open in the other entries. */
@@ -925,7 +966,7 @@
   /** From the New note dialog. */
   async function createFromDialog(note: NewNote, cursor: number | null, kind: string) {
     if (vault.exists(note.path)) return create(note);
-    if (kind === "journal") return create(withJournalPast(note), cursor);
+    if (kind === "journal") return isMonthly(vault.settings.journal) ? journal() : create(withJournalPast(note), cursor);
     // The first one-on-one writes its template, so it can be adapted.
     const tpl = oneOnOneTemplatePath();
     if (kind === "oneonone" && !vault.exists(tpl)) await vault.save(tpl, ONE_ON_ONE_TEMPLATE).catch(() => undefined);
@@ -933,6 +974,37 @@
   }
 
   const oneOnOneTemplatePath = () => `${vault.settings.templatesFolder}/One-on-One.md`;
+
+  /** The one-on-one template; the first default one, still unchanged, is replaced by the current one. */
+  function oneOnOneTemplate(): string | undefined {
+    const path = oneOnOneTemplatePath();
+    if (!vault.exists(path)) return undefined;
+    const text = vault.read(path);
+    if (text.trim() !== ONE_ON_ONE_TEMPLATE_V1.trim()) return text;
+    void vault.save(path, ONE_ON_ONE_TEMPLATE).catch(() => undefined);
+    return ONE_ON_ONE_TEMPLATE;
+  }
+
+  /** Templates offered when creating a note: the generic meeting template is written once if missing. */
+  async function prepareNewNote() {
+    // Once per vault: a Meeting template deleted on purpose does not come back.
+    const key = `zeolite.meetingTemplate.${vault.name}`;
+    let offered = false;
+    try {
+      offered = localStorage.getItem(key) === "1";
+    } catch {
+      // Offered again next time.
+    }
+    if (!offered) {
+      await builtInTemplate("Meeting", MEETING_TEMPLATE);
+      try {
+        localStorage.setItem(key, "1");
+      } catch {
+        // Not remembered.
+      }
+    }
+    showNew = true;
+  }
 
   /** "＋ New" in the New note dialog: add a taxonomy entry, return its code. */
   async function addTaxonomyEntry(kind: TaxonomyKind, entry: { code: string; tag: string; folder?: string }, para?: string): Promise<string> {
@@ -1135,7 +1207,7 @@
     const v = editor?.getView();
     linkFrom = v ? v.state.sliceDoc(v.state.selection.main.from, v.state.selection.main.to) : "";
   }
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "n") { e.preventDefault(); showNew = true; }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "n") { e.preventDefault(); void prepareNewNote(); }
   if (e.key === "F1") { e.preventDefault(); help(); }
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "t") { e.preventDefault(); newTab(); }
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "w") { e.preventDefault(); closeTab(active); }
@@ -1181,8 +1253,8 @@
       <button class="settings hide-side" onclick={toggleSidebar} title="Hide this panel (Ctrl+\); ☰ brings it back" aria-label="Hide the left panel">«</button>
     </header>
     <div class="actions">
-      <button class="primary" onclick={() => (showNew = true)} title="Ctrl+N">＋ New note</button>
-      <button onclick={journal} title="Today's journal">📓</button>
+      <button class="primary" onclick={prepareNewNote} title="Ctrl+N">＋ New note</button>
+      <button onclick={journal} title={isMonthly(vault.settings.journal) ? "This month's journal (＋ Today adds today's heading)" : "Today's journal"}>📓</button>
       <button onclick={() => (showTemplates = true)} title="Templates">📄</button>
       <button onclick={openFolder} title="Open a vault folder">📂</button>
       <button onclick={help} title="User guide (F1): adds it to this vault and opens it" aria-label="Help">❓</button>
@@ -1286,6 +1358,9 @@
         {/if}
       </div>
       {#if collision}<button class="warnbtn" onclick={renumber}>Renumber</button>{/if}
+      {#if current && isMonthly(vault.settings.journal) && isMonthNote(current, vault.settings.journal)}
+        <button class="ghost" onclick={addTodayEntry} title="Add today's heading to this month's journal (or go to it)">＋ Today</button>
+      {/if}
       {#if record?.id && !isArchived(vault.taxonomy, record.path)}
         <button class="ghost" onclick={archive} title="Move to 04 Archives and tag #Archives">Archive</button>
       {/if}
@@ -1642,7 +1717,7 @@
     onAddPerson={addPerson}
     oneOnOneCode={vault.settings.oneOnOneCode}
     peopleProblem={vault.settingsProblem()}
-    oneOnOneTemplate={() => (vault.exists(oneOnOneTemplatePath()) ? vault.read(oneOnOneTemplatePath()) : undefined)}
+    oneOnOneTemplate={oneOnOneTemplate}
     onCreate={createFromDialog}
     onClose={() => (showNew = false)}
   />

@@ -28,6 +28,7 @@
   let journalFolder = $state(start.journal.folder);
   let journalFormat = $state(start.journal.format);
   let journalTemplate = $state(start.journal.template ?? "");
+  let journalPeriod = $state<"month" | "day">(start.journal.period ?? "month");
   let inboxFolder = $state(start.inboxFolder);
   let searchesFolder = $state(start.searchesFolder);
   let exportsFolder = $state(start.exportsFolder);
@@ -137,7 +138,7 @@
   const templates = $derived(vault.templates());
   const journalPreview = $derived.by(() => {
     try {
-      return `${journalFolder.trim().replace(/^\/+|\/+$/g, "") || "(vault root)"}/${formatDate(new Date(), journalFormat || "YYYY-MM-DD")}.md`;
+      return `${journalFolder.trim().replace(/^\/+|\/+$/g, "") || "(vault root)"}/${formatDate(new Date(), journalPeriod === "month" ? "YYYY-MM" : journalFormat || "YYYY-MM-DD")}.md`;
     } catch {
       return "";
     }
@@ -164,7 +165,7 @@
         ...start,
         attachments: attachMode === "root" ? "" : attachMode === "same" ? "./" : attachMode === "sub" ? `./${att}` : att,
         templatesFolder: folder("Templates folder", templatesFolder),
-        journal: { folder: folder("Journal folder", journalFolder, true), format: journalFormat.trim() || "YYYY-MM-DD", template: journalTemplate || undefined },
+        journal: { folder: folder("Journal folder", journalFolder, true), format: journalFormat.trim() || "YYYY-MM-DD", template: journalTemplate || undefined, period: journalPeriod },
         inboxFolder: folder("Inbox folder", inboxFolder, true),
         searchesFolder: folder("Saved searches folder", searchesFolder, true),
         exportsFolder: folder("PDF exports folder", exportsFolder, true),
@@ -257,16 +258,30 @@
 
       <h4>Journal</h4>
       <div class="row">
+        <label>One note per
+          <select bind:value={journalPeriod}>
+            <option value="month">Month (a heading per day)</option>
+            <option value="day">Day (Obsidian daily notes)</option>
+          </select>
+        </label>
         <label>Folder <input bind:value={journalFolder} placeholder="(vault root)" /></label>
-        <label>Date format <input bind:value={journalFormat} placeholder="YYYY-MM-DD" /></label>
       </div>
-      <p class="hint">Today's note: <code>{journalPreview}</code>. Tokens: YYYY, MM, DD, ddd (day name)…</p>
-      <label>Template
-        <select bind:value={journalTemplate}>
-          <option value="">(the template named “Journal”, if any)</option>
-          {#each templates as t}<option value={t}>{t}</option>{/each}
-        </select>
-      </label>
+      {#if journalPeriod === "month"}
+        <p class="hint">
+          This month's note: <code>{journalPreview}</code>. 📓 opens it; <b>＋ Today</b> adds today's heading. Templates
+          <code>Journal month</code> and <code>Journal entry</code> in the templates folder (created on first use, then editable). At the bottom,
+          the open actions, Attn points and decisions of the whole journal.
+        </p>
+      {:else}
+        <label>Date format <input bind:value={journalFormat} placeholder="YYYY-MM-DD" /></label>
+        <p class="hint">Today's note: <code>{journalPreview}</code>. Tokens: YYYY, MM, DD, ddd (day name)…</p>
+        <label>Template
+          <select bind:value={journalTemplate}>
+            <option value="">(the template named “Journal”, if any)</option>
+            {#each templates as t}<option value={t}>{t}</option>{/each}
+          </select>
+        </label>
+      {/if}
 
       <h4>One-on-one meetings</h4>
       {#if vault.settingsProblem()}<p class="error">⚠ {vault.settingsProblem()} Open that note and fix its properties before saving settings here.</p>{/if}

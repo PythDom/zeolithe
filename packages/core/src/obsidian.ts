@@ -152,6 +152,7 @@ export function applyZeoliteSettings(s: VaultSettings, note: string | undefined)
   out.inboxFolder = pick("inbox_folder") ?? out.inboxFolder;
   out.searchesFolder = pick("searches_folder") ?? out.searchesFolder;
   out.exportsFolder = pick("exports_folder") ?? out.exportsFolder;
+  if (data.journal_period === "month" || data.journal_period === "day") out.journal = { ...out.journal, period: data.journal_period };
   const code = typeof data.one_on_one_code === "string" ? data.one_on_one_code.trim() : "";
   if (/^\d{2}\.\d{2}\.\d{2}$/.test(code)) out.oneOnOneCode = code;
   if (Array.isArray(data.one_on_one_people)) out.people = readPeople(data.one_on_one_people);
@@ -186,6 +187,7 @@ export function writeVaultSettings(
     inbox_folder: s.inboxFolder,
     searches_folder: s.searchesFolder,
     exports_folder: s.exportsFolder,
+    journal_period: s.journal.period ?? "month",
     one_on_one_code: s.oneOnOneCode,
     one_on_one_people: s.people.map((p) => (p.email ? { name: p.name, email: p.email } : { name: p.name })),
   };

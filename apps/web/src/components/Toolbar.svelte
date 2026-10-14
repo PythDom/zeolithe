@@ -10,6 +10,7 @@
     setOwner,
     setDue,
     toggleAttnResolved,
+    toggleFupi,
   } from "@zeolite/core";
   import type { EditorView } from "@codemirror/view";
   import { insertBlock, toggleLinePrefix, transformLines, wrapSelection } from "../lib/editor-commands";
@@ -115,6 +116,7 @@
   <div class="group">
     <button class="decide" title="Decision required (Decide::)" onclick={lines(makeDecide)}>❓<span class="lbl">Decision rqd</span></button>
     <button class="decide" title="Decision taken (Decision:: … [decided:: today]); turns a Decision rqd into a decision" onclick={lines((l) => recordDecision(l))}>⚖<span class="lbl">Decision</span></button>
+    <button class="fupi" title="Follow-up item (fupi::): back on the agenda of the next one-on-one until resolved. Click again to remove the mark." onclick={lines(toggleFupi)}>↻<span class="lbl">Follow-up</span></button>
   </div>
 </div>
 
@@ -173,7 +175,7 @@
 {#if attnOpen}
   <div class="options" role="group" aria-label="Attn point">
     <button onclick={() => attn(makeAttn)}>⚠ New Attn point</button>
-    <button onclick={() => attn((l) => toggleAttnResolved(l))}>✓ Resolve / reopen</button>
+    <button onclick={() => attn((l) => toggleAttnResolved(l))} title="Also for follow-up items (fupi::)">✓ Resolve / reopen</button>
     <button onclick={() => attn(convertAttnToTask)}>☐ Convert to task</button>
     <button class="close" aria-label="Close" onclick={() => (attnOpen = false)}>✕</button>
   </div>
@@ -249,6 +251,10 @@
   }
   button.decide {
     color: var(--decide);
+    font-weight: 600;
+  }
+  button.fupi {
+    color: var(--accent-strong);
     font-weight: 600;
   }
   mark {

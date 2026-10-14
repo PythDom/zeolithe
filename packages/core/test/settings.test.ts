@@ -7,15 +7,15 @@ import { readFileSync } from "node:fs";
 
 describe("vault settings", () => {
   it("writes Obsidian's files keeping their other keys, and reads them back", () => {
-    const s = { ...structuredClone(DEFAULT_SETTINGS), attachments: "files/img", templatesFolder: "Tpl", journal: { folder: "Daily", format: "YYYY/MM-DD", template: "Tpl/Day.md" } };
+    const s = { ...structuredClone(DEFAULT_SETTINGS), attachments: "files/img", templatesFolder: "Tpl", journal: { folder: "Daily", format: "YYYY/MM-DD", template: "Tpl/Day.md", period: "day" as const } };
     const out = writeVaultSettings(s, { app: '{"vimMode":true,"attachmentFolderPath":"old"}', templates: '{"dateFormat":"DD"}' });
     expect(JSON.parse(out.app)).toEqual({ vimMode: true, attachmentFolderPath: "files/img" });
     expect(JSON.parse(out.templates)).toEqual({ dateFormat: "DD", folder: "Tpl" });
     expect(JSON.parse(out.dailyNotes)).toEqual({ folder: "Daily", format: "YYYY/MM-DD", template: "Tpl/Day" });
-    const back = readObsidianSettings({ app: out.app, templates: out.templates, dailyNotes: out.dailyNotes });
+    const back = applyZeoliteSettings(readObsidianSettings({ app: out.app, templates: out.templates, dailyNotes: out.dailyNotes }), out.note);
     expect(back.attachments).toBe("files/img");
     expect(back.templatesFolder).toBe("Tpl");
-    expect(back.journal).toEqual({ folder: "Daily", format: "YYYY/MM-DD", template: "Tpl/Day.md" });
+    expect(back.journal).toEqual({ folder: "Daily", format: "YYYY/MM-DD", template: "Tpl/Day.md", period: "day" });
   });
 
   it("vault root and note-relative attachment folders round-trip", () => {

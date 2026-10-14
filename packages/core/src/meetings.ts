@@ -69,8 +69,34 @@ export function appendSection(content: string, heading: string, section: string)
   return `${content.replace(/\s*$/, "")}\n\n${section}`;
 }
 
+/**
+ * Follow-up items from earlier one-on-ones with the same person that are not
+ * resolved yet (`fupi:: …` lines): the start of the next agenda.
+ */
+export const FOLLOW_UP_QUERY = "```dataview\nLIST fupi\nWHERE fupi AND !resolved AND type = \"one-on-one\" AND person = this.person AND file.name != this.file.name\n```";
+
 /** Template written the first time a one-on-one note is created (then editable). */
 export const ONE_ON_ONE_TEMPLATE = `---
+type: ${ONE_ON_ONE_TYPE}
+---
+# {{date}} {{person}}-DZ
+
+## Agenda
+
+### Follow-up items
+
+${FOLLOW_UP_QUERY}
+
+### New topics
+
+- {{cursor}}
+
+## Notes
+
+`;
+
+/** The first default template, replaced by the new one when the vault still has it unchanged. */
+export const ONE_ON_ONE_TEMPLATE_V1 = `---
 type: ${ONE_ON_ONE_TYPE}
 ---
 # {{date}} {{person}}-DZ
@@ -86,6 +112,22 @@ type: ${ONE_ON_ONE_TYPE}
 - [ ]
 
 ## Decisions
+
+`;
+
+/** Generic meeting notes template (written to the templates folder when missing). */
+export const MEETING_TEMPLATE = `---
+type: meeting
+---
+# {{title}}, {{date}}
+
+## Participants
+
+- {{cursor}}
+
+## Agenda
+
+## Notes
 
 `;
 

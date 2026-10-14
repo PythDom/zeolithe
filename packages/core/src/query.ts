@@ -13,7 +13,7 @@
  * startswith(), endswith(), lower(), upper(), length(), default().
  *
  * Zeolite extension: `LIST Attn` lists individual Attn points (with their own
- * `resolved` field) instead of notes; `LIST Decide` lists decisions still to
+ * `resolved` field) instead of notes, and `LIST fupi` follow-up items; `LIST Decide` lists decisions still to
  * take and `LIST Decision` decisions taken (with their `decided` field).
  */
 import { toIsoDate } from "./dates";
@@ -419,6 +419,7 @@ interface Row {
   fields: Fields;
   task?: Task;
   attn?: AttnPoint;
+  fupi?: AttnPoint;
   decision?: DecisionPoint;
 }
 
@@ -504,6 +505,16 @@ function attnFields(r: NoteRecord, a: AttnPoint, base: Fields): Fields {
   setField(f, "assignees", a.assignees);
   setField(f, "text", a.text);
   setField(f, "line", a.line);
+  return f;
+}
+
+function fupiFields(r: NoteRecord, p: AttnPoint, base: Fields): Fields {
+  const f = lineFields(base, p.raw);
+  setField(f, "fupi", p.text);
+  setField(f, "resolved", p.resolved ?? null);
+  setField(f, "assignees", p.assignees);
+  setField(f, "text", p.text);
+  setField(f, "line", p.line);
   return f;
 }
 
@@ -667,11 +678,12 @@ export interface ResultRow {
   values: Value[];
   task?: Task;
   attn?: AttnPoint;
+  fupi?: AttnPoint;
   decision?: DecisionPoint;
 }
 
 export interface QueryResult {
-  kind: "task" | "list" | "table" | "attn" | "decision";
+  kind: "task" | "list" | "table" | "attn" | "fupi" | "decision";
   /** Column headers (TABLE), including the leading file column unless WITHOUT ID. */
   headers: string[];
   withoutId: boolean;
@@ -689,8 +701,9 @@ export function runQuery(source: string, notes: NoteRecord[], today: Date = new 
   thisFields = self ? noteFields(self) : new Map();
   const listOf = q.type === "LIST" && q.fields.length === 1 && q.fields[0]!.expr.k === "id" ? q.fields[0]!.expr.name.toLowerCase() : "";
   const attnList = listOf === "attn";
+  const fupiList = listOf === "fupi";
   const decisionList = listOf === "decide" || listOf === "decision";
-  const pointList = attnList || decisionList;
+  const pointList = attnList || fupiList || decisionList;
 
   const rows: Row[] = [];
   for (const r of notes) {
@@ -698,6 +711,7 @@ export function runQuery(source: string, notes: NoteRecord[], today: Date = new 
     const base = noteFields(r);
     if (q.type === "TASK") for (const t of r.tasks) rows.push({ record: r, fields: taskFields(r, t, base), task: t });
     else if (attnList) for (const a of r.attn) rows.push({ record: r, fields: attnFields(r, a, base), attn: a });
+    else if (fupiList) for (const f of r.fupi) rows.push({ record: r, fields: fupiFields(r, f, base), fupi: f });
     else if (decisionList) {
       for (const d of r.decisions) if (d.required === (listOf === "decide")) rows.push({ record: r, fields: decisionFields(r, d, base), decision: d });
     }
@@ -724,6 +738,7 @@ export function runQuery(source: string, notes: NoteRecord[], today: Date = new 
     values: pointList ? [] : q.fields.map((f) => evalExpr(f.expr, row.fields, today)),
     task: row.task,
     attn: row.attn,
+    fupi: row.fupi,
     decision: row.decision,
   });
 
@@ -742,7 +757,7 @@ export function runQuery(source: string, notes: NoteRecord[], today: Date = new 
   }
 
   return {
-    kind: q.type === "TASK" ? "task" : attnList ? "attn" : decisionList ? "decision" : q.type === "TABLE" ? "table" : "list",
+    kind: q.type === "TASK" ? "task" : attnList ? "attn" : fupiList ? "fupi" : decisionList ? "decision" : q.type === "TABLE" ? "table" : "list",
     headers: q.type === "TABLE" ? [...(q.withoutId ? [] : ["File"]), ...q.fields.map((f) => f.name)] : [],
     withoutId: q.withoutId,
     groups,
