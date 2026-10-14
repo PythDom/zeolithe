@@ -10,9 +10,10 @@
 
 ## Why “Zeolite”?
 
-Zeolite is a mineral. Its name, given in 1756 by the Swedish chemist Axel
+Zeolites are minerals. Their name, given in 1756 by the Swedish chemist Axel
 Cronstedt, comes from the Greek *zeō* (to boil) and *lithos* (stone): when
-he heated the crystal, it released steam, as if the stone were boiling.
+he heated one of these crystals, it released steam, as if the stone were
+boiling.
 
 That boiling stone is a metaphor for the busy mind: a head simmering with
 ideas that escape like steam. Zeolite is there to catch them before they
