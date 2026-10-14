@@ -15,16 +15,17 @@ Cronstedt, comes from the Greek *zeō* (to boil) and *lithos* (stone): when
 he heated one of these crystals, it released steam, as if the stone were
 boiling.
 
-That boiling stone is a metaphor for the busy mind: a head simmering with
-ideas that escape like steam. Zeolite is there to catch them before they
-vanish: every thought, action and decision written down as it rises.
+The boiling stone is a metaphor for the busy mind: a head simmering with
+ideas that escape like steam. The Zeolite app is there to catch them before
+they vanish: every thought, action and decision written down as they rise.
 
 Zeolites are made of regular frameworks of tiny cavities, which catch and
 sort molecules by size; they are used as filters and “molecular sieves”.
 That is the idea behind the app: a solid, orderly structure where every note
 finds its place, and where you can sort and filter what you collect, so that
-the ideas boiling up find a home instead of evaporating. The logo is a rough
-crystal, like a stone just picked up.
+the ideas boiling up find a home instead of evaporating.
+
+The logo itself is a rough zeolite crystal, like a stone just picked up.
 
 ## The PARA method
 
