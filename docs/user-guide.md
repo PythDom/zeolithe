@@ -484,9 +484,19 @@ Syncthing on that PC instead.
   settings and test the connection.
 - Without network, keep working: changes are sent at the next sync.
 - **The same note edited on two devices** before they synced: both
-  versions are kept. Yours stays the note; the other one appears at the
-  top of the Files list as "⇄ Sync conflict: … .sync-conflict-…". Open
-  it, copy what you need into the note, then delete the conflict copy.
+  versions are kept. Yours stays the note; the other one is saved next to
+  it as `….sync-conflict-<date>-SERVER.md`. Differences nobody sees (line
+  endings, spaces at the ends of lines, a last empty line) do not count:
+  such notes are simply made identical.
+- **⇄ Review and clean up…** (top of the side panel, when there are
+  conflict copies) sorts them out: copies identical to their note apart
+  from invisible differences are deleted in one click; for the others it
+  shows the lines that differ, and **Keep the note** (the copy goes to
+  `.trash`) or **Keep the copy** (it takes the note's place, the note goes
+  to `.trash`). To combine both, open them and merge by hand.
+- **Wi-Fi sync** remembers the sharing device by a permanent identifier
+  of its vault, not by its address: a new IP address or port does not
+  make the next sync start over.
 - **A note deleted** on one device is deleted on the others too, but goes
   to the vault's `.trash` folder there, so it can be recovered. If a sync
   would delete many notes at once, Zeolite asks first; when in doubt

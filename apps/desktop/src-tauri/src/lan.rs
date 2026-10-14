@@ -7,7 +7,7 @@
 //! stops. Only files the sync handles are reachable: no hidden folders or
 //! files (`.zeolite`, `.obsidian`, `.trash`…), no `..`.
 //!
-//!   GET    /zeolite/v1/info              → {"app":"zeolite","name":…}
+//!   GET    /zeolite/v1/info              → {"app":"zeolite","name":…,"id":…}
 //!   GET    /zeolite/v1/list              → {"files":{path: version}}
 //!   GET    /zeolite/v1/file?path=…       → the file
 //!   PUT    /zeolite/v1/file?path=…       → {"version":…} (folders created)
@@ -65,11 +65,12 @@ pub fn start(root: PathBuf, name: String, token: String, port: u16, on_change: i
     let server = Arc::new(bind(port)?);
     let port = server.server_addr().to_ip().map(|a| a.port()).unwrap_or(port);
     let (root_kept, token_kept) = (root.clone(), token.clone());
+    let id = vault_id(&root);
     let srv = server.clone();
     let failures = AtomicU32::new(0);
     let thread = std::thread::spawn(move || {
         for req in srv.incoming_requests() {
-            match handle(req, &root, &name, &token, &failures) {
+            match handle(req, &root, &name, &id, &token, &failures) {
                 Handled::Changed(path) => on_change(vec![path]),
                 Handled::Locked => break,
                 Handled::Done => {}
@@ -77,6 +78,29 @@ pub fn start(root: PathBuf, name: String, token: String, port: u16, on_change: i
         }
     });
     Ok(LanServer { server: Some(server), thread: Some(thread), port, root: root_kept, token: token_kept })
+}
+
+/// A permanent identifier of the shared vault (kept in `.zeolite/share-id`,
+/// never synced): the other device keys its sync state on it, so a new IP
+/// address or port does not make it start over.
+pub fn vault_id(root: &Path) -> String {
+    let file = root.join(".zeolite").join("share-id");
+    if let Ok(text) = std::fs::read_to_string(&file) {
+        let t = text.trim();
+        if t.len() >= 8 && t.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') {
+            return t.to_string();
+        }
+    }
+    use std::hash::{BuildHasher, Hasher};
+    let mut h = std::collections::hash_map::RandomState::new().build_hasher();
+    h.write_u128(std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0));
+    h.write_u32(std::process::id());
+    let a = h.finish();
+    let mut h2 = std::collections::hash_map::RandomState::new().build_hasher();
+    h2.write_u64(a);
+    let id = format!("{:016x}{:016x}", a, h2.finish());
+    let _ = std::fs::create_dir_all(file.parent().unwrap()).and_then(|_| std::fs::write(&file, &id));
+    id
 }
 
 /// Listen on `port`, waiting a little if it is still being released, then on
@@ -213,7 +237,7 @@ fn list(root: &Path) -> serde_json::Map<String, serde_json::Value> {
     out
 }
 
-fn handle(mut req: Request, root: &Path, name: &str, token: &str, failures: &AtomicU32) -> Handled {
+fn handle(mut req: Request, root: &Path, name: &str, id: &str, token: &str, failures: &AtomicU32) -> Handled {
     let url = req.url().to_string();
     let (route, query) = url.split_once('?').unwrap_or((url.as_str(), ""));
     let method = req.method().clone();
@@ -234,7 +258,7 @@ fn handle(mut req: Request, root: &Path, name: &str, token: &str, failures: &Ato
     }
     let mut changed = None;
     let response = match (method, route) {
-        (Method::Get, "/zeolite/v1/info") => json(200, serde_json::json!({ "app": "zeolite", "name": name }).to_string()),
+        (Method::Get, "/zeolite/v1/info") => json(200, serde_json::json!({ "app": "zeolite", "name": name, "id": id }).to_string()),
         (Method::Get, "/zeolite/v1/list") => json(200, serde_json::json!({ "files": list(root) }).to_string()),
         (m, "/zeolite/v1/file") => match safe_path(query) {
             None => error(400, "Not a path that can be synced."),
@@ -396,6 +420,22 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_millis(200));
         assert!(!srv.is_running());
         srv.stop();
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn keeps_a_permanent_vault_id_and_reports_it() {
+        let root = std::env::temp_dir().join(format!("zeolite-lan-id-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let id = vault_id(&root);
+        assert!(id.len() >= 16);
+        assert_eq!(vault_id(&root), id, "the same identifier after a restart");
+        let server = start(root.clone(), "V".into(), "CODE9876".into(), 0, |_| {}).unwrap();
+        let (status, body) = call(server.port, "GET", "/zeolite/v1/info", "CODE9876", b"");
+        assert_eq!(status, 200);
+        assert!(body.contains(&format!("\"id\":\"{id}\"")), "{body}");
+        drop(server);
         let _ = std::fs::remove_dir_all(&root);
     }
 

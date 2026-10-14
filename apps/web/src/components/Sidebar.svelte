@@ -22,12 +22,14 @@
     onNewFolder: (parent: string) => void;
     /** Import .md files, or number the notes without ID (several at once). */
     onFiling?: (mode: "import" | "number") => void;
+    /** Sort out sync conflict copies. */
+    onConflicts?: () => void;
     /** An attachment (image, PDF…) was clicked in the Files list. */
     onOpenAttachment: (path: string) => void;
     /** Ctrl/Cmd+click or middle-click on a note: open it in a new tab. */
     onOpenNewTab?: (path: string) => void;
   }
-  let { vault, current, tab = $bindable(), query = $bindable(), related, onOpen, onQuery, onDashboard, onTaxonomy, onMoveNote, onDeleteFolder, onNewFolder, onFiling, onOpenAttachment, onOpenNewTab }: Props = $props();
+  let { vault, current, tab = $bindable(), query = $bindable(), related, onOpen, onQuery, onDashboard, onTaxonomy, onMoveNote, onDeleteFolder, onNewFolder, onFiling, onConflicts, onOpenAttachment, onOpenNewTab }: Props = $props();
 
   // Drag & drop of notes onto folders.
   const DRAG_TYPE = "application/x-zeolite-note";
@@ -162,7 +164,13 @@
           {#each c.renumber as n}<button class="link" onclick={() => onOpen(n.path)}>{label(n.path)}</button>{/each}
         </div>
       {/each}
-      {#each vault.conflicts as c}
+      {#if vault.conflicts.length && onConflicts}
+        <div class="alert">
+          ⇄ {vault.conflicts.length} sync conflict cop{vault.conflicts.length > 1 ? "ies" : "y"}.
+          <button class="link" onclick={onConflicts}>Review and clean up…</button>
+        </div>
+      {/if}
+      {#each vault.conflicts.length > 3 && onConflicts ? [] : vault.conflicts as c}
         {@const original = vault.conflictOf(c.path)}
         <div class="alert">
           ⇄ {original ? "Conflict copy of" : "Conflict copy"}

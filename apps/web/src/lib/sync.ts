@@ -4,7 +4,7 @@
  * run. The decisions are made by planSync in @zeolite/core; this file does
  * the reading and writing.
  */
-import { conflictPath, hashBytes, isSyncedPath, planSync, type SyncAction, type SyncBase } from "@zeolite/core";
+import { conflictPath, hashBytes, isSyncedPath, planSync, sameContent, type SyncAction, type SyncBase } from "@zeolite/core";
 import type { VaultStorage } from "./storage";
 import { LanClient } from "./lan";
 import { OneDriveClient } from "./onedrive";
@@ -28,6 +28,11 @@ export interface SyncSettings {
 export interface SyncRemote {
   /** Identifies the server and folder (another one starts a fresh sync state). */
   readonly url: string;
+  /**
+   * A permanent identity, when the server has one that outlives its address
+   * (a sharing device's vault ID): the sync state follows it instead of `url`.
+   */
+  identity?(): Promise<string>;
   test(): Promise<"ok" | "created">;
   /** Every synced file with its server version. */
   list(): Promise<Map<string, string>>;
@@ -94,11 +99,16 @@ export interface SyncOptions {
   now?: Date;
 }
 
-async function readState(storage: VaultStorage, url: string): Promise<Record<string, SyncBase>> {
+/**
+ * The state of the last sync with this server. `id` is its permanent identity;
+ * a state saved under the address it had then (`url`, before identities
+ * existed) is taken over as long as the address is the same.
+ */
+async function readState(storage: VaultStorage, id: string, url: string): Promise<Record<string, SyncBase>> {
   try {
     const s = JSON.parse(await storage.readText(SYNC_STATE_PATH)) as SyncState;
     // Another server or folder: start again (nothing is deleted on a first sync).
-    return s.url === url ? s.files : {};
+    return s.url === id || s.url === url ? s.files : {};
   } catch {
     return {};
   }
@@ -122,7 +132,8 @@ const tooMany = (n: number, known: number) => n > 5 && n > known * 0.3;
 
 export async function runSync(storage: VaultStorage, client: SyncRemote, opts: SyncOptions): Promise<SyncReport> {
   const report: SyncReport = { uploaded: [], downloaded: [], deletedLocal: [], deletedRemote: [], conflicts: [], errors: [], localChanged: false };
-  const base = await readState(storage, client.url);
+  const id = client.identity ? await client.identity() : client.url;
+  const base = await readState(storage, id, client.url);
 
   // Local files and their stamps (modification time + size): files unchanged since the
   // last sync are not read again, only new or modified ones are hashed.
@@ -206,10 +217,18 @@ export async function runSync(storage: VaultStorage, client: SyncRemote, opts: S
         }
         case "compare": {
           const theirs = await client.get(a.path);
-          const theirHash = hashBytes(await bytes(theirs));
+          const theirBytes = await bytes(theirs);
+          const theirHash = hashBytes(theirBytes);
           const ours = local.get(a.path)!;
           if (theirHash === ours) {
             files[a.path] = { hash: ours, etag: remote.get(a.path) ?? "", stamp: stamps.get(a.path) };
+            break;
+          }
+          // Only invisible differences (line endings, spaces at line ends…): the same note.
+          // Ours is sent, so that both sides are byte for byte identical from now on.
+          if (sameContent(a.path, await bytes(await storage.readBinary(a.path)), theirBytes)) {
+            await upload(a.path);
+            report.uploaded.push(a.path);
             break;
           }
           // Both changed: keep ours as the note, theirs as a conflict copy on both sides.
@@ -233,7 +252,7 @@ export async function runSync(storage: VaultStorage, client: SyncRemote, opts: S
     opts.onProgress?.(++done, plan.length);
   }
 
-  const state: SyncState = { url: client.url, lastSync: now.toISOString(), files };
+  const state: SyncState = { url: id, lastSync: now.toISOString(), files };
   await storage.writeText(SYNC_STATE_PATH, JSON.stringify(state, null, 1));
   return report;
 }

@@ -36,7 +36,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * it like with a WebDAV server. Same protocol and rules as the Windows app's
  * server (apps/desktop/src-tauri/src/lan.rs):
  *
- *   GET    /zeolite/v1/info          {"app":"zeolite","name":…}
+ *   GET    /zeolite/v1/info          {"app":"zeolite","name":…,"id":…}
  *   GET    /zeolite/v1/list          {"files":{path: version}}
  *   GET    /zeolite/v1/file?path=…   the file
  *   PUT    /zeolite/v1/file?path=…   {"version":…} (folders created)
@@ -62,6 +62,8 @@ public class LanServer {
 
     private final File root;
     private final String name;
+    /** Permanent identifier of the shared vault (.zeolite/share-id): the other device keys its sync state on it. */
+    private final String id;
     private final String token;
     private final Listener listener;
     private final ServerSocket socket;
@@ -74,12 +76,34 @@ public class LanServer {
         if (token == null || token.length() < 6) throw new IOException("The pairing code is too short.");
         this.root = root;
         this.name = name;
+        this.id = vaultId(root);
         this.token = token;
         this.listener = listener;
         this.socket = bind(port);
         Thread accept = new Thread(this::acceptLoop, "zeolite-lan");
         accept.setDaemon(true);
         accept.start();
+    }
+
+    /** Read the vault's sharing identifier, or create it (kept in .zeolite/share-id, never synced). */
+    static String vaultId(File root) {
+        File file = new File(new File(root, ".zeolite"), "share-id");
+        try {
+            if (file.isFile()) {
+                String t = new String(java.nio.file.Files.readAllBytes(file.toPath()), java.nio.charset.StandardCharsets.UTF_8).trim();
+                if (t.length() >= 8 && t.matches("[A-Za-z0-9-]+")) return t;
+            }
+        } catch (IOException ignored) {
+            // A new one below.
+        }
+        String id = java.util.UUID.randomUUID().toString().replace("-", "");
+        try {
+            file.getParentFile().mkdirs();
+            java.nio.file.Files.write(file.toPath(), id.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        } catch (IOException ignored) {
+            // Not kept: a new identifier next time (the other device then compares contents).
+        }
+        return id;
     }
 
     private static ServerSocket bind(int port) throws IOException {
@@ -252,7 +276,7 @@ public class LanServer {
             return;
         }
         if (req.method.equals("GET") && req.route.equals("/zeolite/v1/info")) {
-            json(out, 200, "{\"app\":\"zeolite\",\"name\":" + quote(name) + "}");
+            json(out, 200, "{\"app\":\"zeolite\",\"name\":" + quote(name) + ",\"id\":" + quote(id) + "}");
             return;
         }
         if (req.method.equals("GET") && req.route.equals("/zeolite/v1/list")) {

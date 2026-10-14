@@ -92,6 +92,16 @@ export class LanClient {
     return "ok";
   }
 
+  /**
+   * The shared vault's permanent ID (kept by the sharing device): the sync
+   * state follows it, so a new IP address or port does not start over.
+   * Older sharing apps have none: then the address.
+   */
+  async identity(): Promise<string> {
+    const info = (await (await this.request("GET", "info")).json()) as { id?: string };
+    return info.id ? `lan-id:${info.id}` : this.url;
+  }
+
   /** Name of the vault the PC shares. */
   async vaultName(): Promise<string> {
     return ((await (await this.request("GET", "info")).json()) as { name?: string }).name ?? "";

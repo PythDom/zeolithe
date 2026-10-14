@@ -75,8 +75,18 @@ files that differ are kept in both versions.
 - A note changed on **both** sides keeps both versions: yours stays the
   note, the server's version is saved next to it as
   `Note.sync-conflict-<date>-SERVER.md` (the same naming as Syncthing).
-  Zeolite lists conflicts at the top of the Files panel; merge them by
-  hand and delete the copy.
+  Zeolite lists conflicts at the top of the side panel; **⇄ Review and
+  clean up…** deletes copies that only differ invisibly and, for the
+  others, shows the differences and keeps the note or the copy.
+- Versions that differ only invisibly (byte order mark, CRLF/LF line
+  endings, spaces at line ends, trailing blank lines) are the same note:
+  no conflict copy; ours is sent so that both sides become identical.
+- The sync state (`.zeolite/sync.json`) is keyed by the server: its
+  address for WebDAV and OneDrive, the shared vault's permanent identifier
+  (`.zeolite/share-id` on the sharing device) for Wi-Fi sync, so that a new
+  IP address or port does not start a fresh sync. A state saved under the
+  device's address by an older version is taken over while the address is
+  unchanged.
 - An edit always wins over a deletion.
 - If a sync would delete many files at once (for example after opening
   the wrong folder), Zeolite asks first; **Keep them** copies them back.

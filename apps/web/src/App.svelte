@@ -63,6 +63,7 @@
   import DeleteDialog from "./components/DeleteDialog.svelte";
   import ChangeIdDialog from "./components/ChangeIdDialog.svelte";
   import FilingDialog from "./components/FilingDialog.svelte";
+  import ConflictsDialog from "./components/ConflictsDialog.svelte";
   import Preview from "./components/Preview.svelte";
   import Sidebar from "./components/Sidebar.svelte";
   import Toolbar from "./components/Toolbar.svelte";
@@ -113,6 +114,7 @@
   let showChangeId = $state(false);
   /** Importing notes, or numbering the notes without ID. */
   let filing = $state<"import" | "number" | null>(null);
+  let showConflicts = $state(false);
   let deleteFolder = $state<string | null>(null);
   /** Parent of the folder being created ("" = vault root), null when the dialog is closed. */
   let newFolderIn = $state<string | null>(null);
@@ -295,7 +297,7 @@
       syncInfo = `${time}: ${describeReport(report)}`;
       syncError = report.errors.length > 0;
       if (report.errors.length) status = `⚠ Sync: ${report.errors[0]}${report.errors.length > 1 ? ` (+${report.errors.length - 1} more)` : ""}`;
-      else if (report.conflicts.length) status = `Sync: ${report.conflicts.length} note(s) changed on both sides; the server's version is kept as a conflict copy`;
+      else if (report.conflicts.length) status = `Sync: ${report.conflicts.length} note(s) changed on both sides; the other version is kept as a conflict copy (⇄ Review in the side panel)`;
     } catch (e) {
       syncError = true;
       syncInfo = `failed: ${(e as Error).message}`;
@@ -1290,6 +1292,7 @@
       onDeleteFolder={(f) => (deleteFolder = f)}
       onNewFolder={(parent) => (newFolderIn = parent)}
       onFiling={(mode) => flush().then(() => ((filing = mode), (drawer = false)))}
+      onConflicts={() => flush().then(() => ((showConflicts = true), (drawer = false)))}
       onOpenAttachment={(p) => (attachment = p)}
     >
       {#snippet related()}
@@ -1502,6 +1505,26 @@
     }}
     onSetupTaxonomy={() => ((showChangeId = false), (showTaxonomy = true))}
     onClose={() => (showChangeId = false)}
+  />
+{/if}
+
+{#if showConflicts}
+  <ConflictsDialog
+    {vault}
+    onOpen={(p) => ((showConflicts = false), void open(p))}
+    onDone={async (summary) => {
+      showConflicts = false;
+      // The open note may have been replaced by its copy, or moved to .trash.
+      if (current && !vault.exists(current)) {
+        current = null;
+        content = "";
+      } else if (current && vault.read(current) !== content) {
+        content = vault.read(current);
+        editor?.setContent(content);
+      }
+      status = summary;
+    }}
+    onClose={() => (showConflicts = false)}
   />
 {/if}
 
