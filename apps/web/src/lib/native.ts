@@ -429,3 +429,20 @@ export async function readModelFile(folder: string, file: string): Promise<Array
   }
   return null;
 }
+
+// --- E-mail on Android: the mail app with recipients, subject, text and attachments (MailPlugin)
+
+interface MailPlugin {
+  compose(o: { to: string; subject: string; text: string; files: { name: string; data: string }[] }): Promise<void>;
+}
+
+/** Android: open the mail app with a new message; files are base64. */
+export async function androidMail(to: string, subject: string, text: string, files: { name: string; data: string }[]): Promise<void> {
+  const { registerPlugin } = await import("@capacitor/core");
+  const plugin = registerPlugin<MailPlugin>("Mail");
+  try {
+    await plugin.compose({ to, subject, text, files });
+  } catch (e) {
+    throw new Error((e as Error)?.message ?? String(e));
+  }
+}

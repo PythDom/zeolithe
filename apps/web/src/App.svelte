@@ -106,6 +106,8 @@
   let showTemplates = $state(false);
   let showExport = $state(false);
   let showMail = $state(false);
+  /** A PDF made in Export to PDF, to attach to the mail. */
+  let mailPdf = $state<{ blob: Blob; name: string } | null>(null);
   let showRename = $state(false);
   let folderHelp = $state<string | null>(null);
   let readOnlyCopy = $state(false);
@@ -957,6 +959,27 @@
     return { ...note, content: appendSection(note.content, "Past notes", pastItemsSection("Past notes", { from })) };
   }
 
+  /** The open note as a PDF (for "Attach as PDF" in the mail), with the export's default layout. */
+  async function notePdf(): Promise<{ blob: Blob; name: string }> {
+    const r = current ? vault.records.get(current) : undefined;
+    if (!r) throw new Error("No note open.");
+    const { exportPdf } = await import("./lib/pdf");
+    const blob = await exportPdf(
+      [{ path: r.path, title: r.title, markdown: vault.read(r.path), id: r.id, tags: r.tags, created: r.created }],
+      {
+        readAsset: (t) => vault.readAsset(t),
+        runQuery: (src, path) => vault.runQuery(src, path),
+        chords: {
+          transpose: (path, block) => transposed[`${path}#${block}`] ?? 0,
+          variant: (sym, instrument) => fingerings[`${instrument}:${sym}`] ?? 0,
+          diagrams: showDiagrams,
+        },
+      },
+      { pageSize: "A4", properties: true, toc: false },
+    );
+    return { blob, name: `${r.name.replace(/[\\/:*?"<>|]/g, "-")}.pdf` };
+  }
+
   /** Proposed recipient: the note's `email` property, else the e-mail of its one-on-one person. */
   function mailRecipient(): string {
     const fm = record?.frontmatter ?? {};
@@ -1593,7 +1616,9 @@
       variant: (sym, instrument) => fingerings[`${instrument}:${sym}`] ?? 0,
       diagrams: showDiagrams,
     }}
-    onSaved={(p) => ((showExport = false), (status = `Saved ${p}`))} onClose={() => (showExport = false)} />
+    onSaved={(p) => ((showExport = false), (status = `Saved ${p}`))}
+    onMail={(pdf) => ((showExport = false), (mailPdf = pdf), (showMail = true))}
+    onClose={() => (showExport = false)} />
 {/if}
 
 {#if showTemplates}
@@ -1625,7 +1650,9 @@
     {html}
     to={mailRecipient()}
     suggestions={vault.meetingPeople().filter((p) => p.email).map((p) => p.email!)}
-    onClose={() => (showMail = false)}
+    pdf={mailPdf}
+    makePdf={notePdf}
+    onClose={() => ((showMail = false), (mailPdf = null))}
   />
 {/if}
 

@@ -13,9 +13,11 @@
     /** Chord sheets as shown on screen, so the PDF matches. */
     chords?: { transpose(path: string, block: number): number; variant(symbol: string, instrument: Instrument): number; diagrams: boolean };
     onSaved: (path: string) => void;
+    /** Send the PDF just made by e-mail. */
+    onMail?: (pdf: { blob: Blob; name: string }) => void;
     onClose: () => void;
   }
-  let { vault, current, chords, onSaved, onClose }: Props = $props();
+  let { vault, current, chords, onSaved, onMail, onClose }: Props = $props();
 
   const record = $derived(vault.records.get(current));
   const folder = $derived(record?.folder ?? "");
@@ -112,6 +114,7 @@
         <button class="primary" disabled={busy} onclick={build}>{busy ? "Creating PDF…" : "Create PDF"}</button>
       {:else}
         <button onclick={saveToVault} title="Saves into {vault.settings.exportsFolder || 'the vault root'}/ in the vault (works on every device)">Save to vault</button>
+        {#if onMail}<button onclick={() => result && onMail({ blob: result.blob, name: result.name })} title="A new e-mail with this PDF attached">✉ Send by e-mail</button>{/if}
         {#if shell === "tauri"}
           <button class="primary" onclick={async () => { if (result) { const p = await tauriSaveAs(result.name, result.blob); if (p) onSaved(p); } }}>Save as…</button>
         {:else if shell === "web"}

@@ -382,15 +382,23 @@ a clickable table of contents and page numbers.
 ## Sending a note by e-mail
 
 **✉** in the top bar sends the note as it looks in the preview (query
-results included). The recipient is proposed for a one-on-one (the
-person's e-mail from Settings).
+results and pictures included). The recipient is proposed for a
+one-on-one (the person's e-mail from Settings). Tick **Attach the note as
+PDF** to add it as a PDF too.
 
 - **Windows app: Create the message** opens a new formatted message in
-  Outlook (or Windows Mail): check it and press Send.
-- **Open in mail app** (Android, browser): the note as plain text. Very
-  long notes are cut: then use the next option.
-- **Copy formatted**: paste the note with its formatting into any mail
-  (Ctrl+V).
+  Outlook (or Windows Mail), pictures in place and the PDF attached if
+  ticked: check it and press Send.
+- **Android: Open in mail app** opens Gmail, Outlook… with the note as
+  text and the PDF attached (or, without the PDF, the note's pictures as
+  attachments).
+- **Browser: Open in mail app**: the note as plain text (very long notes
+  are cut); a ticked PDF is downloaded, to attach by hand.
+- **Copy formatted** (PC, browser): paste the note with its formatting
+  and pictures into any mail (Ctrl+V).
+
+**PDF → ✉ Send by e-mail**: after **Create PDF** in the PDF export, the
+same mail window opens with that PDF attached.
 
 ## Syncing your PC, phone and tablet
 

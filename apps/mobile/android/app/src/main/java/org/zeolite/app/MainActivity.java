@@ -10,6 +10,7 @@ public class MainActivity extends BridgeActivity {
         // Local plugins must be registered before the bridge starts.
         registerPlugin(AllFilesAccessPlugin.class);
         registerPlugin(LanSharePlugin.class);
+        registerPlugin(MailPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }
