@@ -680,6 +680,8 @@ export interface ResultRow {
   attn?: AttnPoint;
   fupi?: AttnPoint;
   decision?: DecisionPoint;
+  /** The note's `created` date (how long an Attn point or follow-up has been open). */
+  created?: string;
 }
 
 export interface QueryResult {
@@ -740,6 +742,7 @@ export function runQuery(source: string, notes: NoteRecord[], today: Date = new 
     attn: row.attn,
     fupi: row.fupi,
     decision: row.decision,
+    created: row.record.created,
   });
 
   let groups: QueryResult["groups"];

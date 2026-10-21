@@ -9,11 +9,12 @@
     render: (markdown: string) => string;
     onOpenLink: (target: string, heading: string) => void;
     onToggleTask: (line: number, path?: string, kind?: string) => void;
+    onPoints?: (items: { kind: string; path: string; line: number }[]) => void;
     /** Save the dashboard of a person as a note (live queries). */
     onSave: (title: string, markdown: string) => void;
     onClose: () => void;
   }
-  let { people, initial, render, onOpenLink, onToggleTask, onSave, onClose }: Props = $props();
+  let { people, initial, render, onOpenLink, onToggleTask, onPoints, onSave, onClose }: Props = $props();
 
   // svelte-ignore state_referenced_locally
   let person = $state(initial && people.some((p) => p.name === initial) ? initial : (people[0]?.name ?? ""));
@@ -38,7 +39,7 @@
         {/each}
       </div>
       <div class="body">
-        <Preview {html} {onOpenLink} {onToggleTask} onTag={() => {}} />
+        <Preview {html} {onOpenLink} {onToggleTask} {onPoints} onTag={() => {}} />
       </div>
       <footer>
         <span class="hint">Live: ticking an action here ticks it in its note.</span>

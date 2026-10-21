@@ -4,6 +4,11 @@
     html: string;
     onOpenLink: (target: string, heading: string) => void;
     onToggleTask: (line: number, path?: string, kind?: string) => void;
+    /**
+     * Attn points, follow-ups and decisions shown in query results: resolve
+     * (or reopen), or record as decided, in their own notes.
+     */
+    onPoints?: (items: { kind: string; path: string; line: number }[]) => void;
     onTag: (tag: string) => void;
     /** Chord-sheet buttons: transpose, fingerings, diagrams. */
     onChordAction?: (action: string, block: number, chord: string, instrument: string) => void;
@@ -14,7 +19,7 @@
     /** Called when autoscroll reaches the end of the note. */
     onAutoscrollEnd?: () => void;
   }
-  let { html, onOpenLink, onToggleTask, onTag, onChordAction, chordTip, autoscroll = null, onAutoscrollEnd }: Props = $props();
+  let { html, onOpenLink, onToggleTask, onPoints, onTag, onChordAction, chordTip, autoscroll = null, onAutoscrollEnd }: Props = $props();
 
   let pane: HTMLDivElement;
 
@@ -68,10 +73,26 @@
       onChordAction(act.dataset.act, Number(act.dataset.block ?? 0), act.dataset.chord ?? "", instrument);
       return;
     }
-    const box = el.closest<HTMLInputElement>("input.task-box, input.point-box");
+    const point = el.closest<HTMLElement>("[data-point]");
+    if (point && onPoints) {
+      e.preventDefault();
+      onPoints([{ kind: point.dataset.point!, path: point.dataset.path ?? "", line: Number(point.dataset.line) }]);
+      return;
+    }
+    const bulk = el.closest<HTMLElement>("[data-bulk]");
+    if (bulk && onPoints) {
+      e.preventDefault();
+      const boxes = Array.from(bulk.closest(".query")?.querySelectorAll<HTMLInputElement>("input[data-point]") ?? []).filter((b) => !b.checked);
+      const noun = bulk.dataset.bulk === "fupi" ? "follow-up items" : "Attn points";
+      if (boxes.length && confirm(`Mark the ${boxes.length} ${noun} shown here as resolved, each in its own note?`)) {
+        onPoints(boxes.map((b) => ({ kind: b.dataset.point!, path: b.dataset.path ?? "", line: Number(b.dataset.line) })));
+      }
+      return;
+    }
+    const box = el.closest<HTMLInputElement>("input.task-box");
     if (box) {
       e.preventDefault();
-      onToggleTask(Number(box.dataset.line), box.dataset.path, box.dataset.kind);
+      onToggleTask(Number(box.dataset.line), box.dataset.path);
       return;
     }
     const link = el.closest<HTMLAnchorElement>("a.wikilink");

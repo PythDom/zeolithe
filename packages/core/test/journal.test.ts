@@ -94,3 +94,18 @@ describe("follow-up items (fupi::)", () => {
     expect(ONE_ON_ONE_TEMPLATE).toContain("LIST fupi");
   });
 });
+
+describe("open since", () => {
+  it("says how long ago, in rounded units", async () => {
+    const { sinceLabel } = await import("../src/dates");
+    const t = new Date(2026, 9, 21, 15, 0);
+    expect(sinceLabel("2026-10-21T08:00", t)).toBe("today");
+    expect(sinceLabel("2026-10-20", t)).toBe("1 day");
+    expect(sinceLabel("2026-10-11", t)).toBe("10 days");
+    expect(sinceLabel("2026-09-30", t)).toBe("3 weeks");
+    expect(sinceLabel("2026-06-01", t)).toBe("4 months");
+    expect(sinceLabel("2024-10-01", t)).toBe("2 years");
+    expect(sinceLabel(undefined, t)).toBeNull();
+    expect(sinceLabel("2026-11-01", t)).toBeNull();
+  });
+});

@@ -17,6 +17,7 @@ import {
   type QueryResult,
   type ResultRow,
   type Value,
+  sinceLabel,
 } from "@zeolite/core";
 import { CHORD_DBS } from "./chord-db";
 import DOMPurify from "dompurify";
@@ -333,23 +334,36 @@ export function createRenderer(ctx: RenderContext, depth = 0, parents: string[] 
       return `<li class="task task-${t.status}">${box} ${body}</li>`;
     }
     if (row.attn) {
+      // Ticking resolves the point in its own note ([resolved:: date]); ticking again reopens it.
       const a = row.attn;
-      return `<li class="attn-row${a.resolved ? " attn-resolved" : ""}"><span class="linefield linefield-attn">Attn</span> ${md.renderInline(a.text)} <span class="query-src">· ${noteLink(row.path, row.name)}</span></li>`;
+      return `<li class="attn-row${a.resolved ? " attn-resolved" : ""}">${pointBox(row, "attn", a.line, !!a.resolved)} <span class="linefield linefield-attn">Attn</span> ${md.renderInline(a.text)}${since(row, a.resolved)} <span class="query-src">· ${noteLink(row.path, row.name)}</span></li>`;
     }
     if (row.fupi) {
       // Follow-up items: ticking one resolves it in its own note ([resolved:: date]).
       const f = row.fupi;
-      const box = `<input type="checkbox" class="point-box" data-kind="fupi" data-path="${esc(row.path)}" data-line="${f.line}" title="${f.resolved ? "Reopen" : "Followed up: mark as resolved"}"${f.resolved ? " checked" : ""}>`;
-      return `<li class="fupi-row${f.resolved ? " fupi-resolved" : ""}">${box} <span class="linefield linefield-fupi">fupi</span> ${md.renderInline(f.text)} <span class="query-src">· ${noteLink(row.path, row.name)}</span></li>`;
+      return `<li class="fupi-row${f.resolved ? " fupi-resolved" : ""}">${pointBox(row, "fupi", f.line, !!f.resolved)} <span class="linefield linefield-fupi">fupi</span> ${md.renderInline(f.text)}${since(row, f.resolved)} <span class="query-src">· ${noteLink(row.path, row.name)}</span></li>`;
     }
     if (row.decision) {
       const d = row.decision;
       const key = d.required ? "Decide" : "Decision";
-      const when = d.decided ? ` <span class="query-src">(${esc(d.decided)})</span>` : "";
-      return `<li class="decision-row"><span class="linefield linefield-${key.toLowerCase()}">${key}</span> ${md.renderInline(d.text)}${when} <span class="query-src">· ${noteLink(row.path, row.name)}</span></li>`;
+      const when = d.decided ? ` <span class="query-src">(${esc(d.decided)})</span>` : since(row);
+      // A decision still to take: one click records it as taken, in its own note.
+      const act = d.required
+        ? ` <button class="point-act" data-point="decide" data-path="${esc(row.path)}" data-line="${d.line}" title="Decision taken: becomes Decision:: … [decided:: today] in its note">⚖ Decided</button>`
+        : "";
+      return `<li class="decision-row"><span class="linefield linefield-${key.toLowerCase()}">${key}</span> ${md.renderInline(d.text)}${when}${act} <span class="query-src">· ${noteLink(row.path, row.name)}</span></li>`;
     }
     const value = row.values.length ? `: ${row.values.map(valueHtml).join(" ")}` : "";
     return `<li>${noteLink(row.path, row.name)}${value}</li>`;
+  };
+
+  /** Checkbox resolving an Attn point or follow-up item in its own note. */
+  const pointBox = (row: ResultRow, kind: "attn" | "fupi", line: number, resolved: boolean) =>
+    `<input type="checkbox" class="point-box" data-point="${kind}" data-path="${esc(row.path)}" data-line="${line}" title="${resolved ? "Reopen" : kind === "fupi" ? "Followed up: mark as resolved" : "Resolved: mark it so in its note"}"${resolved ? " checked" : ""}>`;
+  /** How long an open item has been waiting (from its note's creation date). */
+  const since = (row: ResultRow, resolved?: string) => {
+    const s = resolved ? null : sinceLabel(row.created);
+    return s ? ` <span class="query-age" title="Open since ${esc(row.created?.slice(0, 10) ?? "")}">${s === "today" ? "today" : `since ${s}`}</span>` : "";
   };
 
   const tableHtml = (res: QueryResult, rows: ResultRow[]): string => {
@@ -377,7 +391,10 @@ export function createRenderer(ctx: RenderContext, depth = 0, parents: string[] 
       .join("");
     const noun = res.kind === "task" ? "task" : res.kind === "attn" ? "Attn point" : res.kind === "fupi" ? "follow-up item" : res.kind === "decision" ? "decision" : "note";
     const empty = res.count === 0 ? `<p class="query-empty">No matching ${noun}s.</p>` : groups;
-    return `<div class="query"><div class="query-title">Dataview · ${res.count} ${noun}${res.count === 1 ? "" : "s"}</div>${empty}</div>`;
+    // Lists of Attn points or follow-ups: resolve everything shown at once.
+    const open = res.kind === "attn" || res.kind === "fupi" ? res.groups.flatMap((g) => g.rows).filter((r) => !(r.attn ?? r.fupi)?.resolved).length : 0;
+    const bulk = open >= 2 ? ` <button class="query-bulk" data-bulk="${res.kind}" title="Mark all the open ${noun}s shown here as resolved, in their notes">✓ Resolve all ${open}</button>` : "";
+    return `<div class="query"><div class="query-title">Dataview · ${res.count} ${noun}${res.count === 1 ? "" : "s"}${bulk}</div>${empty}</div>`;
   }
 
   let chordBlock = 0;

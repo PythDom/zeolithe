@@ -32,6 +32,8 @@
     monthNotePath,
     ONE_ON_ONE_TEMPLATE_V1,
     toggleFupiResolved,
+    toggleAttnResolved,
+    recordDecision,
     transposeChordBlock,
     splitFrontmatter,
     withFrontmatter,
@@ -811,6 +813,69 @@
     await replaceContent(lines.join("\n"));
   }
 
+  /**
+   * Attn points, follow-ups and decisions shown in query results: resolve or
+   * reopen them, or record a decision as taken, each in its own note. One
+   * save per note; the status bar offers to undo.
+   */
+  async function actOnPoints(items: { kind: string; path: string; line: number }[]) {
+    if (!items.length) return;
+    await flush();
+    const byPath = new Map<string, typeof items>();
+    for (const it of items) byPath.set(it.path || current || "", [...(byPath.get(it.path || current || "") ?? []), it]);
+    const before = new Map<string, string>();
+    const after = new Map<string, string>();
+    let resolved = 0;
+    let reopened = 0;
+    let decided = 0;
+    for (const [path, list] of byPath) {
+      if (!path || !vault.exists(path)) continue;
+      const text = path === current ? content : vault.read(path);
+      const lines = text.split("\n");
+      for (const it of list) {
+        const old = lines[it.line];
+        if (old === undefined) continue;
+        const next = it.kind === "decide" ? recordDecision(old) : it.kind === "fupi" ? toggleFupiResolved(old) : toggleAttnResolved(old);
+        if (next === old) continue;
+        if (it.kind === "decide") decided++;
+        else if (/\[resolved::/.test(next) && !/\[resolved::/.test(old)) resolved++;
+        else reopened++;
+        lines[it.line] = next;
+      }
+      const updated = lines.join("\n");
+      if (updated === text) continue;
+      before.set(path, text);
+      after.set(path, updated);
+      if (path === current) await replaceContent(updated);
+      else await vault.save(path, updated);
+    }
+    if (!before.size) return;
+    const parts = [resolved && `${resolved} resolved`, reopened && `${reopened} reopened`, decided && `${decided} recorded as decided`].filter(Boolean);
+    setStatus(parts.join(", "), {
+      label: "Undo",
+      run: async () => {
+        // Only notes still exactly as left here are put back.
+        for (const [path, text] of before) {
+          const now = path === current ? content : vault.exists(path) ? vault.read(path) : null;
+          if (now !== after.get(path)) continue;
+          if (path === current) await replaceContent(text);
+          else await vault.save(path, text);
+        }
+        setStatus("Undone");
+      },
+    });
+  }
+
+  /** A status message, optionally with an action button (e.g. Undo) shown for a few seconds. */
+  let statusAction = $state<{ label: string; run: () => Promise<void> | void } | null>(null);
+  let statusActionTimer: ReturnType<typeof setTimeout> | undefined;
+  function setStatus(text: string, action?: { label: string; run: () => Promise<void> | void }) {
+    status = text;
+    statusAction = action ?? null;
+    clearTimeout(statusActionTimer);
+    if (action) statusActionTimer = setTimeout(() => (statusAction = null), 10_000);
+  }
+
   async function chordAction(action: string, block: number, chord: string, instrument: string) {
     const key = `${current}#${block}`;
     const shift = transposed[key] ?? 0;
@@ -1434,7 +1499,7 @@
         {/if}
         {#if mode !== "edit"}
           <section class="pane">
-            <Preview {html} onOpenLink={openLink} onToggleTask={toggleTask} {onTag} onChordAction={chordAction} {chordTip} autoscroll={scrolling ? scrollSpeed : null} onAutoscrollEnd={() => (scrolling = false)} />
+            <Preview {html} onOpenLink={openLink} onToggleTask={toggleTask} onPoints={actOnPoints} {onTag} onChordAction={chordAction} {chordTip} autoscroll={scrolling ? scrollSpeed : null} onAutoscrollEnd={() => (scrolling = false)} />
           </section>
         {/if}
       </div>
@@ -1444,7 +1509,22 @@
         <p>Open a note from the sidebar or create a new one.</p>
       </div>
     {/if}
-    {#if status}<button class="status" onclick={() => (status = "")}>{status}</button>{/if}
+    {#if status}
+      <div class="status-wrap">
+        <button class="status" onclick={() => ((status = ""), (statusAction = null))}>{status}</button>
+        {#if statusAction}
+          <button
+            class="status status-act"
+            onclick={() => {
+              // Taken before clearing: the button disappears as the action starts.
+              const act = statusAction;
+              statusAction = null;
+              void act?.run();
+            }}>{statusAction.label}</button
+          >
+        {/if}
+      </div>
+    {/if}
   </main>
 </div>
 
@@ -1663,6 +1743,7 @@
     {render}
     onOpenLink={(t, h) => ((showDashboard = false), openLink(t, h))}
     onToggleTask={toggleTask}
+    onPoints={actOnPoints}
     onSave={(title, md) => {
       showDashboard = false;
       const note = createFreeNote(vault.settings.searchesFolder, title);
@@ -2173,10 +2254,20 @@
     justify-items: center;
     color: var(--muted);
   }
-  .status {
+  .status-wrap {
     position: absolute;
     right: 16px;
     bottom: 16px;
+    display: flex;
+    gap: 6px;
+    max-width: calc(100% - 32px);
+  }
+  .status-act {
+    border-color: var(--accent);
+    color: var(--accent-strong);
+    font-weight: 600;
+  }
+  .status {
     padding: 8px 12px;
     border: 1px solid var(--border);
     border-radius: 8px;

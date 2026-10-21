@@ -241,6 +241,16 @@ Inline form: [Attn:: check the drawings]
 The **⚠ Attn** button inserts one, resolves it (adds `[resolved:: date]`)
 or converts it to a task. Open Attn points are listed in the Tasks tab.
 
+**Closing them from a list:** wherever Attn points or follow-up items
+appear in query results (the journal's *Open in the journal*, *Past
+meetings*, the 👥 dashboard, your own `LIST Attn` / `LIST fupi` queries),
+each has a checkbox: tick it and the point gets `[resolved:: date]` in its
+own note, so it leaves every "open" list (tick again to reopen). **✓
+Resolve all N**, at the top of such a list, resolves everything shown
+(after a confirmation). The status bar offers **Undo** for a few seconds.
+Next to each open item, *since 3 weeks* tells how long it has been waiting
+(from its note's creation date), so old ones stand out.
+
 ## Decisions
 
 Two markers keep track of decisions:
@@ -256,7 +266,9 @@ Inline form: we agreed to [Decision:: freeze the design] [decided:: 2026-10-05]
 - **⚖ Decision** records it: `Decide::` becomes `Decision::` with today's
   date. On a plain line it writes a decision taken today.
 
-Decisions still to take are listed in the Tasks tab. **🔍 Query → ⚖
+Decisions still to take are listed in the Tasks tab. In query results,
+**⚖ Decided** next to a decision still to take records it in its own note
+(`Decision:: … [decided:: today]`), with **Undo** in the status bar. **🔍 Query → ⚖
 Decisions** lists them across notes (`LIST Decide` or `LIST Decision`), for
 example all the decisions taken in a project.
 

@@ -301,6 +301,43 @@ body {
   background: none;
   color: var(--muted);
 }
+/* Query results: act on Attn points, follow-ups and decisions in their own notes */
+.markdown .query-age {
+  color: var(--muted);
+  font-size: 0.8em;
+  white-space: nowrap;
+}
+.markdown .point-act,
+.markdown .query-bulk {
+  margin-left: 6px;
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--decide);
+  font: inherit;
+  font-size: 0.78em;
+  font-weight: 600;
+  cursor: pointer;
+}
+.markdown .query-bulk {
+  float: right;
+  color: var(--accent-strong);
+  text-transform: none;
+  letter-spacing: normal;
+}
+.markdown .point-act:hover,
+.markdown .query-bulk:hover {
+  border-color: currentColor;
+}
+.markdown li.attn-row {
+  list-style: none;
+  margin-left: -18px;
+}
+.markdown li.attn-resolved {
+  color: var(--muted);
+  text-decoration: line-through;
+}
 /* Follow-up items: fupi:: (back on the next one-on-one agenda until resolved) */
 .markdown .linefield-fupi {
   background: var(--accent-soft, var(--panel));

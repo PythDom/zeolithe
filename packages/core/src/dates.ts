@@ -126,3 +126,22 @@ export function parseNaturalDate(input: string, today: Date = new Date()): IsoDa
   }
   return null;
 }
+
+/**
+ * How long ago a date was, for "open since": "today", "3 days", "2 weeks",
+ * "5 months", "1 year". Null for a missing or unreadable date.
+ */
+export function sinceLabel(iso: string | undefined, today: Date = new Date()): string | null {
+  if (!iso) return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  if (!m) return null;
+  const then = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  const days = Math.floor((new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime() - then.getTime()) / 86_400_000);
+  if (Number.isNaN(days) || days < 0) return null;
+  const n = (v: number, unit: string) => `${v} ${unit}${v > 1 ? "s" : ""}`;
+  if (days === 0) return "today";
+  if (days < 14) return n(days, "day");
+  if (days < 61) return n(Math.floor(days / 7), "week");
+  if (days < 365) return n(Math.floor(days / 30), "month");
+  return n(Math.floor(days / 365), "year");
+}

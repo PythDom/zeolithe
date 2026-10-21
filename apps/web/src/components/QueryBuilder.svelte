@@ -15,9 +15,10 @@
     onSave: (title: string, block: string) => void;
     onOpenLink: (target: string, heading: string) => void;
     onToggleTask: (line: number, path?: string, kind?: string) => void;
+    onPoints?: (items: { kind: string; path: string; line: number }[]) => void;
     onClose: () => void;
   }
-  let { taxonomy, tags, people, folders, render, onInsert, onSave, onOpenLink, onToggleTask, onClose }: Props = $props();
+  let { taxonomy, tags, people, folders, render, onInsert, onSave, onOpenLink, onToggleTask, onPoints, onClose }: Props = $props();
 
   // Taken once when the dialog opens.
   const archives = untrack(() => taxonomy.paras.find((p) => p.tag.toLowerCase() === "archives")?.folder ?? "");
@@ -221,7 +222,7 @@
         <label for="qb-query" class="lbl">Dataview query {#if edited !== null}<em>(edited)</em>{/if}</label>
         <textarea id="qb-query" rows="7" spellcheck="false" value={query} oninput={(e) => (edited = (e.currentTarget as HTMLTextAreaElement).value)}></textarea>
         <div class="results">
-          <Preview {html} {onOpenLink} {onToggleTask} onTag={(t) => addTag(t)} />
+          <Preview {html} {onOpenLink} {onToggleTask} {onPoints} onTag={(t) => addTag(t)} />
         </div>
       </div>
     </div>
