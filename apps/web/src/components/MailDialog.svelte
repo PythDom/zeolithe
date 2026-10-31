@@ -1,5 +1,6 @@
 <script lang="ts">
   import { base64, buildEml, copyFormatted, mailHtml, mailtoUrl, openDraft, plainText, withPictures, type MailContent, type MailFile } from "../lib/mail";
+  import { diagramsToImages } from "../lib/mermaid";
   import { androidMail, openExternal, platform } from "../lib/native";
 
   interface Props {
@@ -50,8 +51,8 @@
   const pictures = $derived((html.match(/<img\b/gi) ?? []).length);
   const canPdf = $derived(!!givenPdf || !!makePdf);
 
-  /** The note with its pictures, ready for the draft and the clipboard. */
-  const content = (): Promise<MailContent> => withPictures(mailHtml(html, subject));
+  /** The note with its pictures (diagrams included), ready for the draft and the clipboard. */
+  const content = async (): Promise<MailContent> => withPictures(mailHtml(await diagramsToImages(html), subject));
 
   let madePdf: { blob: Blob; name: string } | null = null;
   async function pdfFile(): Promise<MailFile | null> {

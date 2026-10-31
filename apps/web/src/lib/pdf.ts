@@ -139,6 +139,20 @@ async function loadImages(notes: PdfNote[], ctx: PdfContext): Promise<Map<string
       // An unreadable image is shown as missing.
     }
   }
+  // Mermaid diagrams: drawn (light theme) and turned into pictures before layout.
+  const diagrams = new Set<string>();
+  for (const n of notes) for (const m of n.markdown.matchAll(/^```mermaid[^\n]*\n([\s\S]*?)^```/gm)) diagrams.add(m[1]!);
+  if (diagrams.size) {
+    const { renderDiagram, svgToPng } = await import("./mermaid");
+    for (const source of diagrams) {
+      try {
+        const png = await svgToPng(await renderDiagram(source, false));
+        out.set(`mermaid:${source}`, { image: png.dataUrl, width: Math.min(515, png.width) });
+      } catch {
+        // Shown as code, with a note, below.
+      }
+    }
+  }
   return out;
 }
 
@@ -225,6 +239,10 @@ class Builder {
             out.push({ toc: { title: { text: "CONTENTS", style: "tocTitle" } }, margin: [0, 0, 0, 12] });
           } else if (lang === "dataview" || lang === "query") {
             out.push(this.query(tok.content));
+          } else if (lang === "mermaid") {
+            const img = this.images.get(`mermaid:${tok.content}`);
+            if (img) out.push({ ...img, alignment: "center", margin: [0, 4, 0, 10] });
+            else out.push({ stack: [{ text: "Diagram (could not be drawn):", color: C.muted, italics: true, fontSize: 9 }, this.code(tok.content)] });
           } else if (chordsFenceInstrument(tok.info)) {
             out.push(this.chordSheet(tok.content.replace(/\n$/, ""), chordsFenceInstrument(tok.info)!, this.chordBlock++));
           } else {

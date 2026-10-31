@@ -175,8 +175,13 @@ The toolbar formats the line or the selection: headings, **bold**,
 - **Images:** paste or drop them into the editor.
 - **Attachments** (images, PDFs, documents) are listed in the Files panel
   under their folder, after the notes. Click one to view it (images), see
-  which notes use it, link it in the open note, or open it with its usual
-  app (Windows app).
+  which notes use it, link it in the open note, open it with its usual
+  app (Windows app), or **🗑 Delete…** it (a second click confirms, and
+  names the notes that still show it).
+- **Deleted files** (notes, attachments, folders) go to the vault's
+  `.trash` folder with the date and time added to their name, for example
+  `.trash/Budget 2026-10-31 14-05-22.md`, so nothing deleted earlier is
+  ever overwritten.
 - **Tags:** `#tag`. Typing `#` suggests existing tags.
 - **People:** `@name` mentions someone. To *assign* a task, use **👤
   Owner** instead (see Tasks).
@@ -386,6 +391,28 @@ Put songs in a ` ```chords ` block, with chords above the lyrics or inline
 in `[brackets]`. In the preview: chord diagrams, ♭/♯ to transpose, ▶
 autoscroll for playing, and PDF export with aligned chords.
 
+## Diagrams (Mermaid)
+
+A ` ```mermaid ` block is drawn as a diagram in the preview, as in
+Obsidian: flowcharts, sequence diagrams, Gantt charts, class, state, mind
+maps, timelines, pie charts… (see mermaid.js.org for the syntax).
+
+````markdown
+```mermaid
+flowchart LR
+  A[Idea] --> B{Worth it?}
+  B -->|yes| C[Plan]
+  B -->|no| D[Drop]
+```
+````
+
+Diagrams follow the light or dark theme. A mistake in the code shows
+Mermaid's message above the code instead of the diagram. **⬇ SVG** (top
+right of a diagram) saves it as an `.svg` file: *Save as…* on Windows, the
+exports folder on Android, a download in the browser. Diagrams are also in
+PDF exports and e-mails, as pictures. The diagram engine is part of the
+apps (it works offline) and loads only when a note has a diagram.
+
 ## PDF export
 
 **PDF** in the top bar (Ctrl+P) exports the note or its whole folder, with
@@ -518,9 +545,12 @@ Syncthing on that PC instead.
 - **⇄ Review and clean up…** (top of the side panel, when there are
   conflict copies) sorts them out: copies identical to their note apart
   from invisible differences are deleted in one click; for the others it
-  shows the lines that differ, and **Keep the note** (the copy goes to
-  `.trash`) or **Keep the copy** (it takes the note's place, the note goes
-  to `.trash`). To combine both, open them and merge by hand.
+  shows the lines that differ and when each version was last modified
+  (the newer one is marked), with **Keep the most recent**, **Keep the
+  note** (the copy goes to `.trash`) or **Keep the copy** (it takes the
+  note's place, the note goes to `.trash`). **Keep the most recent of
+  each** does it for all the conflicts whose dates are known. To combine
+  both, open them and merge by hand.
 - **Wi-Fi sync** remembers the sharing device by a permanent identifier
   of its vault, not by its address: a new IP address or port does not
   make the next sync start over.

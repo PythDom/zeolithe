@@ -36,6 +36,7 @@
     "dompurify": "^3.2.7",
     "highlight.js": "^11.11.1",
     "markdown-it": "^14.1.0",
+    "mermaid": "12.2.0",
     "pdfmake": "^0.3.11"
   },
   "devDependencies": {

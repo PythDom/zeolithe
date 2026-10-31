@@ -300,6 +300,7 @@ export function createRenderer(ctx: RenderContext, depth = 0, parents: string[] 
     return linkOpen(tokens, idx, opts, env, self);
   };
 
+  let diagramBlock = 0;
   const fence = r.fence!;
   r.fence = (tokens: Token[], idx: number, opts, env, self) => {
     const t = tokens[idx]!;
@@ -309,6 +310,10 @@ export function createRenderer(ctx: RenderContext, depth = 0, parents: string[] 
       return `<nav class="toc"><div class="toc-title">Contents</div>${toc ? md.render(toc) : "<p><em>No headings yet.</em></p>"}</nav>`;
     }
     if (lang === "dataview" || lang === "query") return renderQuery(t.content);
+    // Mermaid diagrams are drawn after the preview is shown (see Preview); until then, the code.
+    if (lang === "mermaid") {
+      return `<div class="mermaid-block" data-src="${esc(encodeURIComponent(t.content))}" data-n="${++diagramBlock}"><pre class="mermaid-src"><code>${esc(t.content)}</code></pre></div>`;
+    }
     const instrument = chordsFenceInstrument(t.info);
     if (instrument) return renderChords(t.content.replace(/\n$/, ""), instrument, chordBlock++);
     return fence(tokens, idx, opts, env, self);
@@ -462,6 +467,7 @@ export function createRenderer(ctx: RenderContext, depth = 0, parents: string[] 
 
   return (markdown: string): string => {
     chordBlock = 0;
+    diagramBlock = 0;
     const { body, hasFrontmatter } = splitFrontmatter(markdown);
     offset = hasFrontmatter ? markdown.slice(0, markdown.length - body.length).split("\n").length - 1 : 0;
     source = markdown;

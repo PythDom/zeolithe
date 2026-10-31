@@ -627,3 +627,49 @@ body {
   color: var(--muted);
   font-weight: 700;
 }
+
+/* Mermaid diagrams */
+.markdown .mermaid-block {
+  position: relative;
+  margin: 1em 0;
+  text-align: center;
+}
+.markdown .mermaid-svg svg {
+  max-width: 100%;
+  height: auto;
+}
+.markdown .mermaid-save {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--accent-strong);
+  font: inherit;
+  font-size: 0.78em;
+  font-weight: 600;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.markdown .mermaid-block:hover .mermaid-save,
+.markdown .mermaid-save:focus-visible {
+  opacity: 1;
+}
+@media (hover: none) {
+  .markdown .mermaid-save {
+    opacity: 1;
+  }
+}
+.markdown .mermaid-error {
+  margin-bottom: 4px;
+  color: var(--danger);
+  font-size: 0.85em;
+  text-align: left;
+  white-space: pre-wrap;
+}
+.markdown .mermaid-src {
+  text-align: left;
+}

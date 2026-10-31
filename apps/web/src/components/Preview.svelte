@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { tick } from "svelte";
+  import { isDark, renderDiagram } from "../lib/mermaid";
   import { openExternal } from "../lib/native";
   interface Props {
     html: string;
@@ -18,10 +20,38 @@
     autoscroll?: number | null;
     /** Called when autoscroll reaches the end of the note. */
     onAutoscrollEnd?: () => void;
+    /** "⬇ SVG" on a diagram: its Mermaid source and its number in the note. */
+    onSaveDiagram?: (source: string, n: number) => void;
   }
-  let { html, onOpenLink, onToggleTask, onPoints, onTag, onChordAction, chordTip, autoscroll = null, onAutoscrollEnd }: Props = $props();
+  let { html, onOpenLink, onToggleTask, onPoints, onTag, onChordAction, chordTip, autoscroll = null, onAutoscrollEnd, onSaveDiagram }: Props = $props();
 
   let pane: HTMLDivElement;
+
+  const escapeHtml = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
+
+  // Mermaid diagrams: drawn once the HTML is in place (cached, so redrawing while typing is quick).
+  $effect(() => {
+    void html;
+    void tick().then(drawDiagrams);
+  });
+  async function drawDiagrams() {
+    if (!pane) return;
+    const blocks = Array.from(pane.querySelectorAll<HTMLElement>(".mermaid-block[data-src]:not([data-drawn])"));
+    if (!blocks.length) return;
+    const dark = isDark();
+    for (const el of blocks) {
+      el.dataset.drawn = "1";
+      const source = decodeURIComponent(el.dataset.src ?? "");
+      try {
+        const svg = await renderDiagram(source, dark);
+        if (!el.isConnected) continue;
+        el.innerHTML = `<div class="mermaid-svg">${svg}</div>${onSaveDiagram ? `<button class="mermaid-save" data-mermaid-save title="Save this diagram as an SVG file">⬇ SVG</button>` : ""}`;
+      } catch (e) {
+        if (!el.isConnected) continue;
+        el.innerHTML = `<div class="mermaid-error">⚠ Diagram: ${escapeHtml((e as Error).message)}</div><pre class="mermaid-src"><code>${escapeHtml(source)}</code></pre>`;
+      }
+    }
+  }
 
   // Autoscroll: smooth scrolling at a steady speed, screen kept awake.
   $effect(() => {
@@ -66,6 +96,13 @@
 
   function click(e: MouseEvent) {
     const el = e.target as HTMLElement;
+    const save = el.closest<HTMLElement>("[data-mermaid-save]");
+    if (save) {
+      e.preventDefault();
+      const block = save.closest<HTMLElement>(".mermaid-block");
+      if (block) onSaveDiagram?.(decodeURIComponent(block.dataset.src ?? ""), Number(block.dataset.n ?? 1));
+      return;
+    }
     const act = el.closest<HTMLElement>("[data-act]");
     if (act && act.dataset.act && onChordAction) {
       e.preventDefault();

@@ -83,7 +83,7 @@
   import { folderAccessProblem, FsAccessStorage, fsAccessSupported, memoryCopyFromFiles, MemoryStorage } from "./lib/storage";
   import { Vault } from "./lib/vault.svelte";
   import { loadLastVault, regainAccess, saveLastVault } from "./lib/last-vault";
-  import { androidExit, CapacitorStorage, lastVaultPath, onAndroidBack, platform, rememberVaultPath, TauriStorage } from "./lib/native";
+  import { androidExit, CapacitorStorage, lastVaultPath, onAndroidBack, platform, rememberVaultPath, tauriSaveAs, TauriStorage } from "./lib/native";
   import AndroidFolderDialog from "./components/AndroidFolderDialog.svelte";
   import logo from "../../../assets/logo/zeolite-icon.svg";
 
@@ -1024,6 +1024,30 @@
     return { ...note, content: appendSection(note.content, "Past notes", pastItemsSection("Past notes", { from })) };
   }
 
+  /** "⬇ SVG" on a diagram: an .svg file (light theme), saved where each platform can. */
+  async function saveDiagram(source: string, n: number) {
+    try {
+      const { diagramFileName, renderDiagram, standaloneSvg } = await import("./lib/mermaid");
+      const name = diagramFileName(record?.name ?? "note", n);
+      const blob = new Blob([standaloneSvg(await renderDiagram(source, false))], { type: "image/svg+xml" });
+      if (shell === "tauri") {
+        const p = await tauriSaveAs(name, blob);
+        if (p) status = `Saved ${p}`;
+      } else if (shell === "web") {
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = name;
+        a.click();
+        status = `Downloaded ${name}`;
+      } else {
+        const dir = vault.settings.exportsFolder;
+        status = `Saved ${await vault.writeFile(`${dir ? `${dir}/` : ""}${name}`, blob)}`;
+      }
+    } catch (e) {
+      fail(e);
+    }
+  }
+
   /** The open note as a PDF (for "Attach as PDF" in the mail), with the export's default layout. */
   async function notePdf(): Promise<{ blob: Blob; name: string }> {
     const r = current ? vault.records.get(current) : undefined;
@@ -1499,7 +1523,7 @@
         {/if}
         {#if mode !== "edit"}
           <section class="pane">
-            <Preview {html} onOpenLink={openLink} onToggleTask={toggleTask} onPoints={actOnPoints} {onTag} onChordAction={chordAction} {chordTip} autoscroll={scrolling ? scrollSpeed : null} onAutoscrollEnd={() => (scrolling = false)} />
+            <Preview {html} onOpenLink={openLink} onToggleTask={toggleTask} onPoints={actOnPoints} onSaveDiagram={saveDiagram} {onTag} onChordAction={chordAction} {chordTip} autoscroll={scrolling ? scrollSpeed : null} onAutoscrollEnd={() => (scrolling = false)} />
           </section>
         {/if}
       </div>
