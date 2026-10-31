@@ -33,6 +33,18 @@
   let dueOpen = $state(false);
   let dueText = $state("");
   let attnOpen = $state(false);
+  let diagramOpen = $state(false);
+
+  /** Starter Mermaid diagrams, inserted as ```mermaid blocks (drawn in the preview). */
+  const DIAGRAMS: { label: string; code: string }[] = [
+    { label: "Flowchart", code: "flowchart LR\n  A[Start] --> B{Decision?}\n  B -->|yes| C[Do it]\n  B -->|no| D[Drop it]" },
+    { label: "Sequence", code: "sequenceDiagram\n  participant A as Anna\n  participant B as Bob\n  A->>B: Question\n  B-->>A: Answer" },
+    { label: "Gantt", code: "gantt\n  title Plan\n  dateFormat YYYY-MM-DD\n  section Phase 1\n  Task one :a1, 2026-11-02, 10d\n  Task two :after a1, 5d" },
+    { label: "Mind map", code: "mindmap\n  root((Topic))\n    Idea one\n      Detail\n    Idea two" },
+    { label: "Timeline", code: "timeline\n  title Milestones\n  2026-Q1 : Kick-off\n  2026-Q2 : First delivery\n  2026-Q3 : Review" },
+    { label: "Pie", code: "pie title Split\n  \"A\" : 50\n  \"B\" : 30\n  \"C\" : 20" },
+    { label: "Org chart", code: "flowchart TD\n  Boss[Manager] --> T1[Team lead 1]\n  Boss --> T2[Team lead 2]\n  T1 --> P1[Member]\n  T2 --> P2[Member]" },
+  ];
   let ownerOpen = $state(false);
   let ownerText = $state("");
   const known = $derived(ownerOpen ? people() : []);
@@ -46,7 +58,7 @@
   }
   /** Focus the name box when it appears (the click left focus on the toolbar button). */
   const focusNow = (el: HTMLInputElement) => void requestAnimationFrame(() => el.focus());
-  const closeOthers = () => ((dueOpen = false), (attnOpen = false), (tplOpen = false), (ownerOpen = false));
+  const closeOthers = () => ((dueOpen = false), (attnOpen = false), (tplOpen = false), (ownerOpen = false), (diagramOpen = false));
 
   const run = (fn: (v: EditorView) => void) => () => {
     const v = view();
@@ -99,19 +111,20 @@
     <button title="Code block (``` … ```): wraps the selection, or inserts an empty block" onclick={run(codeBlock)}><code>```</code></button>
     <button title="Link to a note (Ctrl+K). Tip: typing [[ in the editor also suggests notes." onclick={run((v) => onLink(v.state.sliceDoc(v.state.selection.main.from, v.state.selection.main.to)))}>[[ ]]</button>
     <button title="Table" onclick={run((v) => insertBlock(v, "| Column | Column |\n| ------ | ------ |\n|        |        |"))}>▦</button>
+    <button class:on={diagramOpen} title="Diagram (Mermaid): flowchart, sequence, Gantt, mind map…" onclick={() => { const was = diagramOpen; closeOthers(); diagramOpen = !was; }}>◇<span class="lbl">Diagram</span> ▾</button>
   </div>
   <div class="group">
     <button title="Insert a table of contents (updates itself)" onclick={run((v) => insertBlock(v, "```toc\n```"))}>☰ TOC</button>
     <button title="Write/update a static table of contents" onclick={onStaticToc}>TOC⇣</button>
     <button class="accent" title="Build a Dataview query" onclick={onQuery}>🔍<span class="lbl">Query</span></button>
-    <button class="accent" class:on={tplOpen} title="Insert a template" onclick={() => ((tplOpen = !tplOpen), (dueOpen = false), (attnOpen = false), (ownerOpen = false))}>📄<span class="lbl">Template</span></button>
+    <button class="accent" class:on={tplOpen} title="Insert a template" onclick={() => ((tplOpen = !tplOpen), (dueOpen = false), (attnOpen = false), (ownerOpen = false), (diagramOpen = false))}>📄<span class="lbl">Template</span></button>
   </div>
   <div class="group tasks">
     <button class="accent" title="Task" onclick={lines(makeTask)}>☐<span class="lbl">Task</span></button>
-    <button class="accent" class:on={dueOpen} title="Task with deadline" onclick={() => ((dueOpen = !dueOpen), (attnOpen = false), (tplOpen = false), (ownerOpen = false), (dueText = ""))}>📅<span class="lbl">Due</span></button>
+    <button class="accent" class:on={dueOpen} title="Task with deadline" onclick={() => ((dueOpen = !dueOpen), (attnOpen = false), (tplOpen = false), (ownerOpen = false), (diagramOpen = false), (dueText = ""))}>📅<span class="lbl">Due</span></button>
     <button class="accent" title="Cycle state: open → done → cancelled → deferred" onclick={lines((l) => cycleTaskStatus(l))}>✔<span class="lbl">State</span></button>
     <button class="accent" class:on={ownerOpen} title="Assign to a person: [owner:: name], which Dataview queries can find" onclick={() => { const was = ownerOpen; closeOthers(); ownerOpen = !was; ownerText = ""; }}>👤<span class="lbl">Owner</span></button>
-    <button class="attn" class:on={attnOpen} title="Attn point" onclick={() => ((attnOpen = !attnOpen), (dueOpen = false), (tplOpen = false), (ownerOpen = false))}>⚠<span class="lbl">Attn</span> ▾</button>
+    <button class="attn" class:on={attnOpen} title="Attn point" onclick={() => ((attnOpen = !attnOpen), (dueOpen = false), (tplOpen = false), (ownerOpen = false), (diagramOpen = false))}>⚠<span class="lbl">Attn</span> ▾</button>
   </div>
   <div class="group">
     <button class="decide" title="Decision required (Decide::)" onclick={lines(makeDecide)}>❓<span class="lbl">Decision rqd</span></button>
@@ -169,6 +182,15 @@
     {/each}
     <button onclick={() => ((tplOpen = false), onManageTemplates())}>⚙ Manage templates…</button>
     <button class="close" aria-label="Close" onclick={() => (tplOpen = false)}>✕</button>
+  </div>
+{/if}
+
+{#if diagramOpen}
+  <div class="options" role="group" aria-label="Diagram">
+    {#each DIAGRAMS as d (d.label)}
+      <button onclick={() => { diagramOpen = false; const v = view(); if (v) insertBlock(v, "```mermaid\n" + d.code + "\n```"); }}>{d.label}</button>
+    {/each}
+    <button class="close" aria-label="Close" onclick={() => (diagramOpen = false)}>✕</button>
   </div>
 {/if}
 

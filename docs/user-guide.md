@@ -406,6 +406,9 @@ flowchart LR
 ```
 ````
 
+**◇ Diagram ▾** in the toolbar inserts a ready-made starter to adapt:
+flowchart, sequence, Gantt, mind map, timeline, pie or org chart.
+
 Diagrams follow the light or dark theme. A mistake in the code shows
 Mermaid's message above the code instead of the diagram. **⬇ SVG** (top
 right of a diagram) saves it as an `.svg` file: *Save as…* on Windows, the
