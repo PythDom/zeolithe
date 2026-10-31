@@ -107,9 +107,18 @@ export class LanClient {
     return ((await (await this.request("GET", "info")).json()) as { name?: string }).name ?? "";
   }
 
+  /** Modification times from the last list() (the version is "mtime-size"). */
+  readonly modified = new Map<string, number>();
+
   async list(): Promise<Map<string, string>> {
     const { files } = (await (await this.request("GET", "list")).json()) as { files: Record<string, string> };
-    return new Map(Object.entries(files).filter(([p]) => isSyncedPath(p)));
+    const out = new Map(Object.entries(files).filter(([p]) => isSyncedPath(p)));
+    this.modified.clear();
+    for (const [p, v] of out) {
+      const t = Number(v.split("-")[0]);
+      if (t > 0) this.modified.set(p, t);
+    }
+    return out;
   }
 
   async get(path: string): Promise<Blob> {

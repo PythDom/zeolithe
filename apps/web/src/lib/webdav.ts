@@ -22,6 +22,8 @@ interface Entry {
   dir: boolean;
   /** Server version: ETag, else modification date and size. */
   version: string;
+  /** Modification time (ms), when the server gives it. */
+  modified?: number;
 }
 
 export class WebDavClient {
@@ -88,7 +90,8 @@ export class WebDavClient {
       const prop = (name: string) => scope.getElementsByTagNameNS("DAV:", name)[0]?.textContent?.trim() ?? "";
       const dir = scope.getElementsByTagNameNS("DAV:", "collection").length > 0;
       const etag = prop("getetag");
-      out.push({ path, dir, version: etag ? normaliseEtag(etag) : `${prop("getlastmodified")}|${prop("getcontentlength")}` });
+      const modified = Date.parse(prop("getlastmodified"));
+      out.push({ path, dir, version: etag ? normaliseEtag(etag) : `${prop("getlastmodified")}|${prop("getcontentlength")}`, modified: Number.isNaN(modified) ? undefined : modified });
     }
     return out;
   }
@@ -118,8 +121,12 @@ export class WebDavClient {
   }
 
   /** Every synced file under the sync folder, with its server version. */
+  /** Modification times from the last list(). */
+  readonly modified = new Map<string, number>();
+
   async list(): Promise<Map<string, string>> {
     const files = new Map<string, string>();
+    this.modified.clear();
     const queue = [""];
     while (queue.length) {
       const dir = queue.shift()!;
@@ -128,7 +135,10 @@ export class WebDavClient {
         if (e.dir) {
           this.dirs.add(e.path);
           queue.push(e.path);
-        } else files.set(e.path, e.version);
+        } else {
+          files.set(e.path, e.version);
+          if (e.modified) this.modified.set(e.path, e.modified);
+        }
       }
     }
     return files;

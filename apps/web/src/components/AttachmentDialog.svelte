@@ -7,9 +7,11 @@
     /** Insert a link to it in the open note (absent when no note is being edited). */
     onInsert?: (text: string) => void;
     onOpenNote: (path: string) => void;
+    /** After the file went to .trash: where to. */
+    onDeleted?: (trashPath: string) => void;
     onClose: () => void;
   }
-  let { vault, path, onInsert, onOpenNote, onClose }: Props = $props();
+  let { vault, path, onInsert, onOpenNote, onDeleted, onClose }: Props = $props();
 
   const name = $derived(path.split("/").pop()!);
   const folder = $derived(path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "(vault root)");
@@ -19,6 +21,19 @@
   // Notes that link to or embed this file.
   const usedBy = $derived(vault.notes.filter((r) => r.links.some((l) => l.target === link || l.target === name || l.target === path)));
   let error = $state("");
+
+  // Deleting: a second click confirms (and says which notes still show it).
+  let confirmDelete = $state(false);
+  async function deleteIt() {
+    if (!confirmDelete) return (confirmDelete = true);
+    error = "";
+    try {
+      const to = await vault.trash(path);
+      onDeleted?.(to);
+    } catch (e) {
+      error = `Cannot delete it: ${(e as Error).message ?? e}`;
+    }
+  }
 
   async function openIt() {
     error = "";
@@ -44,8 +59,18 @@
     {:else}
       <p class="hint">No note links to it yet.</p>
     {/if}
+    {#if confirmDelete}
+      <p class="warn">
+        {usedBy.length
+          ? `${usedBy.length} note${usedBy.length > 1 ? "s" : ""} still ${usedBy.length > 1 ? "show" : "shows"} it (${usedBy.map((r) => r.name).join(", ")}): ${usedBy.length > 1 ? "their" : "its"} link will be broken.`
+          : "No note uses it."}
+        It goes to the vault's .trash folder, where it can still be recovered. Click <b>Delete</b> again to confirm.
+      </p>
+    {/if}
     {#if error}<p class="error">{error}</p>{/if}
     <div class="actions">
+      {#if onDeleted}<button class="danger" onclick={deleteIt} title="Move this file to the vault's .trash folder">🗑 {confirmDelete ? "Delete" : "Delete…"}</button>{/if}
+      <span class="spacer"></span>
       {#if onInsert}
         <button onclick={() => onInsert(isImage ? `![[${link}]]` : `[[${link}]]`)} title="At the cursor in the open note">
           {isImage ? "Insert in the note" : "Link in the note"}
@@ -129,5 +154,19 @@
     border-color: var(--accent);
     background: var(--accent);
     color: var(--on-accent);
+  }
+  .actions .danger {
+    border-color: var(--danger);
+    color: var(--danger);
+  }
+  .spacer {
+    flex: 1;
+  }
+  .warn {
+    margin: 0;
+    padding: 8px 10px;
+    border-radius: 6px;
+    background: var(--warn-soft);
+    font-size: 13.5px;
   }
 </style>

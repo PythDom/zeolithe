@@ -182,3 +182,17 @@ export function assignId(req: AssignIdRequest): NewNote & { id: string } {
     content: withFrontmatter(req.content, { id, tags, created, ...rest }),
   };
 }
+
+/**
+ * Where a deleted file goes: `.trash/Name 2026-10-31 14-05-22.md`. The
+ * date and time keep every deleted version apart, even of notes with the
+ * same name deleted from different folders or several times.
+ */
+export function trashPath(path: string, when: Date = new Date(), extra = 0, folder = false): string {
+  const name = path.replace(/\/+$/, "").split("/").pop()!;
+  const dot = folder ? -1 : name.lastIndexOf(".");
+  const [stem, ext] = dot > 0 ? [name.slice(0, dot), name.slice(dot)] : [name, ""];
+  const p = (n: number) => String(n).padStart(2, "0");
+  const stamp = `${when.getFullYear()}-${p(when.getMonth() + 1)}-${p(when.getDate())} ${p(when.getHours())}-${p(when.getMinutes())}-${p(when.getSeconds())}`;
+  return `.trash/${stem} ${stamp}${extra ? ` ${extra + 1}` : ""}${ext}`;
+}

@@ -28,6 +28,7 @@ import {
   type NoteRecord,
   type QueryResult,
   type Taxonomy,
+  trashPath,
 } from "@zeolite/core";
 import { multiUserChecks } from "./features.svelte";
 import { IGNORED_DIRS, type FileStamp, type VaultStorage } from "./storage";
@@ -454,15 +455,26 @@ export class Vault {
   }
 
   /**
-   * Move a note to the vault's .trash folder (like Obsidian), so it can be
-   * recovered from the file system. Returns the trash path.
+   * Move a note (or any file) to the vault's .trash folder (like Obsidian),
+   * so it can be recovered from the file system: `.trash/Name <date time>.md`,
+   * so that it never clashes with something deleted before. Returns the trash path.
    */
   async trash(path: string): Promise<string> {
-    const name = path.split("/").pop()!;
-    let target = `.trash/${name}`;
-    const all = await this.storage.list();
-    for (let i = 1; all.includes(target); i++) target = `.trash/${name.replace(/(\.[^.]*)?$/, ` ${i}$1`)}`;
-    await this.storage.rename(path, target);
+    const now = new Date();
+    let target = trashPath(path, now);
+    for (let i = 1; ; i++) {
+      try {
+        await this.storage.rename(path, target);
+        break;
+      } catch (e) {
+        // Same name deleted in the same second: one more try with a number.
+        if (i >= 5) throw e;
+        target = trashPath(path, now, i);
+      }
+    }
+    const url = this.assetUrls.get(path);
+    if (url) URL.revokeObjectURL(url);
+    this.assetUrls.delete(path);
     this.contents.delete(path);
     this.files = this.files.filter((f) => f !== path);
     const next = new Map(this.records);
@@ -483,10 +495,8 @@ export class Vault {
    */
   async trashFolder(folder: string): Promise<string> {
     const files = this.filesIn(folder);
-    const name = folder.split("/").pop()!;
-    const all = new Set(await this.storage.list());
-    let target = `.trash/${name}`;
-    for (let i = 1; [...all].some((f) => f.startsWith(`${target}/`)); i++) target = `.trash/${name} ${i}`;
+    // `.trash/Projects 2026-10-31 14-05-22/…`: never mixed with a folder deleted before.
+    const target = trashPath(folder, new Date(), 0, true);
     for (const f of files) await this.storage.rename(f, `${target}/${f.slice(folder.length + 1)}`);
     // The emptied folder itself (may hold hidden or ignored files we do not track).
     await this.storage.removeDir?.(folder).catch(() => {});

@@ -3,10 +3,12 @@
    * Sync conflict copies, sorted out in one place: the copies that only differ
    * from their note invisibly (line endings, spaces at line ends…) can all be
    * deleted at once; for the others, the differences are shown and one click
-   * keeps the note or the copy. Deleted copies go to .trash.
+   * keeps the note or the copy, or the most recent of the two. Deleted copies
+   * go to .trash.
    */
   import { lineDiff, normaliseText, type DiffLine } from "@zeolite/core";
   import { untrack } from "svelte";
+  import { CONFLICT_INFO_PATH, readConflictInfo } from "../lib/sync";
   import type { Vault } from "../lib/vault.svelte";
 
   interface Props {
@@ -44,6 +46,43 @@
   const identical = $derived(items.filter((i) => i.same));
   const real = $derived(items.filter((i) => !i.same));
 
+  /**
+   * When each version was last modified: the note from the file, the copy from
+   * what the sync recorded on the other device (Zeolite's copies), else from
+   * the copy's file (Syncthing keeps the other version's date on it).
+   */
+  let times = $state<Record<string, { note?: number; copy?: number }>>({});
+  async function loadTimes() {
+    const info = await readConflictInfo(vault.storage);
+    const stat = async (p: string) => {
+      try {
+        return (await vault.storage.stat?.(p))?.mtime || undefined;
+      } catch {
+        return undefined;
+      }
+    };
+    const next: typeof times = {};
+    for (const i of items) {
+      if (i.same || !i.original || !vault.exists(i.original)) continue;
+      next[i.copy] = { note: await stat(i.original), copy: info[i.copy] ?? (await stat(i.copy)) };
+    }
+    times = next;
+  }
+  void loadTimes();
+  /** Which version is newer, when both dates are known and differ by more than a minute. */
+  const newer = (i: Item): "note" | "copy" | null => {
+    const t = times[i.copy];
+    if (!t?.note || !t.copy || Math.abs(t.note - t.copy) < 60_000) return null;
+    return t.note > t.copy ? "note" : "copy";
+  };
+  const withNewer = $derived(real.filter((i) => newer(i)));
+  const fmt = (ms?: number) => {
+    if (!ms) return "?";
+    const d = new Date(ms);
+    const p = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  };
+
   let open = $state<string | null>(null);
   let busy = $state(false);
   let error = $state("");
@@ -76,6 +115,14 @@
     }
     busy = false;
     items = scan();
+    // Forget the dates of copies that are gone.
+    try {
+      const info = await readConflictInfo(vault.storage);
+      const kept = Object.fromEntries(Object.entries(info).filter(([p]) => vault.exists(p)));
+      if (Object.keys(kept).length !== Object.keys(info).length) await vault.storage.writeText(CONFLICT_INFO_PATH, JSON.stringify(kept, null, 1));
+    } catch {
+      // Kept as it was.
+    }
   }
 
   const deleteIdentical = () =>
@@ -87,20 +134,25 @@
     });
 
   /** Keep the note as it is: the copy goes to .trash. */
-  const keepNote = (i: Item) =>
-    run(async () => {
-      await vault.trash(i.copy);
-      done++;
-    });
-
+  async function doKeepNote(i: Item) {
+    await vault.trash(i.copy);
+    done++;
+  }
   /** Keep the copy: the note goes to .trash (nothing is lost) and the copy takes its place. */
-  const keepCopy = (i: Item) =>
+  async function doKeepCopy(i: Item) {
+    if (!i.original) return;
+    const text = vault.read(i.copy);
+    if (vault.exists(i.original)) await vault.trash(i.original);
+    await vault.move(i.copy, i.original, text);
+    done++;
+  }
+  const keepNote = (i: Item) => run(() => doKeepNote(i));
+  const keepCopy = (i: Item) => run(() => doKeepCopy(i));
+  const keepNewer = (i: Item) => run(() => (newer(i) === "copy" ? doKeepCopy(i) : doKeepNote(i)));
+  /** For every conflict whose dates are known: keep the most recent version. */
+  const keepAllNewer = () =>
     run(async () => {
-      if (!i.original) return;
-      const text = vault.read(i.copy);
-      if (vault.exists(i.original)) await vault.trash(i.original);
-      await vault.move(i.copy, i.original, text);
-      done++;
+      for (const i of withNewer) await (newer(i) === "copy" ? doKeepCopy(i) : doKeepNote(i));
     });
 
   function close() {
@@ -135,8 +187,15 @@
     {#if real.length}
       <p class="hint">
         {real.length} cop{real.length > 1 ? "ies differ" : "y differs"} from {real.length > 1 ? "their notes" : "its note"}. <b>Keep the note</b> deletes the copy;
-        <b>Keep the copy</b> puts it in the note's place (the note goes to .trash). To combine both, open them and merge by hand.
+        <b>Keep the copy</b> puts it in the note's place (the note goes to .trash); <b>Keep the most recent</b> does whichever was modified last.
+        To combine both, open them and merge by hand.
       </p>
+      {#if withNewer.length > 1}
+        <section class="same">
+          <p>For {withNewer.length} of them the dates tell which version was modified last.</p>
+          <button class="primary" onclick={keepAllNewer} disabled={busy}>Keep the most recent of each ({withNewer.length})</button>
+        </section>
+      {/if}
       <ul>
         {#each real as i (i.copy)}
           <li>
@@ -144,9 +203,17 @@
               <span class="name">{i.original ? label(i.original) : label(i.copy)}</span>
               <span class="when">{i.original && vault.exists(i.original) ? `copy of ${when(i.copy)}` : "the note itself is gone"}</span>
             </div>
+            {#if times[i.copy]}
+              {@const n = newer(i)}
+              <div class="dates">
+                Note modified <b class:newer={n === "note"}>{fmt(times[i.copy]?.note)}</b>{n === "note" ? " (newer)" : ""} · other version modified
+                <b class:newer={n === "copy"}>{fmt(times[i.copy]?.copy)}</b>{n === "copy" ? " (newer)" : ""}
+              </div>
+            {/if}
             <div class="buttons">
               <button onclick={() => (open = open === i.copy ? null : i.copy)}>{open === i.copy ? "Hide" : "Show"} differences</button>
               {#if i.original && vault.exists(i.original)}
+                {#if newer(i)}<button class="primary" onclick={() => keepNewer(i)} disabled={busy} title="Keep the version modified last">Keep the most recent ({newer(i) === "copy" ? "the copy" : "the note"})</button>{/if}
                 <button onclick={() => keepNote(i)} disabled={busy}>Keep the note</button>
                 <button onclick={() => keepCopy(i)} disabled={busy}>Keep the copy</button>
                 <button class="link" onclick={() => onOpen(i.original!)}>Open note</button>
@@ -173,6 +240,17 @@
 </div>
 
 <style>
+  .dates {
+    color: var(--muted);
+    font-size: 12.5px;
+  }
+  .dates b {
+    font-weight: 500;
+  }
+  .dates b.newer {
+    color: var(--accent-strong);
+    font-weight: 700;
+  }
   .backdrop {
     position: fixed;
     inset: 0;

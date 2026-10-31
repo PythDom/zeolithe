@@ -109,3 +109,14 @@ describe("open since", () => {
     expect(sinceLabel("2026-11-01", t)).toBeNull();
   });
 });
+
+describe("trash names", () => {
+  it("stamps deleted files and folders with the date and time", async () => {
+    const { trashPath } = await import("../src/notes");
+    const t = new Date(2026, 9, 31, 14, 5, 22);
+    expect(trashPath("Projects/Budget.md", t)).toBe(".trash/Budget 2026-10-31 14-05-22.md");
+    expect(trashPath("Budget.md", t, 1)).toBe(".trash/Budget 2026-10-31 14-05-22 2.md");
+    expect(trashPath("attachments/plan.v2.png", t)).toBe(".trash/plan.v2 2026-10-31 14-05-22.png");
+    expect(trashPath("Projects/v1.2", t, 0, true)).toBe(".trash/v1.2 2026-10-31 14-05-22");
+  });
+});

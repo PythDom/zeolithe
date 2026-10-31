@@ -1810,6 +1810,7 @@
     path={attachment}
     onInsert={current && mode !== "view" ? (text) => ((attachment = null), editor?.insert(text)) : undefined}
     onOpenNote={(p) => ((attachment = null), open(p))}
+    onDeleted={(to) => ((attachment = null), (status = `Moved to ${to}`))}
     onClose={() => (attachment = null)}
   />
 {/if}

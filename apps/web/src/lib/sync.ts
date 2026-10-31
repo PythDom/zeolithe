@@ -37,6 +37,8 @@ export interface SyncRemote {
   /** Every synced file with its server version. */
   list(): Promise<Map<string, string>>;
   get(path: string): Promise<Blob>;
+  /** Modification times (ms) of the files seen by the last `list()`, when the server tells them. */
+  readonly modified?: Map<string, number>;
   /** Upload; returns the new server version. */
   put(path: string, data: Blob): Promise<string>;
   remove(path: string): Promise<void>;
@@ -73,6 +75,20 @@ export function saveSyncSettings(vault: string, s: SyncSettings | null) {
 
 /** Sync state of this device, kept in the vault (never synced itself). */
 export const SYNC_STATE_PATH = ".zeolite/sync.json";
+
+/**
+ * When the other version of each conflict copy was last modified on the
+ * other device (ms), so that the clean-up can tell which version is newer.
+ */
+export const CONFLICT_INFO_PATH = ".zeolite/conflicts.json";
+
+export async function readConflictInfo(storage: VaultStorage): Promise<Record<string, number>> {
+  try {
+    return JSON.parse(await storage.readText(CONFLICT_INFO_PATH)) as Record<string, number>;
+  } catch {
+    return {};
+  }
+}
 
 interface SyncState {
   url: string;
@@ -169,6 +185,7 @@ export async function runSync(storage: VaultStorage, client: SyncRemote, opts: S
   }
 
   const files = { ...base };
+  const theirTimes: Record<string, number> = {};
   // Touched but identical files: remember the new stamp so they are not re-read next time.
   for (const path of rehashed) {
     const b = base[path];
@@ -237,6 +254,8 @@ export async function runSync(storage: VaultStorage, client: SyncRemote, opts: S
           files[copy] = { hash: theirHash, etag: await client.put(copy, theirs), stamp: await stampOf(storage, copy) };
           await upload(a.path);
           report.conflicts.push(copy);
+          const when = client.modified?.get(a.path);
+          if (when) theirTimes[copy] = when;
           report.localChanged = true;
           break;
         }
@@ -254,6 +273,9 @@ export async function runSync(storage: VaultStorage, client: SyncRemote, opts: S
 
   const state: SyncState = { url: id, lastSync: now.toISOString(), files };
   await storage.writeText(SYNC_STATE_PATH, JSON.stringify(state, null, 1));
+  if (Object.keys(theirTimes).length) {
+    await storage.writeText(CONFLICT_INFO_PATH, JSON.stringify({ ...(await readConflictInfo(storage)), ...theirTimes }, null, 1)).catch(() => undefined);
+  }
   return report;
 }
 

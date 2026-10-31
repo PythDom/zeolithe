@@ -213,6 +213,9 @@ interface DriveItem {
   cTag?: string;
   folder?: unknown;
   file?: unknown;
+  lastModifiedDateTime?: string;
+  /** Set by the device that wrote the file: its own modification time. */
+  fileSystemInfo?: { lastModifiedDateTime?: string };
   "@microsoft.graph.downloadUrl"?: string;
 }
 
@@ -304,9 +307,13 @@ export class OneDriveClient {
   }
 
   /** Every synced file under the sync folder, with its content version. */
+  /** Modification times from the last list(). */
+  readonly modified = new Map<string, number>();
+
   async list(): Promise<Map<string, string>> {
     const files = new Map<string, string>();
     this.items.clear();
+    this.modified.clear();
     const root = await this.request("GET", `${this.itemUrl("")}?$select=id`, {}, [404]);
     if (root.status === 404) return files;
     const queue: { id: string; path: string }[] = [{ id: ((await root.json()) as DriveItem).id, path: "" }];
@@ -321,6 +328,8 @@ export class OneDriveClient {
           if (d.folder) queue.push({ id: d.id, path });
           else if (d.file) {
             files.set(path, versionOf(d));
+            const t = Date.parse(d.fileSystemInfo?.lastModifiedDateTime ?? d.lastModifiedDateTime ?? "");
+            if (!Number.isNaN(t)) this.modified.set(path, t);
             this.items.set(path, { id: d.id, version: versionOf(d), downloadUrl: d["@microsoft.graph.downloadUrl"] });
           }
         }
