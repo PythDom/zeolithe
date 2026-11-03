@@ -15,7 +15,7 @@ XX . YY . ZZ . NNN
 └───────────────── PARA
 ```
 
-Example: `01.02.05.001` → #Projets / #SAS / #Typhoon / first note.
+Example: `01.02.00.001` → #Projets / #SAS / #Budget / first note.
 
 Parsing rules:
 
@@ -48,54 +48,48 @@ Parsing rules:
 | 09   | #AAM        |
 | 10   | #Training   |
 | 11   | #Quality    |
-| 13   | #Sonair     |
 | 50   | #Music      |
 | 51   | #Literature |
 | 52   | #IT         |
 | 53   | #FSM        |
 | 54   | #Cinema     |
 | 55   | #Finance    |
+| 56   | #Cognition  |
 | 99   | #Personal   |
 
 ## Sub-PARA (ZZ)
 
 ### 01 Projets
 
-| Code | Tag          |
-| ---- | ------------ |
-| 00   | #Budget      |
-| 01   | #Repairs     |
-| 02   | #SOFAIR      |
-| 03   | #PC-XX       |
-| 04   | #Wisk        |
-| 05   | #Typhoon     |
-| 06   | #Planview    |
-| 07   | #T601        |
-| 50   | #Liquidation |
-| 51   | #Mariages    |
+| Code | Tag      |
+| ---- | -------- |
+| 00   | #Budget  |
+| 01   | #Mariage |
 
 ### 02 Areas
 
-| Code | Tag                   |
-| ---- | --------------------- |
-| 00   | #Team_meetings        |
-| 01   | #One-on-One_Meetings  |
-| 02   | #HR                   |
-| 03   | #Plans                |
-| 50   | #Guitartabs           |
+| Code | Tag                  |
+| ---- | -------------------- |
+| 00   | #Team_meetings       |
+| 01   | #One-on-One_Meetings |
+| 02   | #HR                  |
+| 03   | #Plans               |
+| 50   | #Guitartabs          |
+| 51   | #Video               |
 
 ### 03 References
 
-| Code | Tag         |
-| ---- | ----------- |
-| 00   | #Notes      |
-| 01   | #Lists      |
-| 50   | #Quotes     |
-| 51   | #Tablet     |
-| 52   | #Linux      |
-| 53   | #Software   |
-| 54   | #Analyses   |
-| 55   | #Docker     |
+| Code | Tag        |
+| ---- | ---------- |
+| 00   | #Notes     |
+| 01   | #Lists     |
+| 50   | #Quotes    |
+| 51   | #Tablet    |
+| 52   | #Linux     |
+| 53   | #Software  |
+| 54   | #Analyses  |
+| 55   | #Docker    |
+| 56   | #AndroidTV |
 
 ### 04 Archives
 
@@ -106,5 +100,8 @@ No Sub-PARAs. Archiving a note moves it to `04 Archives/` and adds the
 
 - `#Progams` corrected to `#Programs`.
 - Placeholder rows (`XX.`, repeated `55.`) and empty codes removed.
+- 2026-11: project- and work-specific tags removed from the defaults (they
+  belong in each vault's own taxonomy); `#Cognition`, `#Video` and
+  `#AndroidTV` added. Codes without a tag are left out: they are free.
 - The combined table was split into one table per axis, so it can be parsed
   without ambiguity.

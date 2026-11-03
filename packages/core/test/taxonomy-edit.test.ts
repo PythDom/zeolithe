@@ -13,7 +13,7 @@ import {
   TaxonomyEditError,
 } from "../src/taxonomy-edit";
 
-const doc = readFileSync(new URL("../../../docs/taxonomy.md", import.meta.url), "utf8");
+const doc = readFileSync(new URL("./fixtures/taxonomy.md", import.meta.url), "utf8");
 const tax = parseTaxonomy(doc);
 const ids = ["01.02.05.001", "01.02.05.002", "02.00.00.001"];
 

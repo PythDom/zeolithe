@@ -5,9 +5,22 @@ import { archiveNote, createJournalNote, createParaNote, renumberNote } from "..
 import { splitFrontmatter } from "../src/frontmatter";
 import { numberablePara, parseTaxonomy } from "../src/taxonomy";
 
-const tax = parseTaxonomy(readFileSync(new URL("../../../docs/taxonomy.md", import.meta.url), "utf8"));
+const tax = parseTaxonomy(readFileSync(new URL("./fixtures/taxonomy.md", import.meta.url), "utf8"));
 
-describe("parseTaxonomy (docs/taxonomy.md)", () => {
+describe("the default taxonomy (docs/taxonomy.md)", () => {
+  const def = parseTaxonomy(readFileSync(new URL("../../../docs/taxonomy.md", import.meta.url), "utf8"));
+  it("parses without warnings, every row with a tag", () => {
+    expect(def.warnings).toEqual([]);
+    expect(def.categories.map((c) => c.code)).toEqual(["00", "01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "50", "51", "52", "53", "54", "55", "56", "99"]);
+    expect(def.categories.every((c) => c.tag)).toBe(true);
+    expect(def.subParas["01"]?.map((s) => s.tag)).toEqual(["Budget", "Mariage"]);
+    expect(def.subParas["02"]?.find((s) => s.code === "51")?.tag).toBe("Video");
+    expect(def.subParas["03"]?.find((s) => s.code === "56")?.tag).toBe("AndroidTV");
+    expect(def.categories.find((c) => c.code === "56")?.tag).toBe("Cognition");
+  });
+});
+
+describe("parseTaxonomy (test copy of an earlier default)", () => {
   it("reads PARAs with folders", () => {
     expect(tax.paras.map((p) => `${p.code} ${p.tag} ${p.folder}`)).toEqual([
       "01 Projets 01 Projets",

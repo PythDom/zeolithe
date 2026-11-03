@@ -43,7 +43,7 @@ vault (Chromium/Edge desktop for now; native Windows and Android apps next).
 ## Writing
 
 Markdown basics: *italic*, **bold**, ~~strike~~, ==highlight==, \`code\`,
-[[01.02.05.001 Typhoon status review|wiki links]], #tags and @people.
+[[01.02.00.001 Budget review|wiki links]], #tags and @people.
 
 > [!tip] Callouts
 > Obsidian callouts render too.
@@ -92,16 +92,16 @@ GROUP BY file.link
 **New note → PARA note** picks PARA, Sub-PARA and Category from
 \`_system/Taxonomy.md\` and assigns the next \`XX.YY.ZZ.NNN\` ID.
 `,
-    "01 Projets/01.02.05.001 Typhoon status review.md": `---
-id: 01.02.05.001
-tags: [Projets, SAS, Typhoon]
+    "01 Projets/01.02.00.001 Budget review.md": `---
+id: 01.02.00.001
+tags: [Projets, SAS, Budget]
 created: ${created}
 ---
-# Typhoon status review
+# Budget review
 
 ## Actions
 
-- [ ] Draft report for the program office #Typhoon [owner:: alice] [due:: ${plus(5)}]
+- [ ] Draft report for the program office #Budget [owner:: alice] [due:: ${plus(5)}]
 - [ ] Review supplier schedule [due:: ${plus(-1)}]
 - [x] Send meeting minutes [done:: ${day}]
 
